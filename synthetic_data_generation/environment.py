@@ -15,13 +15,16 @@ class Original_2ABT_Spouts:
         self.swap_prob = swap_prob
         
         # Initial positions of the spouts (0 = left, 1 = right)
-        self.high_spout_position = 0.5 > random.random()  # High-reward spout starts on a random side
-        self.low_spout_position = 1 - self.high_spout_position  # Low-reward spout starts on the other side
+        self.high_spout_position = random.random() < 0.5
+        self.low_spout_position = 1  - self.high_spout_position 
+        self.first_bit = self.high_spout_position
 
     def _swap_spouts(self):
         """Randomly swap the spouts with a given probability."""
         if random.random() < self.swap_prob:
             self.high_spout_position, self.low_spout_position = self.low_spout_position, self.high_spout_position
+            return True
+        return False
 
     def step(self, choice):
         """
@@ -33,16 +36,16 @@ class Original_2ABT_Spouts:
         Returns:
         - reward (bool): Whether the agent received a reward (True or False).
         """
-        # Swap the spouts with a given probability before the choice is evaluated
-        self._swap_spouts()
+        swapped = self._swap_spouts()
 
-        # Determine if the choice corresponds to the high or low reward spout
-        if choice == self.high_spout_position:
+        selected_high_reward = (choice == self.high_spout_position)
+
+        if selected_high_reward:
             reward = random.random() < self.high_reward_prob
         else:
             reward = random.random() < self.low_reward_prob
 
-        return reward
+        return reward, swapped
 
     def get_spout_positions(self):
         """Returns the current positions of the high and low reward spouts."""

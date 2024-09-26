@@ -1,6 +1,7 @@
 import numpy as np
 from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
+import os
 
 def generate_data(num_steps, agent, environment):
     """
@@ -16,14 +17,16 @@ def generate_data(num_steps, agent, environment):
     """
     data = []
 
+    if environment.first_bit:
+        data.append('O') #starts on right
+
     for step in range(num_steps):
-        # The agent makes a choice (0 for left, 1 for right)
         choice = agent.make_choice()
 
-        # The environment returns whether the choice results in a reward (1 for rewarded, 0 for no reward)
-        reward = environment.step(choice)
+        reward, swapped = environment.step(choice)
 
-        # Log behavior as 'L' or 'R' for rewarded choices, and 'l' or 'r' for unrewarded choices
+        if swapped: #swap occurs, log it as S
+            data.append('S')
         if choice == 0:  # Left choice
             if reward:
                 data.append('L')
@@ -35,26 +38,41 @@ def generate_data(num_steps, agent, environment):
             else:
                 data.append('r')
 
-        # Update the agent's state (pass the reward to the agent)
-        agent.step(reward)
+        agent.update_phi(choice,reward)
 
     return data
 
 def main():
-    # Set the number of steps/tokens to generate
-    num_steps = 1000  # Adjust this value as needed
+    # num_steps = 100000
+    num_steps = 20
 
-    # Initialize the environment and agent
-    environment = Original_2ABT_Spouts()
-    agent = RFLR_mouse(alpha=0.6, beta=0.9, tau=1.5)  # Customize alpha, beta, tau as needed
+    environment = Original_2ABT_Spouts(0.8,0.2,0.02)
+    agent = RFLR_mouse(alpha=0.5, beta=2, tau=1.2)
 
-    # Generate data
     behavior_data = generate_data(num_steps, agent, environment)
 
-    # Write data to a file
-    with open('./data/mouse_behavior.txt', 'w') as f:
-        for token in behavior_data:
-            f.write(token + '\n')
+    def find_filename(base):
+        if not os.path.exists(base):
+            return base
+        file_root, file_ext = os.path.splitext(base)
+        counter = 2
+        new_filename = f"{file_root}_run_{counter}{file_ext}"
+        while os.path.exists(new_filename):
+            counter += 1
+            new_filename = f"{file_root}_run_{counter}{file_ext}"
+        return new_filename
+    filename = find_filename("../data/2ABT_logistic.txt")
 
-    print(f"Generated {num_steps} steps of behavior data and saved to './data/mouse_behavior.txt'")
+    with open(filename, 'w') as f:
+        counter = 0
+        for token in behavior_data:
+            if counter == 100:
+                f.write('\n')
+                counter = 0
+            f.write(token)
+            counter += 1
+            
+
+
+    print(f"Generated {num_steps} steps of behavior data and saved to {filename}")
 main()
