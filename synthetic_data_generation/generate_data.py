@@ -43,10 +43,10 @@ def generate_data(num_steps, agent, environment):
     return data
 
 def main():
-    # num_steps = 100000
-    num_steps = 20
+    num_steps = 100000
+    # num_steps = 20 
 
-    environment = Original_2ABT_Spouts(0.8,0.2,0.02)
+    environment = Original_2ABT_Spouts(0.5,0.5,0.02)
     agent = RFLR_mouse(alpha=0.5, beta=2, tau=1.2)
 
     behavior_data = generate_data(num_steps, agent, environment)

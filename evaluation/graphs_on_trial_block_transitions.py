@@ -3,7 +3,7 @@ import numpy as np
 
 def parse_file(filename):
     """
-    Parse the data file to extract relevant information: choices, rewards, selected_high, block_position, and switches.
+    Parse the data file to extract relevant information: choices, rewards, selected_high, block_position, switches, etc.
 
     Args:
     - filename (str): The file path of the data file.
@@ -12,7 +12,9 @@ def parse_file(filename):
     - events (list): A list of dictionaries with keys:
         - 'trial_number'
         - 'choice' (0 for left, 1 for right)
+        - 'choice_str' ('L' or 'R')
         - 'reward' (1 for rewarded, 0 for unrewarded)
+        - 'rewarded' (True or False)
         - 'selected_high' (1 if high-reward spout selected, 0 otherwise)
         - 'switch' (1 if switched from last choice, 0 otherwise)
         - 'swap' (1 if swap occurred on this trial, 0 otherwise)
@@ -37,10 +39,13 @@ def parse_file(filename):
                 elif token in 'LlRr':  # Process the choice
                     if token in 'Ll':
                         choice = 0  # Left
+                        choice_str = 'L'
                     elif token in 'Rr':
                         choice = 1  # Right
+                        choice_str = 'R'
 
                     reward = 1 if token.isupper() else 0  # Rewarded if uppercase
+                    rewarded = bool(reward)
 
                     # Determine if agent selected the high-reward spout
                     selected_high = 1 if choice == current_state else 0
@@ -58,7 +63,9 @@ def parse_file(filename):
                     event = {
                         'trial_number': trial_number,
                         'choice': choice,
+                        'choice_str': choice_str,
                         'reward': reward,
+                        'rewarded': rewarded,
                         'selected_high': selected_high,
                         'switch': switch,
                         'swap': 1 if trial_number in swap_trials else 0,
@@ -145,14 +152,146 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.tight_layout()
     plt.show()
 
+def map_sequence_to_pattern(seq):
+    """
+    Map a sequence of three actions to a pattern as per the specified rules.
+
+    Args:
+    - seq (list): A list of three event dictionaries.
+
+    Returns:
+    - pattern (str): The mapped pattern string.
+    """
+    action1, action2, action3 = seq
+
+    # First action: 'A' if rewarded, 'a' if unrewarded
+    first_reward = 'A' if action1['rewarded'] else 'a'
+    first_choice = action1['choice_str']
+
+    # Second action
+    second_same_side = action2['choice_str'] == first_choice
+    if second_same_side:
+        second_letter = 'A' if action2['rewarded'] else 'a'
+    else:
+        second_letter = 'B' if action2['rewarded'] else 'b'
+
+    # Third action
+    third_same_side = action3['choice_str'] == first_choice
+    if third_same_side:
+        third_letter = 'A' if action3['rewarded'] else 'a'
+    else:
+        third_letter = 'B' if action3['rewarded'] else 'b'
+
+    # Combine letters to form the pattern
+    pattern = f"{first_reward}{second_letter}{third_letter}"
+
+    return pattern
+
+def calculate_switch_probabilities(events):
+    """
+    Calculate the probability of switching given the previous three actions.
+
+    Args:
+    - events (list): The list of events.
+
+    Returns:
+    - sorted_patterns (list): List of patterns sorted by ascending switch probability.
+    - sorted_probabilities (list): Corresponding switch probabilities.
+    - counts (list): Counts of each pattern.
+    """
+    pattern_data = {}
+
+    for i in range(3, len(events)):
+        # Previous three actions
+        seq = events[i-3:i]
+        # Next action
+        next_action = events[i]
+
+        # Map the sequence to a pattern
+        pattern = map_sequence_to_pattern(seq)
+
+        # Determine if agent switched on the next trial
+        switched = seq[2]['choice'] != next_action['choice']
+
+        # Update counts
+        if pattern not in pattern_data:
+            pattern_data[pattern] = {'switches': 0, 'total': 0}
+        pattern_data[pattern]['total'] += 1
+        if switched:
+            pattern_data[pattern]['switches'] += 1
+
+    # Calculate probabilities and prepare for sorting
+    patterns = []
+    probabilities = []
+    counts = []
+    for pattern, data in pattern_data.items():
+        total = data['total']
+        switches = data['switches']
+        prob = switches / total if total > 0 else 0
+        patterns.append(pattern)
+        probabilities.append(prob)
+        counts.append(total)
+
+    # Sort patterns by ascending switch probability
+    sorted_indices = np.argsort(probabilities)
+    sorted_patterns = [patterns[i] for i in sorted_indices]
+    sorted_probabilities = [probabilities[i] for i in sorted_indices]
+    sorted_counts = [counts[i] for i in sorted_indices]
+
+    return sorted_patterns, sorted_probabilities, sorted_counts
+
+def plot_switch_probabilities(patterns, probabilities, counts):
+    """
+    Plot the switch probabilities as a bar chart.
+
+    Args:
+    - patterns (list): List of patterns.
+    - probabilities (list): Corresponding switch probabilities.
+    - counts (list): Counts of each pattern.
+    """
+    # Create the bar chart
+    plt.figure(figsize=(18, 6))
+    bars = plt.bar(range(len(patterns)), probabilities, tick_label=patterns)
+
+    # Annotate bars with counts
+    for bar, count in zip(bars, counts):
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2.0, height, f'n={count}', ha='center', va='bottom', fontsize=8)
+
+    plt.xlabel('History')
+    plt.ylabel('Probability of Switching')
+    plt.title('Probability of Switching Given the Previous Three Actions')
+    plt.xticks(rotation=90)
+    plt.ylim(0, 1)
+    plt.tight_layout()
+    plt.show()
+
+# Main code
+
 # Define the file path
 filename = "../data/2ABT_logistic_run_2.txt"
 
 # Parse the file
 events = parse_file(filename)
 
-# Calculate probabilities
+for event in events[:30]:
+    print(event)
+
+# Calculate and print the percent of trials with a switch
+total_trials = len(events[:30]) - 1  # Exclude the first trial
+total_switches = sum(event['switch'] for event in events[1:30])  # Exclude the first trial
+percent_switches = (total_switches / total_trials) * 100
+
+print(f"Percent of trials with a switch: {percent_switches:.2f}%")
+
+# Calculate probabilities for block positions
 block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
 
-# Plot the results
+# Plot the probabilities
 plot_probabilities(block_positions, high_reward_prob, switch_prob)
+
+# Calculate switch probabilities
+sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
+
+# Plot the switch probabilities
+plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
