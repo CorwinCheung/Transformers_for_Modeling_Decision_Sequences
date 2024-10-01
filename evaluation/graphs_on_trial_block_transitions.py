@@ -122,36 +122,39 @@ def calculate_probabilities(events):
 
 def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     """
-    Plot the probabilities of high-reward selection and switching relative to block positions.
+    Plot the probabilities of high-reward selection and switching relative to block positions
+    as two separate plots, each with their own y-axis limits.
 
     Args:
     - block_positions (list): Block positions relative to swaps.
     - high_reward_prob (list): Probability of selecting the high-reward port.
     - switch_prob (list): Probability of switching sides.
     """
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
     # Plot P(high port)
-    axes[0].plot(block_positions, high_reward_prob, label="P(high port)", marker='o')
-    axes[0].axvline(0, color='black', linestyle='--', label="Block Transition")
-    axes[0].set_xlabel("Block Position")
-    axes[0].set_ylabel("P(high port)")
-    axes[0].set_title("Probability of Selecting High-Reward Port")
-    axes[0].legend()
-    axes[0].set_ylim(0, 1)  # Set y-axis limits to [0,1]
-
-    # Plot P(switch)
-    axes[1].plot(block_positions, switch_prob, label="P(switch)", color='red', marker='o')
-    axes[1].axvline(0, color='black', linestyle='--', label="Block Transition")
-    axes[1].set_xlabel("Block Position")
-    axes[1].set_ylabel("P(switch)")
-    axes[1].set_title("Probability of Switching")
-    axes[1].legend()
-    axes[1].set_ylim(0, 1)  # Set y-axis limits to [0,1]
-
+    plt.figure(figsize=(10, 5))
+    plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
+    plt.axvline(0, color='black', linestyle='--', label="Block Transition")
+    plt.xlabel("Block Position")
+    plt.ylabel("P(high port)")
+    plt.title("Probability of Selecting High-Reward Port")
+    plt.legend()
+    plt.ylim(0, 1)  # Adjust y-axis limits as needed
+    plt.grid(True)
     plt.tight_layout()
     plt.show()
 
+    # Plot P(switch)
+    plt.figure(figsize=(10, 5))
+    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='red')
+    plt.axvline(0, color='black', linestyle='--', label="Block Transition")
+    plt.xlabel("Block Position")
+    plt.ylabel("P(switch)")
+    plt.title("Probability of Switching")
+    plt.legend()
+    plt.ylim(0, max(switch_prob) * 1.1)  # Adjust y-axis limits based on data
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 def map_sequence_to_pattern(seq):
     """
     Map a sequence of three actions to a pattern as per the specified rules.
@@ -278,8 +281,8 @@ for event in events[:30]:
     print(event)
 
 # Calculate and print the percent of trials with a switch
-total_trials = len(events[:30]) - 1  # Exclude the first trial
-total_switches = sum(event['switch'] for event in events[1:30])  # Exclude the first trial
+total_trials = len(events) - 1  # Exclude the first trial
+total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
 percent_switches = (total_switches / total_trials) * 100
 
 print(f"Percent of trials with a switch: {percent_switches:.2f}%")

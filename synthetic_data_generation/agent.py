@@ -13,7 +13,7 @@ class RFLR_mouse:
         self.alpha = alpha  # influence of the most recent choice
         self.beta = beta    # influence of the reward
         self.tau = tau      # decay rate for the reward history
-        self.phi_t = 0      # initial value of the recursive reward term
+        self.phi_t = 0.5      # initial value of the recursive reward term
         self.last_choice = np.random.choice([0,1])
 
     def update_phi(self, c_t, r_t):
@@ -36,7 +36,7 @@ class RFLR_mouse:
         Returns:
         - log_odds (float): Log-odds of selecting the action on the next trial.
         """
-        log_odds = self.alpha * c_t + self.phi_t
+        log_odds = self.alpha * (2 * c_t -1) + self.phi_t
         return log_odds
 
     def make_choice(self):
