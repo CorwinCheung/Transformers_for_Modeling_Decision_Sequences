@@ -94,7 +94,7 @@ def print_table(analysis):
     print(f"{'Selected Correct(%):':<20} {analysis['selected_correct_percentage']:>10.2f}%")
 
 # File path to the generated data
-filename = "../data/2ABT_logistic_run_2.txt"
+filename = "../data/2ABT_logistic_run_3.txt"
 
 # Analyze the data and print the results
 if os.path.exists(filename):

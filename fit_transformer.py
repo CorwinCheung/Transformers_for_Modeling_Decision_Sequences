@@ -1,7 +1,7 @@
 import torch
 from transformers import Trainer, TrainingArguments
 from torch.utils.data import DataLoader
-import transformer  # Importing from transformer.py
+import transformer.transformer as transformer  # Importing from transformer.py
 import os
 
 def tokenize(data_string, tokenizer, max_length=512):
