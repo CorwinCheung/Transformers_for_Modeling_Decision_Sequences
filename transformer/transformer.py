@@ -64,11 +64,11 @@ class Block(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
+    block_size: int = 12
     vocab_size: int = 4
-    n_layer: int = 12
-    n_head: int = 12
-    n_embd: int = 768
+    n_layer: int = 2
+    n_head: int = 2
+    n_embd: int = 64
 
 class GPT(nn.Module):
 
@@ -242,9 +242,9 @@ torch.manual_seed(1337)
 if torch.backends.mps.is_available():
     torch.mps.manual_seed(1337)
 
-total_batch_size = 4096
-B = 4
-T = 1024
+total_batch_size = 3072
+B = 16
+T = 12
 assert total_batch_size % (B*T*ddp_world_size) == 0, "make sure total batch size is divisible by B * T * ddp_world_size"
 grad_accum_steps = total_batch_size//(B*T*ddp_world_size)
 if master_process:
@@ -263,7 +263,7 @@ model.to(device)
 max_lr = 6e-4
 min_lr = max_lr * 0.1
 warmup_steps = 80
-max_steps = 15000
+max_steps = 3300
 
 def get_lr(it):
     if it < warmup_steps:
@@ -288,8 +288,8 @@ for step in range(max_steps):
         x, y = x.to(device), y.to(device)
         #with torch.autocast(device_type='cpu', dtype = torch.bfloat16): #for NVIDIA GPUS
         logits, loss = model(x,y)
-        loss_accum += loss.detach()
         loss = loss/grad_accum_steps
+        loss_accum += loss.detach()
         loss.backward()
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(),1.0)
     lr = get_lr(step)
@@ -303,7 +303,7 @@ for step in range(max_steps):
     if step % 100 == 0:
         print(f"step {step} | loss: {loss_accum.item()} | lr {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
 
-torch.save(model.state_dict(), 'trained_model_5.pth')
+torch.save(model.state_dict(), 'trained_model_1M.pth')
 
 import sys
 sys.exit(0)
@@ -335,3 +335,5 @@ sys.exit(0)
 #Model 3: 2, 2, 768 [65.42%]
 #Model 4: 12, 8, 64 [68.02%]
 #Model 5: 12, 12, 768 -> On 15k steps and 10M tokens -> [69.59%]
+
+#Model 2M: -> Block Size 12, On 2M tokens, 500 steps, 2, 2, 64

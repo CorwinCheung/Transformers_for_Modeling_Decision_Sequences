@@ -272,7 +272,7 @@ def plot_switch_probabilities(patterns, probabilities, counts):
 # Main code
 
 # Define the file path
-filename = "../data/2ABT_logistic_run_2.txt"
+filename = "../transformer/Preds_for_4_with_model_5.txt"
 
 # Parse the file
 events = parse_file(filename)

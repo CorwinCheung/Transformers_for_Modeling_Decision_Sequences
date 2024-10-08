@@ -43,7 +43,7 @@ def generate_data(num_steps, agent, environment):
     return data
 
 def main():
-    num_steps = 100000
+    num_steps = 10000
     # num_steps = 20 
 
     environment = Original_2ABT_Spouts(0.8,0.2,0.02)

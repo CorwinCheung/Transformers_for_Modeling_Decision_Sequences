@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 import math
 import inspect
+import time
 
 # Define the model components (ensure these match your training script)
 class CausalSelfAttention(nn.Module):
@@ -65,11 +66,11 @@ class Block(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
+    block_size: int = 12
     vocab_size: int = 4
-    n_layer: int = 12
-    n_head: int = 12
-    n_embd: int = 768
+    n_layer: int = 2
+    n_head: int = 2
+    n_embd: int = 64
 
 class GPT(nn.Module):
 
@@ -115,10 +116,11 @@ else:
     device = torch.device('cpu')
     print("Using CPU")
 
+model_number = "10M"
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load('trained_model_5.pth', map_location=device))
+model.load_state_dict(torch.load(f'trained_model_{model_number}.pth', map_location=device))
 model.to(device)
 model.eval()  # Set model to evaluation mode
 
@@ -131,93 +133,72 @@ itos = {i: ch for i, ch in enumerate(vocab)}
 def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
 
+run_number = 7
 # Load and preprocess the new data
-with open('../data/2ABT_logistic_run_4.txt', 'r') as f:
+with open(f'../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
     text = f.read()
-text = text.replace("\n","")
+text = text.replace("\n", "")
 # Encode the entire text
 tokens = encode_sequence(text)
-print(f"Loaded {len(tokens)} tokens from new data.")
+print(f"Loaded {len(tokens)} tokens from ground truth(RFLR) data.")
+start_token_idx = stoi['R']
+tokens = torch.cat([torch.tensor([start_token_idx], dtype=torch.long), tokens])
 
-# Define batch size and sequence length for evaluation
-eval_batch_size = 4
-eval_block_size = 512  # Adjust based on your memory constraints
-
-# Create evaluation dataset
-def create_eval_batches(tokens, batch_size, block_size):
-    # Calculate the number of tokens needed for complete batches
-    tokens_per_batch = block_size + 1  # We need block_size + 1 tokens for input and target
-    total_tokens_per_iteration = batch_size * tokens_per_batch
-    num_iterations = len(tokens) // total_tokens_per_iteration
-    total_tokens_needed = num_iterations * total_tokens_per_iteration
-    tokens = tokens[:total_tokens_needed]
-    tokens = tokens.view(batch_size, -1)  # Shape: (batch_size, num_iterations * tokens_per_batch)
-    return tokens
-
-# Prepare evaluation batches
+# Prepare tokens
 tokens = tokens.to(device)
-eval_data = create_eval_batches(tokens, eval_batch_size, eval_block_size)
-
-# Function to evaluate the model on the evaluation data
-def evaluate_model(model, data, batch_size, block_size):
+def generate_predictions(model, tokens, max_context_length=12):
     model.eval()
-    total_loss = 0.0
-    total_tokens = 0
-    criterion = nn.CrossEntropyLoss()
+    predicted_indices = []
+    N = len(tokens)
 
-    with torch.no_grad():
-        total_length = data.size(1)
-        # Calculate the number of complete batches we can process
-        num_batches = (total_length - 1) // block_size
-        for i in range(num_batches):
-            start = i * block_size
-            end = start + block_size + 1  # Need block_size + 1 tokens for input and target
-            if end > total_length:
-                # Not enough tokens left for a full batch
-                break
-            x = data[:, start:end - 1]  # Input tokens of shape (batch_size, block_size)
-            y = data[:, start + 1:end]  # Target tokens of shape (batch_size, block_size)
+    # Ensure that tokens are on the correct device
+    tokens = tokens.to(next(model.parameters()).device)
+    t0 = time.time()
+    for i in range(N-1):
+        # For the first predictions, include the prepended 'R' in the context
+        if i < max_context_length:
+            context_window = tokens[0:i+1]  # Includes the prepended 'R'
+        else:
+            # From the 13th prediction onward, use the last 'max_context_length' tokens
+            context_window = tokens[i - max_context_length + 1:i+1]
+        
+        input_ids = context_window.unsqueeze(0)  # Shape: (1, context_length)
 
-            # Forward pass
-            logits, _ = model(x)
-            logits = logits.view(-1, logits.size(-1))  # Shape: (batch_size * block_size, vocab_size)
-            y = y.reshape(-1)  # Shape: (batch_size * block_size)
+        with torch.no_grad():
+            logits, _ = model(input_ids)
+        
+        # Get the logits for the last position
+        last_logits = logits[0, -1, :]  # Shape: (vocab_size,)
+        
+        # Get the predicted index (token) with the highest probability
+        predicted_index = torch.argmax(last_logits).item()
+        predicted_indices.append(predicted_index)
+        
+        if i % 1000 == 0 and i > 0:
+            t1 = time.time()
+            print(f"Guessed on tokens up to {i} in {t1 - t0:.2f} additional seconds")
+            t0 = time.time()
 
-            # Compute loss
-            loss = criterion(logits, y)
+    return predicted_indices
 
-            # Accumulate loss
-            total_loss += loss.item() * y.size(0)
-            total_tokens += y.size(0)
+# Generate predictions
+predicted_indices = generate_predictions(model, tokens, max_context_length=12)
 
-    average_loss = total_loss / total_tokens
-    perplexity = math.exp(average_loss)
-    return average_loss, perplexity
 
-# Evaluate the model
-average_loss, perplexity = evaluate_model(model, eval_data, eval_batch_size, eval_block_size)
-print(f"Evaluation Loss: {average_loss:.4f}")
-print(f"Perplexity: {perplexity:.2f}")
+# Convert predicted indices to characters
+predicted_chars = [itos[idx] for idx in predicted_indices]
 
-def evaluate_accuracy(model, data, batch_size, block_size):
-    model.eval()
-    correct = 0
-    total = 0
+print(len(predicted_chars))
 
-    with torch.no_grad():
-        num_batches = data.size(1) // block_size
-        for i in range(num_batches):
-            start = i * block_size
-            end = start + block_size + 1
-            x = data[:, start:end - 1]
-            y = data[:, start + 1:end]
 
-            logits, _ = model(x)
-            predictions = logits.argmax(dim=-1)
-            correct += (predictions == y).sum().item()
-            total += y.numel()
+# Write predicted sequence to a text file
+with open(f'Preds_for_{run_number}_with_model_{model_number}.txt', 'w') as f:
+    counter = 0
+    for char in predicted_chars:
+        if counter == 100:
+            f.write('\n')
+            counter = 0
+        f.write(char)
+        counter += 1
 
-    accuracy = correct / total
-    return accuracy
-accuracy = evaluate_accuracy(model, eval_data, eval_batch_size, eval_block_size)
-print(f"Accuracy: {accuracy:.2%}")
+print(f"Model predictions saved to Preds_for_{run_number}_with_model_{model_number}.txt")

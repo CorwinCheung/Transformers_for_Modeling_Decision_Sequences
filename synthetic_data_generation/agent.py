@@ -54,6 +54,9 @@ class RFLR_mouse:
         prob_right = 1 / (1 + np.exp(-log_odds))
 
         choice = np.random.choice([0, 1], p=[1 - prob_right, prob_right])
+        #deterministic environment - reward 100% on the right <->
+        #greedy policy. Expect the adjusted accuracy to be even higher. Perfectly
+        #predictable, learn the algorithm. tasking the transformer
 
         self.last_choice = choice
 
