@@ -281,8 +281,8 @@ ground_truth = True
 if ground_truth:
     rflr = 'rflr_'
 # Define the file path
-# filename = "../transformer/Preds_for_8_with_model_.txt"
-filename = "../data/2ABT_logistic_run_8.txt"
+# filename = "../transformer/Preds_for_2_with_model_90k.txt"
+filename = "../data/2ABT_logistic_run_2.txt"
 
 # Parse the file
 events = parse_file(filename)
