@@ -141,7 +141,8 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, 1)  # Adjust y-axis limits as needed
     plt.grid(True)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('rflr_selecting high-reward port.png')
+    # plt.show()
 
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
@@ -154,7 +155,8 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, max(switch_prob) * 1.1)  # Adjust y-axis limits based on data
     plt.grid(True)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('rflr_switch probabilities.png')
+    # plt.show()
 def map_sequence_to_pattern(seq):
     """
     Map a sequence of three actions to a pattern as per the specified rules.
@@ -267,18 +269,19 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     plt.xticks(rotation=90)
     plt.ylim(0, 1)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('rflr_conditional switching.png')
+    # plt.show()
 
 # Main code
 
 # Define the file path
-filename = "../transformer/Preds_for_4_with_model_5.txt"
+filename = "../data/2ABT_logistic_run_2.txt"
 
 # Parse the file
 events = parse_file(filename)
 
-for event in events[:30]:
-    print(event)
+# for event in events[:30]:
+#     print(event)
 
 # Calculate and print the percent of trials with a switch
 total_trials = len(events) - 1  # Exclude the first trial

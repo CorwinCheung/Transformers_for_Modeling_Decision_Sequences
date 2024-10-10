@@ -17,16 +17,16 @@ def generate_data(num_steps, agent, environment):
     """
     data = []
 
-    # if environment.first_bit:
-    #     data.append('O') #starts on right
+    if environment.first_bit:
+        data.append('O') #starts on right
 
     for step in range(num_steps):
         choice = agent.make_choice()
 
         reward, swapped = environment.step(choice)
 
-        # if swapped: #swap occurs, log it as S
-        #     data.append('S')
+        if swapped: #swap occurs, log it as S
+            data.append('S')
         if choice == 0:  # Left choice
             if reward:
                 data.append('L')
@@ -43,7 +43,7 @@ def generate_data(num_steps, agent, environment):
     return data
 
 def main():
-    num_steps = 10000
+    num_steps = 1000000
     # num_steps = 20 
 
     environment = Original_2ABT_Spouts(0.8,0.2,0.02)

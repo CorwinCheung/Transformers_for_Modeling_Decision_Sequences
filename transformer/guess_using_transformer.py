@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 import time
 # Define the run number and model number
-run_number= '4'
-model_number = ""
+run_number= '2'
+model_number = "90k"
 
 # Define model
 class CausalSelfAttention(nn.Module):
@@ -62,7 +62,7 @@ class Block(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
+    block_size: int = 12
     vocab_size: int = 4
     n_layer: int = 2
     n_head: int = 2
@@ -109,7 +109,7 @@ print(f"Using {device} device")
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load(f'trained_model{model_number}.pth', map_location=device))
+model.load_state_dict(torch.load(f'trained_model_{model_number}.pth', map_location=device))
 model.to(device)
 model.eval()
 
@@ -125,6 +125,8 @@ def encode_sequence(seq):
 # Load and preprocess the new data
 with open(f'../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
     text = f.read().replace("\n", "")
+    text = text.replace("S", "")
+    text = text.replace("O", "")
 
 tokens = encode_sequence(text)
 print(f"Loaded {len(tokens)} tokens from ground truth(RFLR) data.")
@@ -159,9 +161,31 @@ predicted_indices = generate_predictions(model, tokens, max_context_length=12)
 predicted_chars = [itos[idx] for idx in predicted_indices]
 print(len(predicted_chars))
 
+with open(f'../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
+    original_text = f.read().replace("\n", "")
+    original_chars = list(original_text)
+
+# Step 2: Initialize index counters
+predicted_index = 0
+merged_chars = []
+# Step 3: Merge predictions with original data
+for c in original_chars:
+    if c in {'L', 'l', 'R', 'r'}:
+        # Replace with predicted character
+        if predicted_index < len(predicted_chars):
+            merged_chars.append(predicted_chars[predicted_index])
+            predicted_index += 1
+        else:
+            # Handle the case where there are more original chars than predictions
+            print("Warning: Not enough predicted characters to replace all 'L's and 'R's.")
+            merged_chars.append(c)
+    else:
+        # Keep 'S' and 'O' as is
+        merged_chars.append(c)
+
 # Write predictions to a file
 with open(f'Preds_for_{run_number}_with_model_{model_number}.txt', 'w') as f:
-    for i, char in enumerate(predicted_chars):
+    for i, char in enumerate(merged_chars):
         if i % 100 == 0 and i > 0:
             f.write('\n')
         f.write(char)
