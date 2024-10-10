@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+global rflr
+
 def parse_file(filename):
     """
     Parse the data file to extract relevant information: choices, rewards, selected_high, block_position, switches, etc.
@@ -141,7 +143,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, 1)  # Adjust y-axis limits as needed
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig('rflr_selecting high-reward port.png')
+    plt.savefig(f'{rflr}selecting high-reward port.png')
     # plt.show()
 
     # Plot P(switch)
@@ -155,7 +157,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, max(switch_prob) * 1.1)  # Adjust y-axis limits based on data
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig('rflr_switch probabilities.png')
+    plt.savefig(f'{rflr}switch probabilities.png')
     # plt.show()
 def map_sequence_to_pattern(seq):
     """
@@ -269,13 +271,18 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     plt.xticks(rotation=90)
     plt.ylim(0, 1)
     plt.tight_layout()
-    plt.savefig('rflr_conditional switching.png')
+    plt.savefig(f'{rflr}conditional switching.png')
     # plt.show()
 
 # Main code
 
+rflr = ''
+ground_truth = True
+if ground_truth:
+    rflr = 'rflr_'
 # Define the file path
-filename = "../data/2ABT_logistic_run_2.txt"
+# filename = "../transformer/Preds_for_8_with_model_.txt"
+filename = "../data/2ABT_logistic_run_8.txt"
 
 # Parse the file
 events = parse_file(filename)
@@ -286,7 +293,7 @@ events = parse_file(filename)
 # Calculate and print the percent of trials with a switch
 total_trials = len(events) - 1  # Exclude the first trial
 total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
-percent_switches = (total_switches / total_trials) * 100
+percent_switches = (total_switches / (total_trials)) * 100
 
 print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 

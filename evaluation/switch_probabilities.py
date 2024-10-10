@@ -26,5 +26,5 @@ def compute_switches(filename):
     print(f"Total switches: {switches}")
     print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-compute_switches('../data/2ABT_logistic_run_2.txt')
-compute_switches('../transformer/Preds_for_2_with_model_90k.txt')
+compute_switches('../data/2ABT_logistic_run_8.txt')
+compute_switches('../transformer/Preds_for_8_with_model_.txt')

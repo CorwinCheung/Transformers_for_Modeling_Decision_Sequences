@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 import time
 # Define the run number and model number
-run_number= '2'
-model_number = "90k"
+run_number= '9'
+model_number = ""
 
 # Define model
 class CausalSelfAttention(nn.Module):
@@ -62,7 +62,7 @@ class Block(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int = 12
+    block_size: int = 1024
     vocab_size: int = 4
     n_layer: int = 2
     n_head: int = 2
@@ -109,7 +109,7 @@ print(f"Using {device} device")
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load(f'trained_model_{model_number}.pth', map_location=device))
+model.load_state_dict(torch.load(f'trained_model{model_number}.pth', map_location=device))
 model.to(device)
 model.eval()
 
