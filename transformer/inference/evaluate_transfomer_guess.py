@@ -40,14 +40,10 @@ print("Ground Truth -> Prediction: Count")
 for (gt_char, pred_char), count in sorted(confusion.items(), key=lambda x: x[1], reverse=True):
     print(f"{gt_char} -> {pred_char}: {count}")
 
-# Function to normalize characters ('R' and 'r' -> 'R', 'L' and 'l' -> 'L')
-def normalize_char(c):
-    return 'R' if c in ['R', 'r'] else 'L' if c in ['L', 'l'] else c
-
 # Calculate accuracy ignoring 'R'-'r' and 'L'-'l' differences
 def calculate_accuracy_ignore_case(ground_truth, predictions):
     correct = sum(
-        normalize_char(gt) == normalize_char(pred) 
+        gt.upper() == pred.upper()
         for gt, pred in zip(ground_truth, predictions)
     )
     return correct / len(ground_truth)
@@ -58,22 +54,22 @@ print(f"\nAdjusted Accuracy (ignoring 'R'-'r' and 'L'-'l' differences): {adjuste
 
 # Calculate switch percentage between 'R'/'r' and 'L'/'l'
 def calculate_switch_percentage_with_gt(predictions, ground_truth):
-    normalized_preds = [normalize_char(c) for c in predictions]
-    normalized_gt = [normalize_char(c) for c in ground_truth]
+    upper_preds = [c.upper() for c in predictions]
+    upper_gt = [c.upper() for c in ground_truth]
     switches = sum(
-        1 for i in range(1, len(normalized_preds))
-        if normalized_preds[i] != normalized_gt[i - 1]
+        1 for i in range(1, len(upper_preds))
+        if upper_preds[i] != upper_gt[i - 1]
     )
-    total_transitions = len(normalized_preds) - 1
+    total_transitions = len(upper_preds) - 1
     return (switches / total_transitions) * 100 if total_transitions > 0 else 0
 
 def calculate_switch_percentage_within_gt(ground_truth):
-    normalized_gt = [normalize_char(c) for c in ground_truth]
+    upper_gt = [c.upper() for c in ground_truth]
     switches = sum(
-        1 for i in range(1, len(normalized_gt))
-        if normalized_gt[i] != normalized_gt[i - 1]
+        1 for i in range(1, len(upper_gt))
+        if upper_gt[i] != upper_gt[i - 1]
     )
-    total_transitions = len(normalized_gt) - 1
+    total_transitions = len(upper_gt) - 1
     return (switches / total_transitions) * 100 if total_transitions > 0 else 0
 
 

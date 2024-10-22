@@ -11,16 +11,7 @@ def parse_file(filename):
     - filename (str): The file path of the ground truth data file.
 
     Returns:
-    - events (list): A list of dictionaries with keys:
-        - 'trial_number'
-        - 'choice' (0 for left, 1 for right)
-        - 'choice_str' ('L' or 'R')
-        - 'reward' (1 for rewarded, 0 for unrewarded)
-        - 'rewarded' (True or False)
-        - 'selected_high' (1 if high-reward spout selected, 0 otherwise)
-        - 'switch' (1 if switched from last choice, 0 otherwise)
-        - 'swap' (1 if swap occurred on this trial, 0 otherwise)
-        - 'block_position' (position relative to last swap)
+    - events (list): A list of dictionaries with keys as described earlier.
     """
     events = []
     last_choice = None
@@ -60,9 +51,6 @@ def parse_file(filename):
                     else:
                         switch = 0  # No switch on first trial
 
-                    # Calculate block_position relative to last swap
-                    block_position = trial_number - last_swap_trial
-
                     # Record the event
                     event = {
                         'trial_number': trial_number,
@@ -73,7 +61,7 @@ def parse_file(filename):
                         'selected_high': selected_high,
                         'switch': switch,
                         'swap': 1 if trial_number in swap_trials else 0,
-                        'block_position': block_position
+                        'block_position': [trial_number - last_swap_trial]  # Store as list to hold multiple positions
                     }
 
                     events.append(event)
@@ -89,9 +77,11 @@ def parse_file(filename):
         for i in range(1, min(11, swap_trial + 1)):
             idx = swap_trial - i
             if idx >= 0:
-                events[idx]['block_position'] = -i
+                events[idx]['block_position'].append(-i)  # Add negative block position
+                # events[idx]['block_position'] = [-i]
 
     return events
+
 
 def read_predictions(filename):
     """
@@ -119,8 +109,9 @@ def align_events_with_predictions(events, predictions):
 
     Returns:
     - events (list): The updated events with predictions and adjusted switches.
+    - predictions (list): The updated predictions, matching the length of events.
     """
-    # Ensure the sequences are of the same length
+    # Ensure the sequences are of the same length by adjusting predictions
     min_length = min(len(events), len(predictions))
     events = events[:min_length]
     predictions = predictions[:min_length]
@@ -157,10 +148,10 @@ def align_events_with_predictions(events, predictions):
         last_ground_truth_choice = event['choice']  # Update for next iteration
 
     return events
-
 def calculate_probabilities(events):
     """
-    Calculate probabilities for high-reward selection and switching around block transitions.
+    Calculate probabilities for high-reward selection and switching around block transitions,
+    considering both positive and negative block positions.
 
     Args:
     - events (list): The parsed events from the data file.
@@ -168,16 +159,23 @@ def calculate_probabilities(events):
     Returns:
     - block_positions (list): Block positions relative to swaps.
     - high_reward_prob (list): Probability of selecting the high-reward port.
-    - switch_prob (list): Probability of switching sides (left to right or vice versa).
+    - switch_prob (list): Probability of switching sides.
     """
-    block_positions = list(range(-10, 21))
+    block_positions = list(range(-10, 21))  # This range includes both negative and positive
     high_reward_prob = []
     switch_prob = []
 
     for pos in block_positions:
-        selected_high = [event['selected_high'] for event in events if event['block_position'] == pos]
-        switches = [event['switch'] for event in events if event['block_position'] == pos]
+        selected_high = []
+        switches = []
 
+        # Gather probabilities for both positive and negative positions
+        for event in events:
+            if pos in event['block_position']:  # If the position (either positive or negative) is in the list
+                selected_high.append(event['selected_high'])
+                switches.append(event['switch'])
+
+        # Calculate probabilities for each block position
         if selected_high:
             high_reward_prob.append(np.mean(selected_high))
         else:
@@ -189,6 +187,7 @@ def calculate_probabilities(events):
             switch_prob.append(np.nan)  # Use NaN for positions with no data
 
     return block_positions, high_reward_prob, switch_prob
+
 
 def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     """
@@ -211,7 +210,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, 1)  # Adjust y-axis limits as needed
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'../graphs/{rflr}_G_selecting high-reward port.png')
+    plt.savefig(f'../../graphs/{rflr}_G_selecting high-reward port.png')
     # plt.show()
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
@@ -224,7 +223,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, max(switch_prob) * 1.1)  # Adjust y-axis limits based on data
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'../graphs/{rflr}_G_switch probabilities.png')
+    plt.savefig(f'../../graphs/{rflr}_G_switch probabilities.png')
     # plt.show()
 
 def map_sequence_to_pattern(seq):
@@ -339,7 +338,7 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     plt.xticks(rotation=90)
     plt.ylim(0, 1)
     plt.tight_layout()
-    plt.savefig(f'../graphs/{rflr}_F_conditional switching.png')
+    plt.savefig(f'../../graphs/{rflr}_F_conditional switching.png')
     # plt.show()
 
 # Main code
@@ -349,24 +348,27 @@ ground_truth = False
 if ground_truth:
     rflr = 'rflr_'
 else:
-    rflr = 'model_92k'
+    rflr = 'model_92K'
 
 # Define the file paths
-ground_truth_file = "../data/2ABT_logistic_run_4.txt"
-predictions_file = "../transformer/inference/Preds_for_4_with_model_92k.txt"
+ground_truth_file = "../../data/2ABT_logistic_run_4.txt"
+predictions_file = "Preds_for_4_with_model_92K.txt"
 
 # Parse the ground truth events
 events = parse_file(ground_truth_file)
 
 # Read predictions
 predictions = read_predictions(predictions_file)
+print(len(events))
+print(len(predictions))
 
 # Align events with predictions and adjust switches
 events = align_events_with_predictions(events, predictions)
 
 # For debugging: print a sample of events
-# for event in events[:30]:
-#     print(event)
+print(len(events))
+for event in events[1000:1030]:
+    print(event)
 
 # Calculate and print the percent of trials with a switch
 total_trials = len(events) - 1  # Exclude the first trial

@@ -292,7 +292,7 @@ else:
     rflr = 'model_92K'
 # Define the file path
 # filename = "../transformer/inference/Preds_for_4_with_model_92K.txt"
-filename = "../data/2ABT_logistic_run_3.txt"
+filename = "../data/2ABT_logistic_run_4.txt"
 
 # Parse the file
 events = parse_file(filename)
@@ -307,14 +307,19 @@ percent_switches = (total_switches / (total_trials)) * 100
 
 print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
+print(len(events))
+for event in events[:100]:
+    print(event)
+
 # Calculate probabilities for block positions
 block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
 
-# Plot the probabilities
-plot_probabilities(block_positions, high_reward_prob, switch_prob)
+print(len(block_positions), len(high_reward_prob), len(switch_prob))
+# # Plot the probabilities
+# plot_probabilities(block_positions, high_reward_prob, switch_prob)
 
-# Calculate switch probabilities
-sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
+# # Calculate switch probabilities
+# sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
 
-# Plot the switch probabilities
-plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
+# # Plot the switch probabilities
+# plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
