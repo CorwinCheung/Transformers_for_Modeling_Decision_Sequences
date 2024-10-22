@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 import time
 # Define the run number and model number
-run_number= '9'
+run_number= '4'
 model_number = ""
 
 # Define model
