@@ -34,6 +34,8 @@ def parse_file(filename):
             for token in line.strip():
                 if token == 'O':  # Starts on right
                     current_state = 1  # High-reward spout is on the right
+                    last_swap_trial = trial_number  # Treat 'O' as an initial swap
+                    swap_trials.append(trial_number)
                 elif token == 'S':  # Swap occurred
                     current_state = 1 - current_state  # Swap high-reward spout position
                     last_swap_trial = trial_number  # Set swap point at current trial
@@ -86,8 +88,14 @@ def parse_file(filename):
         # Go back up to 10 trials before the swap
         for i in range(1, min(11, swap_trial + 1)):
             idx = swap_trial - i
-            events[idx]['block_position'] = -i
+            if idx >= 0:
+                # Create a duplicate event with block_position set to -i
+                new_event = events[idx].copy()  # Copy the event
+                new_event['block_position'] = -i  # Adjust block position
+                events.append(new_event)  # Add the new event to the list
 
+    # Sort the events by trial_number to ensure order
+    events = sorted(events, key=lambda x: x['trial_number'])
     return events
 
 def calculate_probabilities(events):
@@ -148,7 +156,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
 
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='red')
+    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
     plt.xlabel("Block Position")
     plt.ylabel("P(switch)")
@@ -279,10 +287,12 @@ def plot_switch_probabilities(patterns, probabilities, counts):
 rflr = ''
 ground_truth = True
 if ground_truth:
-    rflr = 'rflr_'
+    rflr = 'rflr_1M'
+else:
+    rflr = 'model_92K'
 # Define the file path
-# filename = "../transformer/Preds_for_2_with_model_90k.txt"
-filename = "../data/2ABT_logistic_run_4.txt"
+# filename = "../transformer/inference/Preds_for_4_with_model_92K.txt"
+filename = "../data/2ABT_logistic_run_3.txt"
 
 # Parse the file
 events = parse_file(filename)

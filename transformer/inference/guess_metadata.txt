@@ -1,0 +1,12 @@
+
+Filename: 'Preds_for_4_with_model_92K.txt'
+Model used for guessing: 92K
+
+Data guessed on: ../../data/2ABT_logistic_run_4.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64

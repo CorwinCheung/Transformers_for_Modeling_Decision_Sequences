@@ -1,0 +1,19 @@
+
+Model name: model_92K
+
+File trained on: ../data/2ABT_logistic_run_2.txt
+
+Total batch size: 3,072
+
+Max steps: 30
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
