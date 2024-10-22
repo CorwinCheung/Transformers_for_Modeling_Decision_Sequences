@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from dataclasses import dataclass
 
-run_number = 3
+run_number = 2
 compile = True
 
 global master_process
@@ -231,6 +231,18 @@ min_lr = max_lr * 0.1
 warmup_steps = 10
 max_steps = 30
 
+tokens_trained_on = total_batch_size * max_steps
+def format_tokens(tokens):
+    """Format the number of tokens to nearest thousand (K) or million (M)."""
+    if tokens >= 1_000_000:
+        return f"{tokens // 1_000_000}M"  # Nearest million
+    elif tokens >= 1_000:
+        return f"{tokens // 1_000}K"      # Nearest thousand
+    else:
+        return str(tokens)
+
+model_name = f"model_{format_tokens(tokens_trained_on)}"
+
 def get_lr(it):
     if it < warmup_steps:
         return max_lr * (it + 1) / warmup_steps
@@ -280,9 +292,33 @@ for step in range(max_steps):
         print(f"step {step} | loss: {loss_accum.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
 
 if compile:
-    torch.save(model._orig_mod.state_dict(), f'trained_model_90k.pth')
+    torch.save(model._orig_mod.state_dict(), f'{model_name}.pth')
 else:
-    torch.save(model.state_dict(), 'trained_model.pth')
+    torch.save(model.state_dict(), f'{model_name}.pth')
+
+def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
+    metadata_filename = "model_metadata.txt"
+    tokens_trained_on = total_batch_size * max_steps
+
+    with open(metadata_filename, 'a') as meta_file:
+        meta_file.write(f"\nModel name: {model_name}\n")
+        meta_file.write(f"\nFile trained on: ../data/2ABT_logistic_run_{run_number}.txt\n")
+        meta_file.write(f"\nTotal batch size: {total_batch_size:,}\n")
+        meta_file.write(f"\nMax steps: {max_steps:,}\n")
+        meta_file.write(f"\nDataloader parameters:\n")
+        meta_file.write(f"  Batch size (B): {train_loader.B}\n")
+        meta_file.write(f"  Sequence length (T): {train_loader.T}\n")
+        meta_file.write(f"\nGPTConfig parameters:\n")
+        meta_file.write(f"  Block size: {config.block_size}\n")
+        meta_file.write(f"  Vocab size: {config.vocab_size}\n")
+        meta_file.write(f"  Number of layers: {config.n_layer}\n")
+        meta_file.write(f"  Number of heads: {config.n_head}\n")
+        meta_file.write(f"  Embedding size: {config.n_embd}\n")
+
+    print(f"Metadata saved to {metadata_filename}")
+
+# Call this function after the model training code
+write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
 
 if ddp:
     destroy_process_group()

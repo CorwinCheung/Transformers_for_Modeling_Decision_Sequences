@@ -43,7 +43,7 @@ def generate_data(num_steps, agent, environment):
     return data
 
 def main():
-    num_steps = 1000000
+    num_steps = 10000
     # num_steps = 20 
 
     environment = Original_2ABT_Spouts(0.8,0.2,0.02)
@@ -75,4 +75,11 @@ def main():
 
 
     print(f"Generated {num_steps} steps of behavior data and saved to {filename}")
+    with open("../data/metadata.txt", 'a') as meta_file:
+        meta_file.write(f"\nData file: {filename}\n")
+        meta_file.write(f"Number of steps: {num_steps:,}\n") 
+        meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, low_reward_prob={environment.low_reward_prob}, swap_prob={environment.swap_prob}\n")
+        meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
+    
+    print(f"Metadata saved to ../data/metadata.txt")
 main()

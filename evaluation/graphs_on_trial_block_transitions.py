@@ -143,7 +143,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, 1)  # Adjust y-axis limits as needed
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'{rflr}selecting high-reward port.png')
+    plt.savefig(f'../graphs/{rflr}_G_selecting high-reward port.png')
     # plt.show()
 
     # Plot P(switch)
@@ -157,7 +157,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylim(0, max(switch_prob) * 1.1)  # Adjust y-axis limits based on data
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'{rflr}switch probabilities.png')
+    plt.savefig(f'../graphs/{rflr}_G_switch probabilities.png')
     # plt.show()
 def map_sequence_to_pattern(seq):
     """
@@ -271,7 +271,7 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     plt.xticks(rotation=90)
     plt.ylim(0, 1)
     plt.tight_layout()
-    plt.savefig(f'{rflr}conditional switching.png')
+    plt.savefig(f'../graphs/{rflr}_F_conditional switching.png')
     # plt.show()
 
 # Main code
@@ -282,7 +282,7 @@ if ground_truth:
     rflr = 'rflr_'
 # Define the file path
 # filename = "../transformer/Preds_for_2_with_model_90k.txt"
-filename = "../data/2ABT_logistic_run_2.txt"
+filename = "../data/2ABT_logistic_run_4.txt"
 
 # Parse the file
 events = parse_file(filename)

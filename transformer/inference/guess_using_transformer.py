@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 import time
 # Define the run number and model number
-run_number= '4'
-model_number = ""
+run_number = '4'
+model_name = "92K"
 
 # Define model
 class CausalSelfAttention(nn.Module):
@@ -62,7 +62,7 @@ class Block(nn.Module):
 
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
+    block_size: int = 12
     vocab_size: int = 4
     n_layer: int = 2
     n_head: int = 2
@@ -109,7 +109,7 @@ print(f"Using {device} device")
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load(f'trained_model{model_number}.pth', map_location=device))
+model.load_state_dict(torch.load(f'../model_{model_name}.pth', map_location=device))
 model.to(device)
 model.eval()
 
@@ -123,7 +123,7 @@ def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
 
 # Load and preprocess the new data
-with open(f'../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
+with open(f'../../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
     text = f.read().replace("\n", "")
     text = text.replace("S", "")
     text = text.replace("O", "")
@@ -161,7 +161,7 @@ predicted_indices = generate_predictions(model, tokens, max_context_length=12)
 predicted_chars = [itos[idx] for idx in predicted_indices]
 print(len(predicted_chars))
 
-with open(f'../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
+with open(f'../../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
     original_text = f.read().replace("\n", "")
     original_chars = list(original_text)
 
@@ -184,10 +184,27 @@ for c in original_chars:
         merged_chars.append(c)
 
 # Write predictions to a file
-with open(f'Preds_for_{run_number}_with_model_{model_number}.txt', 'w') as f:
+with open(f'Preds_for_{run_number}_with_model_{model_name}.txt', 'w') as f:
     for i, char in enumerate(merged_chars):
         if i % 100 == 0 and i > 0:
             f.write('\n')
         f.write(char)
 
-print(f"Model predictions saved to Preds_for_{run_number}_with_model_{model_number}.txt")
+def write_guess_metadata(model_name, data_file, config):
+    metadata_filename = f"guess_metadata.txt"
+    
+    with open(metadata_filename, 'w') as meta_file:
+        meta_file.write(f"\nFilename: 'Preds_for_{run_number}_with_model_{model_name}.txt'")
+        meta_file.write(f"\nModel used for guessing: {model_name}\n")
+        meta_file.write(f"\nData guessed on: {data_file}\n")
+        meta_file.write(f"\nGPTConfig parameters:\n")
+        meta_file.write(f"  Block size: {config.block_size}\n")
+        meta_file.write(f"  Vocab size: {config.vocab_size}\n")
+        meta_file.write(f"  Number of layers: {config.n_layer}\n")
+        meta_file.write(f"  Number of heads: {config.n_head}\n")
+        meta_file.write(f"  Embedding size: {config.n_embd}\n")
+    
+    print(f"Guess metadata saved to {metadata_filename}")
+write_guess_metadata(model_name, f'../../data/2ABT_logistic_run_{run_number}.txt', config)
+
+print(f"Model predictions saved to Preds_for_{run_number}_with_model_{model_name}.txt")
