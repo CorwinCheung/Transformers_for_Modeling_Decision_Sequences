@@ -72,6 +72,6 @@ class RFLR_mouse:
         return choice
 
 def main():
-    agent = RFLR_mouse(alpha=0.5, beta=2, tau=1.2)
+    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4)
 
 main()

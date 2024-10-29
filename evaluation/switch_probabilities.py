@@ -1,20 +1,17 @@
-def compute_switches(filename):
-    with open(filename, 'r') as f:
+def compute_switches(behavior_filename):
+    with open(behavior_filename, 'r') as f:
         data = f.read()
-
-    # Remove 'T' and 'O' characters
-    data = data.replace('T', '').replace('O', '')
-
-    # Convert to lowercase
-    data = data.lower()
 
     # Remove any whitespace or newlines
     data = data.replace('\n', '').replace(' ', '')
 
+    # Convert to lowercase to standardize 'L'/'l' and 'R'/'r'
+    data = data.lower()
+
     # Now, data is a string of 'l' and 'r' characters
     # Initialize switches count
     switches = 0
-    total_trials = len(data) - 1  # Number of transitions
+    total_trials = len(data) - 1  # Number of transitions between choices
 
     for i in range(1, len(data)):
         if data[i-1] != data[i]:
@@ -26,5 +23,5 @@ def compute_switches(filename):
     print(f"Total switches: {switches}")
     print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-compute_switches('../data/2ABT_logistic_run_8.txt')
-compute_switches('../transformer/Preds_for_8_with_model_.txt')
+# Update the filename to point to your behavior data file
+compute_switches('../data/2ABT_behavior_run_5.txt')
