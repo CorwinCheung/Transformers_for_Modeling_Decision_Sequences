@@ -1,90 +1,109 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 global rflr
 
-def parse_file(filename):
+def parse_files(behavior_filename, high_port_filename):
     """
-    Parse the data file to extract ground truth events.
+    Parse the behavior and high port files to extract events.
 
     Args:
-    - filename (str): The file path of the ground truth data file.
+    - behavior_filename (str): The file path of the behavior data file.
+    - high_port_filename (str): The file path of the high port data file.
 
     Returns:
-    - events (list): A list of dictionaries with keys as described earlier.
+    - events (list): A list of dictionaries containing event data.
     """
     events = []
     last_choice = None
-    current_state = 0  # Default starting state; 0 for high-reward on left, 1 for high-reward on right
     trial_number = 0
-    last_transition_trial = 0  # Initialize to 0
     transition_trials = []  # List to store the trial numbers where transitions occurred
 
-    with open(filename, 'r') as file:
-        for line in file:
-            for token in line.strip():
-                if token == 'O':  # Starts on right
-                    current_state = 1  # High-reward spout is on the right
-                    last_transition_trial = trial_number  # Treat 'O' as a transition at the beginning
-                    transition_trials.append(trial_number)
-                elif token == 'T':  # transition occurred
-                    current_state = 1 - current_state  # transition high-reward spout position
-                    last_transition_trial = trial_number  # Set transition point at current trial
-                    transition_trials.append(trial_number)
-                elif token in 'LlRr':  # Process the choice
-                    if token in 'Ll':
-                        choice = 0  # Left
-                        choice_str = 'L'
-                    elif token in 'Rr':
-                        choice = 1  # Right
-                        choice_str = 'R'
+    # Read behavior data
+    with open(behavior_filename, 'r') as behavior_file:
+        behavior_data = behavior_file.read().replace('\n', '').replace(' ', '')
 
-                    reward = 1 if token.isupper() else 0  # Rewarded if uppercase
-                    rewarded = bool(reward)
+    # Read high port data
+    with open(high_port_filename, 'r') as high_port_file:
+        high_port_data = high_port_file.read().replace('\n', '').replace(' ', '')
 
-                    # Determine if agent selected the high-reward spout
-                    selected_high = 1 if choice == current_state else 0
+    # Ensure both data have the same length
+    if len(behavior_data) != len(high_port_data):
+        print("Error: Behavior data and high port data have different lengths.")
+        return None
 
-                    # Determine if agent switched sides from previous trial
-                    if last_choice is not None:
-                        switch = 1 if choice != last_choice else 0
-                    else:
-                        switch = 0  # No switch on first trial
+    # Initialize previous high port
+    previous_high_port = None
 
-                    # Record the event
-                    # Inside parse_file, when you create the event dictionary
-                    event = {
-                        'trial_number': trial_number,
-                        'choice': choice,
-                        'choice_str': choice_str,
-                        'reward': reward,
-                        'rewarded': rewarded,
-                        'selected_high': selected_high,
-                        'switch': switch,
-                        'transition': 1 if trial_number in transition_trials else 0,
-                        'block_position': [trial_number - last_transition_trial],  # Store as list to hold multiple positions
-                        'current_state': current_state  # Add current_state
-                    }
+    last_transition_trial = 0
+    transition_trials = []
+    # Process each trial
+    for i in range(len(behavior_data)):
+        token = behavior_data[i]
+        current_high_port = int(high_port_data[i])  # 0 for left, 1 for right
+
+        # Determine if a transition occurred
+        if previous_high_port is not None and current_high_port != previous_high_port:
+            # Transition occurred
+            last_transition_trial = trial_number
+            transition_trials.append(trial_number)
 
 
-                    events.append(event)
+        # Process the behavior token
+        if token in 'LlRr':
+            if token in 'Ll':
+                choice = 0  # Left
+                choice_str = 'L'
+            elif token in 'Rr':
+                choice = 1  # Right
+                choice_str = 'R'
 
-                    last_choice = choice
-                    trial_number += 1
-                else:
-                    continue  # Ignore other tokens
+            reward = 1 if token.isupper() else 0  # Rewarded if uppercase
+            rewarded = bool(reward)
 
-    # Adjust block positions for trials before each transition
+            # Determine if agent selected the high-reward spout
+            selected_high = 1 if choice == current_high_port else 0
+
+            # Determine if agent switched sides from previous trial
+            if last_choice is not None:
+                switch = 1 if choice != last_choice else 0
+            else:
+                switch = 0  # No switch on first trial
+
+            # Record the event
+            event = {
+                'trial_number': trial_number,
+                'choice': choice,
+                'choice_str': choice_str,
+                'reward': reward,
+                'rewarded': rewarded,
+                'selected_high': selected_high,
+                'switch': switch,
+                'transition': 1 if trial_number in transition_trials else 0,
+                'block_position': [trial_number - last_transition_trial],  # Will update later
+                'current_state': current_high_port  # Add current_state
+            }
+
+            events.append(event)
+
+            last_choice = choice
+            trial_number += 1
+        else:
+            print(f"Unexpected token '{token}' at trial {trial_number}")
+
+        # Update previous high port
+        previous_high_port = current_high_port
+
+    # Assign negative block positions for trials before transitions
     for transition_trial in transition_trials:
         # Go back up to 10 trials before the transition
         for i in range(1, min(11, transition_trial + 1)):
             idx = transition_trial - i
             if idx >= 0:
-                events[idx]['block_position'].append(-i)  # Add negative block position
-                # events[idx]['block_position'] = [-i]
+                events[idx]['block_position'].append(-i)  # Assign negative block position
 
     return events
-
 
 def read_predictions(filename):
     """
@@ -97,9 +116,7 @@ def read_predictions(filename):
     - predictions (str): The prediction sequence as a string.
     """
     with open(filename, 'r') as f:
-        predictions = f.read().replace('\n', '')
-        predictions = predictions.replace('T', '')
-        predictions = predictions.replace('O', '')
+        predictions = f.read().replace('\n', '').replace(' ', '')
     return predictions
 
 def align_events_with_predictions(events, predictions):
@@ -112,14 +129,9 @@ def align_events_with_predictions(events, predictions):
 
     Returns:
     - events (list): The updated events with predictions and adjusted switches.
-    - predictions (list): The updated predictions, matching the length of events.
     """
-    # Ensure the sequences are of the same length by adjusting predictions
-    min_length = min(len(events), len(predictions))
-    events = events[:min_length]
-    predictions = predictions[:min_length]
 
-    # Initialize the last ground truth choice
+    # Initialize the last prediction choice
     last_ground_truth_choice = None
 
     for i in range(len(events)):
@@ -133,15 +145,12 @@ def align_events_with_predictions(events, predictions):
         elif pred_char in 'Rr':
             pred_choice = 1  # Right
             pred_choice_str = 'R'
-        else:
-            pred_choice = None
-            pred_choice_str = None
 
         event['prediction_choice'] = pred_choice
         event['prediction_choice_str'] = pred_choice_str
         event['selected_high_prediction'] = 1 if pred_choice == event['current_state'] else 0
 
-        # Calculate switch based on ground truth choice at previous trial
+        # Calculate switch based on previous prediction
         if i > 0 and last_ground_truth_choice is not None:
             switch = 1 if pred_choice != last_ground_truth_choice else 0
         else:
@@ -152,10 +161,10 @@ def align_events_with_predictions(events, predictions):
         last_ground_truth_choice = event['choice']  # Update for next iteration
 
     return events
+
 def calculate_probabilities(events):
     """
-    Calculate probabilities for high-reward selection and switching around block transitions,
-    considering both positive and negative block positions.
+    Calculate probabilities for high-reward selection and switching around block transitions.
 
     Args:
     - events (list): The parsed events from the data file.
@@ -176,7 +185,7 @@ def calculate_probabilities(events):
         # Gather probabilities for both positive and negative positions
         for event in events:
             if pos in event['block_position']:  # If the position (either positive or negative) is in the list
-                selected_high.append(event['selected_high_prediction'])  # Use prediction
+                selected_high.append(event['selected_high_prediction'])
                 switches.append(event['switch'])
 
         # Calculate probabilities for each block position
@@ -192,19 +201,15 @@ def calculate_probabilities(events):
 
     return block_positions, high_reward_prob, switch_prob
 
-
 def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     """
-    Plot the probabilities of high-reward selection and switching relative to block positions
-    as two separate plots, each with their own y-axis limits.
+    Plot the probabilities of high-reward selection and switching relative to block positions.
 
     Args:
     - block_positions (list): Block positions relative to transition.
     - high_reward_prob (list): Probability of selecting the high-reward port.
     - switch_prob (list): Probability of switching sides.
     """
-    switch_prob = np.array(switch_prob)
-    switch_prob = np.nan_to_num(switch_prob, nan=0.0)
     # Plot P(high port)
     plt.figure(figsize=(10, 5))
     plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
@@ -213,11 +218,11 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylabel("P(high port)")
     plt.title("Probability of Selecting High-Reward Port")
     plt.legend()
-    plt.ylim(0, 1)  # Adjust y-axis limits as needed
+    plt.ylim(0, 1)
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'../../graphs/{rflr}_G_selecting high-reward port.png')
-    # plt.show()
+    plt.savefig(f'../../graphs/{rflr}_G_selecting_high_reward_port.png')
+
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
     plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
@@ -226,11 +231,10 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     plt.ylabel("P(switch)")
     plt.title("Probability of Switching")
     plt.legend()
-    plt.ylim(0, max(switch_prob) * 1.1)  # Adjust y-axis limits based on data
+    plt.ylim(0, max(switch_prob) * 1.1)
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig(f'../../graphs/{rflr}_G_switch probabilities.png')
-    # plt.show()
+    plt.savefig(f'../../graphs/{rflr}_G_switch_probabilities.png')
 
 def map_sequence_to_pattern(seq):
     """
@@ -246,17 +250,17 @@ def map_sequence_to_pattern(seq):
 
     # First action: 'A' if rewarded, 'a' if unrewarded
     first_reward = 'A' if action1['rewarded'] else 'a'
-    first_choice = action1['choice']  # Use prediction choice
+    first_choice = action1['choice_str']
 
     # Second action
-    second_same_side = action2['choice'] == first_choice
+    second_same_side = action2['choice_str'] == first_choice
     if second_same_side:
         second_letter = 'A' if action2['rewarded'] else 'a'
     else:
         second_letter = 'B' if action2['rewarded'] else 'b'
 
     # Third action
-    third_same_side = action3['choice'] == first_choice
+    third_same_side = action3['choice_str'] == first_choice
     if third_same_side:
         third_letter = 'A' if action3['rewarded'] else 'a'
     else:
@@ -290,8 +294,8 @@ def calculate_switch_probabilities(events):
         # Map the sequence to a pattern
         pattern = map_sequence_to_pattern(seq)
 
-        # Determine if agent switched on the next trial (based on ground truth)
-        switched = seq[2]['choice'] != next_action['prediction_choice']
+        # Determine if agent switched on the next trial (based on predictions)
+        switched = 1 if next_action['prediction_choice'] != seq[-1]['prediction_choice'] else 0
 
         # Update counts
         if pattern not in pattern_data:
@@ -312,7 +316,7 @@ def calculate_switch_probabilities(events):
         probabilities.append(prob)
         counts.append(total)
 
-    # Sort patterns by ascending switch probability
+    # Sort patterns alphabetically
     sorted_indices = np.argsort(patterns)
     sorted_patterns = [patterns[i] for i in sorted_indices]
     sorted_probabilities = [probabilities[i] for i in sorted_indices]
@@ -329,7 +333,6 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     - probabilities (list): Corresponding switch probabilities.
     - counts (list): Counts of each pattern.
     """
-    print(sum(counts))
     # Create the bar chart
     plt.figure(figsize=(18, 6))
     bars = plt.bar(range(len(patterns)), probabilities, tick_label=patterns)
@@ -345,56 +348,47 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     plt.xticks(rotation=90)
     plt.ylim(0, 1)
     plt.tight_layout()
-    plt.savefig(f'../../graphs/{rflr}_F_conditional switching.png')
-    # plt.show()
+    plt.savefig(f'../../graphs/{rflr}_F_conditional_switching.png')
 
 # Main code
 
-rflr = ''
-ground_truth = False
-if ground_truth:
-    rflr = 'rflr_'
-else:
-    rflr = 'model_92K_1M'
+rflr = 'model_new_gen'
 
 # Define the file paths
-ground_truth_file = "../../data/2ABT_logistic_run_3.txt"
-predictions_file = "Preds_for_3_with_model_92K.txt"
-# ground_truth_file = '../../data/test.txt'
-# predictions_file = 'Preds_test.txt'
+behavior_filename = "../../data/2ABT_behavior_run_5.txt"
+high_port_filename = "../../data/2ABT_high_port_run_5.txt"
+predictions_filename = "Preds_for_5_with_model_92K.txt"
 
+# Check if files exist
+if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(predictions_filename):
+    print("One or more files not found!")
+else:
+    # Parse the ground truth events
+    events = parse_files(behavior_filename, high_port_filename)
 
-# Parse the ground truth events
-events = parse_file(ground_truth_file)
+    # Read predictions
+    predictions = read_predictions(predictions_filename)
+    print(f"Number of events: {len(events)}")
+    print(f"Number of predictions: {len(predictions)}")
 
-# Read predictions
-predictions = read_predictions(predictions_file)
-print(len(events))
-print(len(predictions))
+    # Align events with predictions and adjust switches
+    events = align_events_with_predictions(events, predictions)
 
-# Align events with predictions and adjust switches
-events = align_events_with_predictions(events, predictions)
+    # Calculate and print the percent of trials with a switch
+    total_trials = len(events) - 1  # Exclude the first trial
+    total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
+    percent_switches = (total_switches / total_trials) * 100 if total_trials > 0 else 0
 
-# For debugging: print a sample of events
-print(len(events))
-for event in events[1000:1030]:
-    print(event)
+    print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-# Calculate and print the percent of trials with a switch
-total_trials = len(events) - 1  # Exclude the first trial
-total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
-percent_switches = (total_switches / total_trials) * 100
+    # Calculate probabilities for block positions
+    block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
 
-print(f"Percent of trials with a switch: {percent_switches:.2f}%")
+    # Plot the probabilities
+    plot_probabilities(block_positions, high_reward_prob, switch_prob)
 
-# Calculate probabilities for block positions
-block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
+    # Calculate switch probabilities
+    sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
 
-# Plot the probabilities
-plot_probabilities(block_positions, high_reward_prob, switch_prob)
-
-# Calculate switch probabilities
-sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
-
-# Plot the switch probabilities
-plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
+    # Plot the switch probabilities
+    plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)

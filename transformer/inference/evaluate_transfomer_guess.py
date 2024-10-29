@@ -1,26 +1,20 @@
 from collections import Counter
 
 # Define run number and model number
-run_number = '4'
+run_number = '5'
 model_name = '92K'
 
 # File paths
-# ground_truth_path = f'../../data/2ABT_logistic_run_{run_number}.txt'
-ground_truth_path = '../../data/test.txt'
-# predictions_path = f'Preds_for_{run_number}_with_model_{model_name}.txt'
-predictions_path = 'Preds_test.txt'
+ground_truth_path = f'../../data/2ABT_behavior_run_{run_number}.txt'
+predictions_path = f'Preds_for_{run_number}_with_model_{model_name}.txt'
 
 # Load ground truth data
 with open(ground_truth_path, 'r') as f:
-    ground_truth = f.read().replace('\n', '')
-    ground_truth = ground_truth.replace('T', '')
-    ground_truth = ground_truth.replace('O', '')
+    ground_truth = f.read().replace('\n', '').replace(' ', '')
 
 # Load model predictions
 with open(predictions_path, 'r') as f:
-    predictions = f.read().replace('\n', '')
-    predictions = predictions.replace('T', '')
-    predictions = predictions.replace('O', '')
+    predictions = f.read().replace('\n', '').replace(' ', '')
 
 # Ensure both sequences have the same length
 min_length = min(len(ground_truth), len(predictions))
@@ -30,7 +24,7 @@ predictions = predictions[:min_length]
 # Compute accuracy
 correct = sum(gt == pred for gt, pred in zip(ground_truth, predictions))
 total = len(ground_truth)
-accuracy = correct / total
+accuracy = correct / total if total > 0 else 0
 print(f"Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
 
 # Compute confusion matrix
@@ -48,7 +42,7 @@ def calculate_accuracy_ignore_case(ground_truth, predictions):
         gt.upper() == pred.upper()
         for gt, pred in zip(ground_truth, predictions)
     )
-    return correct / len(ground_truth)
+    return correct / len(ground_truth) if len(ground_truth) > 0 else 0
 
 # Compute and print the adjusted accuracy
 adjusted_accuracy = calculate_accuracy_ignore_case(ground_truth, predictions)
@@ -73,7 +67,6 @@ def calculate_switch_percentage_within_gt(ground_truth):
     )
     total_transitions = len(upper_gt) - 1
     return (switches / total_transitions) * 100 if total_transitions > 0 else 0
-
 
 # Compute and print switch percentages
 switch_percentage = calculate_switch_percentage_with_gt(predictions, ground_truth)
