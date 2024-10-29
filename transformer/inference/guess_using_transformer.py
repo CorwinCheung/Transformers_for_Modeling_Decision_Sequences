@@ -3,10 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dataclasses import dataclass
 import time
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from transformer import GPT, GPTConfig
 
 # Define the run number and model number
-run_number = '4'
+run_number = '3'
 model_name = "92K"
     
 # Device setup

@@ -52,6 +52,7 @@ def parse_file(filename):
                         switch = 0  # No switch on first trial
 
                     # Record the event
+                    # Inside parse_file, when you create the event dictionary
                     event = {
                         'trial_number': trial_number,
                         'choice': choice,
@@ -61,8 +62,10 @@ def parse_file(filename):
                         'selected_high': selected_high,
                         'switch': switch,
                         'swap': 1 if trial_number in swap_trials else 0,
-                        'block_position': [trial_number - last_swap_trial]  # Store as list to hold multiple positions
+                        'block_position': [trial_number - last_swap_trial],  # Store as list to hold multiple positions
+                        'current_state': current_state  # Add current_state
                     }
+
 
                     events.append(event)
 
@@ -136,6 +139,7 @@ def align_events_with_predictions(events, predictions):
 
         event['prediction_choice'] = pred_choice
         event['prediction_choice_str'] = pred_choice_str
+        event['selected_high_prediction'] = 1 if pred_choice == event['current_state'] else 0
 
         # Calculate switch based on ground truth choice at previous trial
         if i > 0 and last_ground_truth_choice is not None:
@@ -172,7 +176,7 @@ def calculate_probabilities(events):
         # Gather probabilities for both positive and negative positions
         for event in events:
             if pos in event['block_position']:  # If the position (either positive or negative) is in the list
-                selected_high.append(event['selected_high'])
+                selected_high.append(event['selected_high_prediction'])  # Use prediction
                 switches.append(event['switch'])
 
         # Calculate probabilities for each block position
@@ -199,6 +203,8 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     - high_reward_prob (list): Probability of selecting the high-reward port.
     - switch_prob (list): Probability of switching sides.
     """
+    switch_prob = np.array(switch_prob)
+    switch_prob = np.nan_to_num(switch_prob, nan=0.0)
     # Plot P(high port)
     plt.figure(figsize=(10, 5))
     plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
@@ -214,7 +220,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     # plt.show()
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='red')
+    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
     plt.xlabel("Block Position")
     plt.ylabel("P(switch)")
@@ -240,17 +246,17 @@ def map_sequence_to_pattern(seq):
 
     # First action: 'A' if rewarded, 'a' if unrewarded
     first_reward = 'A' if action1['rewarded'] else 'a'
-    first_choice = action1['prediction_choice_str']  # Use prediction choice
+    first_choice = action1['choice']  # Use prediction choice
 
     # Second action
-    second_same_side = action2['prediction_choice_str'] == first_choice
+    second_same_side = action2['choice'] == first_choice
     if second_same_side:
         second_letter = 'A' if action2['rewarded'] else 'a'
     else:
         second_letter = 'B' if action2['rewarded'] else 'b'
 
     # Third action
-    third_same_side = action3['prediction_choice_str'] == first_choice
+    third_same_side = action3['choice'] == first_choice
     if third_same_side:
         third_letter = 'A' if action3['rewarded'] else 'a'
     else:
@@ -285,7 +291,7 @@ def calculate_switch_probabilities(events):
         pattern = map_sequence_to_pattern(seq)
 
         # Determine if agent switched on the next trial (based on ground truth)
-        switched = seq[2]['prediction_choice'] != next_action['prediction_choice']
+        switched = seq[2]['choice'] != next_action['prediction_choice']
 
         # Update counts
         if pattern not in pattern_data:
@@ -307,7 +313,7 @@ def calculate_switch_probabilities(events):
         counts.append(total)
 
     # Sort patterns by ascending switch probability
-    sorted_indices = np.argsort(probabilities)
+    sorted_indices = np.argsort(patterns)
     sorted_patterns = [patterns[i] for i in sorted_indices]
     sorted_probabilities = [probabilities[i] for i in sorted_indices]
     sorted_counts = [counts[i] for i in sorted_indices]
@@ -323,6 +329,7 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     - probabilities (list): Corresponding switch probabilities.
     - counts (list): Counts of each pattern.
     """
+    print(sum(counts))
     # Create the bar chart
     plt.figure(figsize=(18, 6))
     bars = plt.bar(range(len(patterns)), probabilities, tick_label=patterns)
@@ -348,11 +355,14 @@ ground_truth = False
 if ground_truth:
     rflr = 'rflr_'
 else:
-    rflr = 'model_92K'
+    rflr = 'model_92K_1M'
 
 # Define the file paths
-ground_truth_file = "../../data/2ABT_logistic_run_4.txt"
-predictions_file = "Preds_for_4_with_model_92K.txt"
+ground_truth_file = "../../data/2ABT_logistic_run_3.txt"
+predictions_file = "Preds_for_3_with_model_92K.txt"
+# ground_truth_file = '../../data/test.txt'
+# predictions_file = 'Preds_test.txt'
+
 
 # Parse the ground truth events
 events = parse_file(ground_truth_file)

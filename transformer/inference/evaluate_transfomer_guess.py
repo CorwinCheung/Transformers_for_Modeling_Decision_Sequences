@@ -5,8 +5,10 @@ run_number = '4'
 model_name = '92K'
 
 # File paths
-ground_truth_path = f'../../data/2ABT_logistic_run_{run_number}.txt'
-predictions_path = f'Preds_for_{run_number}_with_model_{model_name}.txt'
+# ground_truth_path = f'../../data/2ABT_logistic_run_{run_number}.txt'
+ground_truth_path = '../../data/test.txt'
+# predictions_path = f'Preds_for_{run_number}_with_model_{model_name}.txt'
+predictions_path = 'Preds_test.txt'
 
 # Load ground truth data
 with open(ground_truth_path, 'r') as f:

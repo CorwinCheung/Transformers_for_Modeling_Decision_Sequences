@@ -5,22 +5,13 @@ global rflr
 
 def parse_file(filename):
     """
-    Parse the data file to extract relevant information: choices, rewards, selected_high, block_position, switches, etc.
+    Parse the data file to extract ground truth events.
 
     Args:
-    - filename (str): The file path of the data file.
+    - filename (str): The file path of the ground truth data file.
 
     Returns:
-    - events (list): A list of dictionaries with keys:
-        - 'trial_number'
-        - 'choice' (0 for left, 1 for right)
-        - 'choice_str' ('L' or 'R')
-        - 'reward' (1 for rewarded, 0 for unrewarded)
-        - 'rewarded' (True or False)
-        - 'selected_high' (1 if high-reward spout selected, 0 otherwise)
-        - 'switch' (1 if switched from last choice, 0 otherwise)
-        - 'swap' (1 if swap occurred on this trial, 0 otherwise)
-        - 'block_position' (position relative to last swap)
+    - events (list): A list of dictionaries with keys as described earlier.
     """
     events = []
     last_choice = None
@@ -34,7 +25,7 @@ def parse_file(filename):
             for token in line.strip():
                 if token == 'O':  # Starts on right
                     current_state = 1  # High-reward spout is on the right
-                    last_swap_trial = trial_number  # Treat 'O' as an initial swap
+                    last_swap_trial = trial_number  # Treat 'O' as a swap at the beginning
                     swap_trials.append(trial_number)
                 elif token == 'S':  # Swap occurred
                     current_state = 1 - current_state  # Swap high-reward spout position
@@ -60,9 +51,6 @@ def parse_file(filename):
                     else:
                         switch = 0  # No switch on first trial
 
-                    # Calculate block_position relative to last swap
-                    block_position = trial_number - last_swap_trial
-
                     # Record the event
                     event = {
                         'trial_number': trial_number,
@@ -73,7 +61,7 @@ def parse_file(filename):
                         'selected_high': selected_high,
                         'switch': switch,
                         'swap': 1 if trial_number in swap_trials else 0,
-                        'block_position': block_position
+                        'block_position': [trial_number - last_swap_trial]  # Store as list to hold multiple positions
                     }
 
                     events.append(event)
@@ -89,18 +77,15 @@ def parse_file(filename):
         for i in range(1, min(11, swap_trial + 1)):
             idx = swap_trial - i
             if idx >= 0:
-                # Create a duplicate event with block_position set to -i
-                new_event = events[idx].copy()  # Copy the event
-                new_event['block_position'] = -i  # Adjust block position
-                events.append(new_event)  # Add the new event to the list
+                events[idx]['block_position'].append(-i)  # Add negative block position
+                # events[idx]['block_position'] = [-i]
 
-    # Sort the events by trial_number to ensure order
-    events = sorted(events, key=lambda x: x['trial_number'])
     return events
 
 def calculate_probabilities(events):
     """
-    Calculate probabilities for high-reward selection and switching around block transitions.
+    Calculate probabilities for high-reward selection and switching around block transitions,
+    considering both positive and negative block positions.
 
     Args:
     - events (list): The parsed events from the data file.
@@ -108,16 +93,23 @@ def calculate_probabilities(events):
     Returns:
     - block_positions (list): Block positions relative to swaps.
     - high_reward_prob (list): Probability of selecting the high-reward port.
-    - switch_prob (list): Probability of switching sides (left to right or vice versa).
+    - switch_prob (list): Probability of switching sides.
     """
-    block_positions = list(range(-10, 21))
+    block_positions = list(range(-10, 21))  # This range includes both negative and positive
     high_reward_prob = []
     switch_prob = []
 
     for pos in block_positions:
-        selected_high = [event['selected_high'] for event in events if event['block_position'] == pos]
-        switches = [event['switch'] for event in events if event['block_position'] == pos]
+        selected_high = []
+        switches = []
 
+        # Gather probabilities for both positive and negative positions
+        for event in events:
+            if pos in event['block_position']:  # If the position (either positive or negative) is in the list
+                selected_high.append(event['selected_high'])
+                switches.append(event['switch'])
+
+        # Calculate probabilities for each block position
         if selected_high:
             high_reward_prob.append(np.mean(selected_high))
         else:
@@ -140,6 +132,8 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     - high_reward_prob (list): Probability of selecting the high-reward port.
     - switch_prob (list): Probability of switching sides.
     """
+    switch_prob = np.array(switch_prob)
+    switch_prob = np.nan_to_num(switch_prob, nan=0.0)
     # Plot P(high port)
     plt.figure(figsize=(10, 5))
     plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
@@ -248,7 +242,7 @@ def calculate_switch_probabilities(events):
         counts.append(total)
 
     # Sort patterns by ascending switch probability
-    sorted_indices = np.argsort(probabilities)
+    sorted_indices = np.argsort(patterns)
     sorted_patterns = [patterns[i] for i in sorted_indices]
     sorted_probabilities = [probabilities[i] for i in sorted_indices]
     sorted_counts = [counts[i] for i in sorted_indices]
@@ -264,6 +258,7 @@ def plot_switch_probabilities(patterns, probabilities, counts):
     - probabilities (list): Corresponding switch probabilities.
     - counts (list): Counts of each pattern.
     """
+    print(sum(counts))
     # Create the bar chart
     plt.figure(figsize=(18, 6))
     bars = plt.bar(range(len(patterns)), probabilities, tick_label=patterns)
@@ -289,10 +284,12 @@ ground_truth = True
 if ground_truth:
     rflr = 'rflr_1M'
 else:
-    rflr = 'model_92K'
+    rflr = 'rflr'
 # Define the file path
 # filename = "../transformer/inference/Preds_for_4_with_model_92K.txt"
-filename = "../data/2ABT_logistic_run_4.txt"
+filename = "../data/2ABT_logistic_run_3.txt"
+# filename = "../data/test.txt"
+
 
 # Parse the file
 events = parse_file(filename)
@@ -315,11 +312,11 @@ for event in events[:100]:
 block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
 
 print(len(block_positions), len(high_reward_prob), len(switch_prob))
-# # Plot the probabilities
-# plot_probabilities(block_positions, high_reward_prob, switch_prob)
+# Plot the probabilities
+plot_probabilities(block_positions, high_reward_prob, switch_prob)
 
-# # Calculate switch probabilities
-# sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
+# Calculate switch probabilities
+sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
 
-# # Plot the switch probabilities
-# plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
+# Plot the switch probabilities
+plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
