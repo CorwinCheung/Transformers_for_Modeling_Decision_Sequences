@@ -1,7 +1,7 @@
 import numpy as np
 
 class RFLR_mouse:
-    def __init__(self, alpha=0.5, beta=2, tau=1.2):
+    def __init__(self, alpha=0.5, beta=2, tau=1.2, policy="probability_matching"):
         """
         Initialize the agent with the provided parameters.
 
@@ -15,6 +15,7 @@ class RFLR_mouse:
         self.tau = tau      # decay rate for the reward history
         self.phi_t = 0.5      # initial value of the recursive reward term
         self.last_choice = np.random.choice([0,1])
+        self.policy = policy
 
     def update_phi(self, c_t, r_t):
         """
@@ -39,6 +40,10 @@ class RFLR_mouse:
         log_odds = self.alpha * (2 * c_t -1) + self.phi_t
         return log_odds
 
+    def sigmoid(self, log_odds):
+        prob_right =  1 / (1 + np.exp(-log_odds))
+        return prob_right
+
     def make_choice(self):
         """
         Make a choice based on the current log-odds of selecting the left or right spout.
@@ -51,9 +56,13 @@ class RFLR_mouse:
 
         log_odds = self.compute_log_odds(self.last_choice)
 
-        prob_right = 1 / (1 + np.exp(-log_odds))
+        prob_right = self.sigmoid(log_odds)
 
-        choice = np.random.choice([0, 1], p=[1 - prob_right, prob_right])
+        if self.policy == "probability_matching": # make the choice with the random probability equal to the one calculated
+            choice = np.random.choice([0, 1], p=[1 - prob_right, prob_right])
+        elif self.policy == "greedy_policy": #greedily selects based on what prob right leans towards
+            choice = 1 if prob_right > 0.5 else 0
+
         #deterministic environment - reward 100% on the right <->
         #greedy policy. Expect the adjusted accuracy to be even higher. Perfectly
         #predictable, learn the algorithm. tasking the transformer

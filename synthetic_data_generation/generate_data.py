@@ -47,7 +47,7 @@ def main():
     # num_steps = 20 
 
     environment = Original_2ABT_Spouts(0.8,0.2,0.02)
-    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4)
+    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
 
     behavior_data = generate_data(num_steps, agent, environment)
 
@@ -80,6 +80,7 @@ def main():
         meta_file.write(f"Number of steps: {num_steps:,}\n") 
         meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, low_reward_prob={environment.low_reward_prob}, swap_prob={environment.swap_prob}\n")
         meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
+        meta_file.write(f"Agent policy: {agent.policy}\n")
     
     print(f"Metadata saved to ../data/metadata.txt")
 main()
