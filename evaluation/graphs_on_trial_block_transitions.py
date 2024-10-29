@@ -177,7 +177,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
 
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='green')
+    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
     plt.xlabel("Block Position")
     plt.ylabel("P(switch)")
