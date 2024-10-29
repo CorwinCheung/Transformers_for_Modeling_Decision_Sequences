@@ -1,25 +1,25 @@
 Data file: ../data/2ABT_logistic.txt
 Number of steps: 100,000
-Environment parameters: high_reward_prob=1, low_reward_prob=0, swap_prob=0
+Environment parameters: high_reward_prob=1, low_reward_prob=0, transition_prob=0
 Agent parameters: alpha=0.75, beta=2.1, tau=1.4
 
 Data file: ../data/2ABT_logistic_run_2.txt
 Number of steps: 100,000
-Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, swap_prob=0.02
+Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, transition_prob=0.02
 Agent parameters: alpha=0.75, beta=2.1, tau=1.4
 
 Data file: ../data/2ABT_logistic_run_3.txt
 Number of steps: 1,000,000
-Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, swap_prob=0.02
+Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, transition_prob=0.02
 Agent parameters: alpha=0.75, beta=2.1, tau=1.4
 
 Data file: ../data/2ABT_logistic_run_4.txt
 Number of steps: 10,000
-Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, swap_prob=0.02
+Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, transition_prob=0.02
 Agent parameters: alpha=0.75, beta=2.1, tau=1.4
 
 Data file: ../data/2ABT_logistic_run_5.txt
 Number of steps: 10,000
-Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, swap_prob=0.02
+Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, transition_prob=0.02
 Agent parameters: alpha=0.75, beta=2.1, tau=1.4
 Agent policy: probability_matching

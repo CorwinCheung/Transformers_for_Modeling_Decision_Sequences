@@ -13,13 +13,13 @@ predictions_path = 'Preds_test.txt'
 # Load ground truth data
 with open(ground_truth_path, 'r') as f:
     ground_truth = f.read().replace('\n', '')
-    ground_truth = ground_truth.replace('S', '')
+    ground_truth = ground_truth.replace('T', '')
     ground_truth = ground_truth.replace('O', '')
 
 # Load model predictions
 with open(predictions_path, 'r') as f:
     predictions = f.read().replace('\n', '')
-    predictions = predictions.replace('S', '')
+    predictions = predictions.replace('T', '')
     predictions = predictions.replace('O', '')
 
 # Ensure both sequences have the same length

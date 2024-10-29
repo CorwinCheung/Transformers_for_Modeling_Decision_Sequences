@@ -17,20 +17,20 @@ def parse_file(filename):
     last_choice = None
     current_state = 0  # Default starting state; 0 for high-reward on left, 1 for high-reward on right
     trial_number = 0
-    last_swap_trial = 0  # Initialize to 0
-    swap_trials = []  # List to store the trial numbers where swaps occurred
+    last_transition_trial = 0  # Initialize to 0
+    transition_trials = []  # List to store the trial numbers where transitions occurred
 
     with open(filename, 'r') as file:
         for line in file:
             for token in line.strip():
                 if token == 'O':  # Starts on right
                     current_state = 1  # High-reward spout is on the right
-                    last_swap_trial = trial_number  # Treat 'O' as a swap at the beginning
-                    swap_trials.append(trial_number)
-                elif token == 'S':  # Swap occurred
-                    current_state = 1 - current_state  # Swap high-reward spout position
-                    last_swap_trial = trial_number  # Set swap point at current trial
-                    swap_trials.append(trial_number)
+                    last_transition_trial = trial_number  # Treat 'O' as a transition at the beginning
+                    transition_trials.append(trial_number)
+                elif token == 'T':  # transition occurred
+                    current_state = 1 - current_state  # transition high-reward spout position
+                    last_transition_trial = trial_number  # Set transition point at current trial
+                    transition_trials.append(trial_number)
                 elif token in 'LlRr':  # Process the choice
                     if token in 'Ll':
                         choice = 0  # Left
@@ -61,8 +61,8 @@ def parse_file(filename):
                         'rewarded': rewarded,
                         'selected_high': selected_high,
                         'switch': switch,
-                        'swap': 1 if trial_number in swap_trials else 0,
-                        'block_position': [trial_number - last_swap_trial],  # Store as list to hold multiple positions
+                        'transition': 1 if trial_number in transition_trials else 0,
+                        'block_position': [trial_number - last_transition_trial],  # Store as list to hold multiple positions
                         'current_state': current_state  # Add current_state
                     }
 
@@ -74,11 +74,11 @@ def parse_file(filename):
                 else:
                     continue  # Ignore other tokens
 
-    # Adjust block positions for trials before each swap
-    for swap_trial in swap_trials:
-        # Go back up to 10 trials before the swap
-        for i in range(1, min(11, swap_trial + 1)):
-            idx = swap_trial - i
+    # Adjust block positions for trials before each transition
+    for transition_trial in transition_trials:
+        # Go back up to 10 trials before the transition
+        for i in range(1, min(11, transition_trial + 1)):
+            idx = transition_trial - i
             if idx >= 0:
                 events[idx]['block_position'].append(-i)  # Add negative block position
                 # events[idx]['block_position'] = [-i]
@@ -98,7 +98,7 @@ def read_predictions(filename):
     """
     with open(filename, 'r') as f:
         predictions = f.read().replace('\n', '')
-        predictions = predictions.replace('S', '')
+        predictions = predictions.replace('T', '')
         predictions = predictions.replace('O', '')
     return predictions
 
@@ -161,7 +161,7 @@ def calculate_probabilities(events):
     - events (list): The parsed events from the data file.
 
     Returns:
-    - block_positions (list): Block positions relative to swaps.
+    - block_positions (list): Block positions relative to transitions.
     - high_reward_prob (list): Probability of selecting the high-reward port.
     - switch_prob (list): Probability of switching sides.
     """
@@ -199,7 +199,7 @@ def plot_probabilities(block_positions, high_reward_prob, switch_prob):
     as two separate plots, each with their own y-axis limits.
 
     Args:
-    - block_positions (list): Block positions relative to swaps.
+    - block_positions (list): Block positions relative to transition.
     - high_reward_prob (list): Probability of selecting the high-reward port.
     - switch_prob (list): Probability of switching sides.
     """

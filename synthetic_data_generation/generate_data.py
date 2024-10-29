@@ -23,10 +23,10 @@ def generate_data(num_steps, agent, environment):
     for step in range(num_steps):
         choice = agent.make_choice()
 
-        reward, swapped = environment.step(choice)
+        reward, transitioned = environment.step(choice)
 
-        if swapped: #swap occurs, log it as S
-            data.append('S')
+        if transitioned: #transition occurs, log it as S
+            data.append('T')
         if choice == 0:  # Left choice
             if reward:
                 data.append('L')
@@ -78,7 +78,7 @@ def main():
     with open("../data/metadata.txt", 'a') as meta_file:
         meta_file.write(f"\nData file: {filename}\n")
         meta_file.write(f"Number of steps: {num_steps:,}\n") 
-        meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, low_reward_prob={environment.low_reward_prob}, swap_prob={environment.swap_prob}\n")
+        meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, low_reward_prob={environment.low_reward_prob}, transition_prob={environment.transition_prob}\n")
         meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
         meta_file.write(f"Agent policy: {agent.policy}\n")
     

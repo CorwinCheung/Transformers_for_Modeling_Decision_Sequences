@@ -2,8 +2,8 @@ def compute_switches(filename):
     with open(filename, 'r') as f:
         data = f.read()
 
-    # Remove 'S' and 'O' characters
-    data = data.replace('S', '').replace('O', '')
+    # Remove 'T' and 'O' characters
+    data = data.replace('T', '').replace('O', '')
 
     # Convert to lowercase
     data = data.lower()

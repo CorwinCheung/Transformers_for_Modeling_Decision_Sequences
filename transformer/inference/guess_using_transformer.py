@@ -91,7 +91,7 @@ for c in original_chars:
             print("Warning: Not enough predicted characters to replace all 'L's and 'R's.")
             merged_chars.append(c)
     else:
-        # Keep 'S' and 'O' as is
+        # Keep 'T' and 'O' as is
         merged_chars.append(c)
 
 # Write predictions to a file
