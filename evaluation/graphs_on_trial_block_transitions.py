@@ -306,15 +306,15 @@ def plot_switch_probabilities(patterns, probabilities, counts):
 # Main code
 
 rflr = ''
-ground_truth = False
+ground_truth = True
 if ground_truth:
-    rflr = 'rflr_1M'
+    rflr = 'rflr_100k'
 else:
     rflr = 'new_gen'
 
 # Define the file paths
-behavior_filename = "../data/2ABT_behavior_run_5.txt"
-high_port_filename = "../data/2ABT_high_port_run_5.txt"
+behavior_filename = "../data/2ABT_behavior_run_3.txt"
+high_port_filename = "../data/2ABT_high_port_run_3.txt"
 
 # Check if files exist
 if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):

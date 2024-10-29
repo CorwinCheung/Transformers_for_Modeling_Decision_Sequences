@@ -46,10 +46,9 @@ def generate_data(num_steps, agent, environment):
 
 def main():
     num_steps = 10000
-    # num_steps = 20  # For testing with fewer steps
 
     environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
-    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
+    agent = RFLR_mouse(alpha=-0.5, beta=2.1, tau=1.4, policy="greedy_policy")
 
     behavior_data, high_port_data = generate_data(num_steps, agent, environment)
 

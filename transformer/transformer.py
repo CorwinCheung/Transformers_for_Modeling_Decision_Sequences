@@ -124,7 +124,7 @@ class GPT(nn.Module):
 
         return model
 
-    def configure_optimizers(self, weight_decay, learning_rate, device):
+    def configure_optimizers(self, weight_decay, learning_rate, device, master_process):
         params = {pn: p for pn, p in self.named_parameters() if p.requires_grad}
         decay_params = [p for n, p in params.items() if p.dim() >= 2]
         nodecay_params = [p for n, p in params.items() if p.dim() < 2]
@@ -146,10 +146,8 @@ class DataLoaderLite:
     def __init__(self, B, T, run_number):
         self.B = B
         self.T = T
-        with open(f'../data/2ABT_logistic_run_{run_number}.txt', 'r') as f:
+        with open(f'../data/2ABT_behavior_run_{run_number}.txt', 'r') as f:
             text = f.read().replace("\n", "")
-            text = text.replace("O", "")
-            text = text.replace("S", "")
         
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}

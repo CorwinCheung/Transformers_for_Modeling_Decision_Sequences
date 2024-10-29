@@ -1,8 +1,8 @@
 
-Filename: 'Preds_for_5_with_model_92K.txt'
-Model used for guessing: 92K
+Filename: 'Preds_for_3_with_model_seen92M.txt'
+Model used for guessing: seen92M
 
-Data guessed on: ../../data/2ABT_behavior_run_5.txt
+Data guessed on: ../../data/2ABT_behavior_run_3.txt
 
 GPTConfig parameters:
   Block size: 12

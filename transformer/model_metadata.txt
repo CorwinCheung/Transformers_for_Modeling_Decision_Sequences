@@ -1,11 +1,57 @@
+Model name: model_seen92K
+  Num Parameters: 101,120
 
-Model name: model_92K
+File trained on: ../data/2ABT_behavior_run_2.txt
 
-File trained on: ../data/2ABT_logistic_run_2.txt
+Tokens seen: 92,160
 
 Total batch size: 3,072
 
 Max steps: 30
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
+
+Model name: model_seen921K
+  Num Parameters: 101,120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 921,600
+
+Total batch size: 3,072
+
+Max steps: 300
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
+
+Model name: model_seen92M
+  Num Parameters: 101120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 92160000
+
+Total batch size: 3,072
+
+Max steps: 30,000
 
 Dataloader parameters:
   Batch size (B): 256

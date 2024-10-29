@@ -1,8 +1,8 @@
 from collections import Counter
 
 # Define run number and model number
-run_number = '5'
-model_name = '92K'
+run_number = '3'
+model_name = 'seen92M'
 
 # File paths
 ground_truth_path = f'../../data/2ABT_behavior_run_{run_number}.txt'

@@ -12,8 +12,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from transformer import GPT, GPTConfig
 
 # Define the run number and model number
-run_number = '5'
-model_name = "92K"
+run_number = '4'
+model_name = "seen92M"
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

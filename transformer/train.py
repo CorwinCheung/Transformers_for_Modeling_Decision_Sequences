@@ -11,7 +11,7 @@ from transformer import GPT, GPTConfig, DataLoaderLite
 run_number = 2
 compile = True
 
-global master_process
+master_process = None
 
 ddp = int(os.environ.get('RANK', -1)) != -1
 if ddp:
@@ -63,7 +63,7 @@ if compile:
 max_lr = 6e-4
 min_lr = max_lr * 0.1
 warmup_steps = 10
-max_steps = 30
+max_steps = 30000
 
 tokens_trained_on = total_batch_size * max_steps
 def format_tokens(tokens):
@@ -75,7 +75,7 @@ def format_tokens(tokens):
     else:
         return str(tokens)
 
-model_name = f"model_{format_tokens(tokens_trained_on)}"
+model_name = f"model_seen{format_tokens(tokens_trained_on)}"
 
 def get_lr(it):
     if it < warmup_steps:
@@ -85,7 +85,7 @@ def get_lr(it):
     decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device)
+optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device, master_process=master_process)
 
 # Training loop
 for step in range(max_steps):
@@ -136,7 +136,9 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, config
 
     with open(metadata_filename, 'a') as meta_file:
         meta_file.write(f"\nModel name: {model_name}\n")
-        meta_file.write(f"\nFile trained on: ../data/2ABT_logistic_run_{run_number}.txt\n")
+        meta_file.write(f"  Num Parameters: {sum(p.numel() for p in model.parameters())}\n")
+        meta_file.write(f"\nFile trained on: ../data/2ABT_behavior_run_{run_number}.txt\n")
+        meta_file.write(f"\nTokens seen: {tokens_trained_on}\n")
         meta_file.write(f"\nTotal batch size: {total_batch_size:,}\n")
         meta_file.write(f"\nMax steps: {max_steps:,}\n")
         meta_file.write(f"\nDataloader parameters:\n")
