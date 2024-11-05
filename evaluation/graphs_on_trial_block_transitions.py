@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from graph_helper import plot_probabilities, calculate_switch_probabilities
+from graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
 
 global rflr
 
