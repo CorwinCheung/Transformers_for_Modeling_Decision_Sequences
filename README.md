@@ -16,13 +16,13 @@ Project Organization
     │   └── metadata.txt               <- Stores num steps, environment, and agent settings for each run.
 
     ├── synthetic_data_generation
-    │   ├── agent.py                   <- RFLR class to estimate p(choice) and apply policy (make_choice). Can be switched out.
-    │   ├── environment.py             <- Original_2ABT_Spouts class for simulation. Can be switched out.
+    │   ├── agent.py                   <- Estimates log odds and apply policy to make choice. Could be another agent
+    │   ├── environment.py             <- Original_2ABT_Spouts class for simulation. Could be other env
     │   └── generate_data.py           <- Main function to generate sequential data.
 
     ├── evaluation
     │   ├── basic_evaluation.py        <- Basic metrics: reward, choice correctness(selects high port?), transitions.
-    │   ├── graphs_on_trial_block_transitions.py <- Generates prob switch, prob high port vs block position, and conditional switching(last 3 steps) graphs.
+    │   ├── graphs_on_trial_block_transitions.py <- Graphs prob switch, high port, and conditional probs(last 3 steps).
     │   └── switch_probabilities.py    <- Calculates switch percentage in sequences.
 
     ├── transformer
@@ -38,7 +38,7 @@ Project Organization
     │   ├── model_seen92M.pth          <- Model trained on 92 million tokens.
     │   └── model_metadata.txt         <- Metadata on each model: params, training data, tokens seen.
 
-    ├── graphs                    <- stores graphs by the number of steps and the model vs rflr for conditional switching, selecting high port, switch prob
+    ├── graphs                    <- stores graphs by the number of steps and the model vs rflr for 3 graphs
     │   └── model_1M_F_conditional_switching.png
     │   └── model_1M_G_selecting_high_reward_port.png
     │   └── model_1M_G_switch_probabilities.png
