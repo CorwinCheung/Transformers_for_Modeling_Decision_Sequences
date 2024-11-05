@@ -63,7 +63,7 @@ if compile:
 max_lr = 6e-4
 min_lr = max_lr * 0.1
 warmup_steps = 10
-max_steps = 30000
+max_steps = 300000
 
 tokens_trained_on = total_batch_size * max_steps
 def format_tokens(tokens):

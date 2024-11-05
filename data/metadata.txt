@@ -28,3 +28,9 @@ Number of steps: 10,000
 Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, transition_prob=0.02
 Agent parameters: alpha=-0.5, beta=2.1, tau=1.4
 Agent policy: greedy_policy
+
+Data files: ../data/2ABT_behavior_run_6.txt, ../data/2ABT_high_port_run_6.txt
+Number of steps: 10,000
+Environment parameters: high_reward_prob=0.8, low_reward_prob=0.2, transition_prob=0.02
+Agent parameters: alpha=0.75, beta=2.1, tau=1.4
+Agent policy: probability_matching

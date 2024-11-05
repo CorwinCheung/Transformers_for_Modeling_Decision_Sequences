@@ -1,3 +1,6 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 from collections import Counter
 
 # Define run number and model number
@@ -46,7 +49,7 @@ def calculate_accuracy_ignore_case(ground_truth, predictions):
 
 # Compute and print the adjusted accuracy
 adjusted_accuracy = calculate_accuracy_ignore_case(ground_truth, predictions)
-print(f"\nAdjusted Accuracy (ignoring 'R'-'r' and 'L'-'l' differences): {adjusted_accuracy:.2%}")
+print(f"\nAdjusted Accuracy ('R'-'r','L'-'l' same): {adjusted_accuracy:.2%}")
 
 # Calculate switch percentage between 'R'/'r' and 'L'/'l'
 def calculate_switch_percentage_with_gt(predictions, ground_truth):
@@ -73,3 +76,23 @@ switch_percentage = calculate_switch_percentage_with_gt(predictions, ground_trut
 gt_switch_percentage = calculate_switch_percentage_within_gt(ground_truth)
 print(f"\nSwitch Percentage (model): {switch_percentage:.2f}%")
 print(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
+
+labels = sorted(set(ground_truth + predictions))
+label_map = {label: i for i, label in enumerate(labels)}
+
+# Initialize the confusion matrix array
+conf_matrix = np.zeros((len(labels), len(labels)), dtype=int)
+
+# Populate the confusion matrix array
+for (gt_char, pred_char), count in confusion.items():
+    i, j = label_map[gt_char], label_map[pred_char]
+    conf_matrix[i, j] = count
+
+# Plot the confusion matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
+            xticklabels=labels, yticklabels=labels)
+plt.xlabel("Predicted Label")
+plt.ylabel("Ground Truth Label")
+plt.title("Confusion Matrix")
+plt.savefig("Conf_matrix")

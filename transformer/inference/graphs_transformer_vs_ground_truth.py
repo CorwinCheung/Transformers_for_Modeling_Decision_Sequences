@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from ...evaluation.graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
 
 global rflr
 
@@ -163,17 +164,6 @@ def align_events_with_predictions(events, predictions):
     return events
 
 def calculate_probabilities(events):
-    """
-    Calculate probabilities for high-reward selection and switching around block transitions.
-
-    Args:
-    - events (list): The parsed events from the data file.
-
-    Returns:
-    - block_positions (list): Block positions relative to transitions.
-    - high_reward_prob (list): Probability of selecting the high-reward port.
-    - switch_prob (list): Probability of switching sides.
-    """
     block_positions = list(range(-10, 21))  # This range includes both negative and positive
     high_reward_prob = []
     switch_prob = []
@@ -201,158 +191,9 @@ def calculate_probabilities(events):
 
     return block_positions, high_reward_prob, switch_prob
 
-def plot_probabilities(block_positions, high_reward_prob, switch_prob):
-    """
-    Plot the probabilities of high-reward selection and switching relative to block positions.
-
-    Args:
-    - block_positions (list): Block positions relative to transition.
-    - high_reward_prob (list): Probability of selecting the high-reward port.
-    - switch_prob (list): Probability of switching sides.
-    """
-    # Plot P(high port)
-    plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
-    plt.axvline(0, color='black', linestyle='--', label="Block Transition")
-    plt.xlabel("Block Position")
-    plt.ylabel("P(high port)")
-    plt.title("Probability of Selecting High-Reward Port")
-    plt.legend()
-    plt.ylim(0, 1)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'../../graphs/{rflr}_G_selecting_high_reward_port.png')
-
-    # Plot P(switch)
-    plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
-    plt.axvline(0, color='black', linestyle='--', label="Block Transition")
-    plt.xlabel("Block Position")
-    plt.ylabel("P(switch)")
-    plt.title("Probability of Switching")
-    plt.legend()
-    plt.ylim(0, max(switch_prob) * 1.1)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'../../graphs/{rflr}_G_switch_probabilities.png')
-
-def map_sequence_to_pattern(seq):
-    """
-    Map a sequence of three actions to a pattern as per the specified rules.
-
-    Args:
-    - seq (list): A list of three event dictionaries.
-
-    Returns:
-    - pattern (str): The mapped pattern string.
-    """
-    action1, action2, action3 = seq
-
-    # First action: 'A' if rewarded, 'a' if unrewarded
-    first_reward = 'A' if action1['rewarded'] else 'a'
-    first_choice = action1['choice_str']
-
-    # Second action
-    second_same_side = action2['choice_str'] == first_choice
-    if second_same_side:
-        second_letter = 'A' if action2['rewarded'] else 'a'
-    else:
-        second_letter = 'B' if action2['rewarded'] else 'b'
-
-    # Third action
-    third_same_side = action3['choice_str'] == first_choice
-    if third_same_side:
-        third_letter = 'A' if action3['rewarded'] else 'a'
-    else:
-        third_letter = 'B' if action3['rewarded'] else 'b'
-
-    # Combine letters to form the pattern
-    pattern = f"{first_reward}{second_letter}{third_letter}"
-
-    return pattern
-
-def calculate_switch_probabilities(events):
-    """
-    Calculate the probability of switching given the previous three actions.
-
-    Args:
-    - events (list): The list of events.
-
-    Returns:
-    - sorted_patterns (list): List of patterns sorted by ascending switch probability.
-    - sorted_probabilities (list): Corresponding switch probabilities.
-    - counts (list): Counts of each pattern.
-    """
-    pattern_data = {}
-
-    for i in range(3, len(events)):
-        # Previous three actions
-        seq = events[i-3:i]
-        # Next action
-        next_action = events[i]
-
-        # Map the sequence to a pattern
-        pattern = map_sequence_to_pattern(seq)
-
-        # Determine if agent switched on the next trial (based on predictions)
-        switched = 1 if next_action['prediction_choice'] != seq[-1]['prediction_choice'] else 0
-
-        # Update counts
-        if pattern not in pattern_data:
-            pattern_data[pattern] = {'switches': 0, 'total': 0}
-        pattern_data[pattern]['total'] += 1
-        if switched:
-            pattern_data[pattern]['switches'] += 1
-
-    # Calculate probabilities and prepare for sorting
-    patterns = []
-    probabilities = []
-    counts = []
-    for pattern, data in pattern_data.items():
-        total = data['total']
-        switches = data['switches']
-        prob = switches / total if total > 0 else 0
-        patterns.append(pattern)
-        probabilities.append(prob)
-        counts.append(total)
-
-    # Sort patterns alphabetically
-    sorted_indices = np.argsort(patterns)
-    sorted_patterns = [patterns[i] for i in sorted_indices]
-    sorted_probabilities = [probabilities[i] for i in sorted_indices]
-    sorted_counts = [counts[i] for i in sorted_indices]
-
-    return sorted_patterns, sorted_probabilities, sorted_counts
-
-def plot_switch_probabilities(patterns, probabilities, counts):
-    """
-    Plot the switch probabilities as a bar chart.
-
-    Args:
-    - patterns (list): List of patterns.
-    - probabilities (list): Corresponding switch probabilities.
-    - counts (list): Counts of each pattern.
-    """
-    # Create the bar chart
-    plt.figure(figsize=(18, 6))
-    bars = plt.bar(range(len(patterns)), probabilities, tick_label=patterns)
-
-    # Annotate bars with counts
-    for bar, count in zip(bars, counts):
-        height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2.0, height, f'n={count}', ha='center', va='bottom', fontsize=8)
-
-    plt.xlabel('History')
-    plt.ylabel('Probability of Switching')
-    plt.title('Probability of Switching Given the Previous Three Actions')
-    plt.xticks(rotation=90)
-    plt.ylim(0, 1)
-    plt.tight_layout()
-    plt.savefig(f'../../graphs/{rflr}_F_conditional_switching.png')
-
 # Main code
 
-rflr = 'model_1M'
+prefix = 'model_1M'
 
 # Define the file paths
 behavior_filename = "../../data/2ABT_behavior_run_4.txt"
@@ -385,10 +226,10 @@ else:
     block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
 
     # Plot the probabilities
-    plot_probabilities(block_positions, high_reward_prob, switch_prob)
+    plot_probabilities(block_positions, high_reward_prob, switch_prob, prefix, "../")
 
     # Calculate switch probabilities
     sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
 
     # Plot the switch probabilities
-    plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
+    plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts, prefix, "../")

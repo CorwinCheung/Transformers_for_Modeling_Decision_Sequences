@@ -63,3 +63,25 @@ GPTConfig parameters:
   Number of layers: 2
   Number of heads: 2
   Embedding size: 64
+
+Model name: model_seen921M
+  Num Parameters: 101120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 921600000
+
+Total batch size: 3,072
+
+Max steps: 300,000
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
