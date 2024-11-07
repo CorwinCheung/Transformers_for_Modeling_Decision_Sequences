@@ -143,9 +143,11 @@ class GPT(nn.Module):
 
 
 class DataLoaderLite:
-    def __init__(self, B, T, run_number):
+    def __init__(self, B, T, process_rank, num_processes, run_number):
         self.B = B
         self.T = T
+        self.process_rank = process_rank
+        self.num_processes = num_processes
         with open(f'../data/2ABT_behavior_run_{run_number}.txt', 'r') as f:
             text = f.read().replace("\n", "")
         
@@ -154,15 +156,15 @@ class DataLoaderLite:
         tokens = [stoi[ch] for ch in text if ch in stoi]
         print(f"read in {len(tokens)} tokens")
         self.tokens = torch.tensor(tokens, dtype=torch.long)
-        self.current_position = 0
+        self.current_position = self.B * self.T * self.process_rank
 
     def next_batch(self):
         B, T = self.B, self.T
         buf = self.tokens[self.current_position:self.current_position + B * T + 1]
         x = buf[:-1].view(B, T)
         y = buf[1:].view(B, T)
-        self.current_position += B * T
-        if self.current_position + B * T + 1 > len(self.tokens):
-            self.current_position = 0
+        self.current_position += B * T * self.num_processes
+        if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
+            self.current_position = self.B * self.T * self.process_rank
         return x, y
 

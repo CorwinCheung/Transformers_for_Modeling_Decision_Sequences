@@ -13,14 +13,17 @@ compile = True
 
 master_process = None
 
+#regular undistributed one GPU/cpu python train.py
+#launch ddp with
+#torchrun --standalone --nproc_per_node=2 train.py
 ddp = int(os.environ.get('RANK', -1)) != -1
 if ddp:
     assert torch.cuda.is_available(), "need CUDA for DDP"
     init_process_group(backend="nccl")
     ddp_rank = int(os.environ['RANK'])
     ddp_local_rank = int(os.environ['LOCAL_RANK'])
-    ddp_global_rank = int(os.environ['WORLD_SIZE'])
-    device = f'cuda:{ddp_local_rank}'
+    ddp_world_size = int(os.environ['WORLD_SIZE'])
+    device = torch.device(f'cuda:{ddp_local_rank}')
     torch.cuda.set_device(device)
     master_process = ddp_rank == 0
 else:
@@ -46,28 +49,27 @@ if master_process:
     print(f"total desired batch size: {total_batch_size}")
     print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
 
-print("I am GPU ", ddp_rank)
-print("Bye")
-import sys; sys.exit(0)
-
-train_loader = DataLoaderLite(B=B, T=T, run_number=run_number)
+train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=run_number)
 # val_loader = DataLoaderLite(B=B, T=T) #to do
 
 torch.set_float32_matmul_precision('high')
 
-
+#create model
 model = GPT(GPTConfig(vocab_size=4))
 model.to(device)
 
 if compile:
     model = torch.compile(model)
+if ddp:
+    model = DDP(model, device_ids = [ddp_local_rank])
+raw_model = model.module if ddp else model
 
 
 # Learning rate schedule
 max_lr = 6e-4
 min_lr = max_lr * 0.1
-warmup_steps = 10
-max_steps = 300000
+warmup_steps = 1000
+max_steps = 150000
 
 tokens_trained_on = total_batch_size * max_steps
 def format_tokens(tokens):
@@ -89,7 +91,7 @@ def get_lr(it):
     decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-optimizer = model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device, master_process=master_process)
+optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device, master_process=master_process)
 
 # Training loop
 for step in range(max_steps):
@@ -108,7 +110,11 @@ for step in range(max_steps):
         logits, loss = model(x, y)
         loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
         loss_accum += loss.detach()  # Track the total loss
+        if ddp:
+            model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
         loss.backward()  # Backpropagate gradients
+    if ddp:
+        dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
 
     # Clip gradients to prevent exploding gradients
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -123,11 +129,12 @@ for step in range(max_steps):
     # Time the step and calculate tokens processed per second
     t1 = time.time()
     dt = (t1 - t0) * 1000  # Time in milliseconds
-    tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps / (t1 - t0)
+    tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp_world_size/ (t1 - t0)
 
     # Print logging information every 100 steps
     if step % 100 == 0:
-        print(f"step {step} | loss: {loss_accum.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
+        if master_process:
+            print(f"step {step} | loss: {loss_accum.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
 
 if compile:
     torch.save(model._orig_mod.state_dict(), f'{model_name}.pth')
