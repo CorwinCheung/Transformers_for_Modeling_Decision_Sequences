@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 from graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
+from scipy.stats import bootstrap
 
 global rflr
 
@@ -148,19 +149,45 @@ def calculate_probabilities(events):
             if pos in block_positions:
                 high_reward_data[pos].append(event['selected_high'])
                 switch_data[pos].append(event['switch'])
+
     high_reward_prob = []
+    high_reward_ci_lower = []
+    high_reward_ci_upper = []
     switch_prob = []
+    switch_ci_lower = []
+    switch_ci_upper = []
+
     for pos in block_positions:
         if high_reward_data[pos]:
-            high_reward_prob.append(np.mean(high_reward_data[pos]))
+            data = np.array(high_reward_data[pos])
+            prob = np.mean(data)
+            res = bootstrap((data,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
+            ci_lower = res.confidence_interval.low
+            ci_upper = res.confidence_interval.high
+            high_reward_prob.append(prob)
+            high_reward_ci_lower.append(ci_lower)
+            high_reward_ci_upper.append(ci_upper)
         else:
             high_reward_prob.append(np.nan)
+            high_reward_ci_lower.append(np.nan)
+            high_reward_ci_upper.append(np.nan)
+
         if switch_data[pos]:
-            switch_prob.append(np.mean(switch_data[pos]))
+            data = np.array(switch_data[pos])
+            prob = np.mean(data)
+            res = bootstrap((data,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
+            ci_lower = res.confidence_interval.low
+            ci_upper = res.confidence_interval.high
+            switch_prob.append(prob)
+            switch_ci_lower.append(ci_lower)
+            switch_ci_upper.append(ci_upper)
         else:
             switch_prob.append(np.nan)
+            switch_ci_lower.append(np.nan)
+            switch_ci_upper.append(np.nan)
 
-    return block_positions, high_reward_prob, switch_prob
+    return block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper
+
 
 # Main code
 
@@ -195,13 +222,13 @@ else:
         #     print(event)
 
         # Calculate probabilities for block positions
-        block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
+        block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper = calculate_probabilities(events)
 
         # Plot the probabilities
-        plot_probabilities(block_positions, high_reward_prob, switch_prob, prefix)
+        plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix)
 
         # Calculate switch probabilities
-        sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
+        sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
 
         # Plot the switch probabilities
-        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts, prefix)
+        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix)

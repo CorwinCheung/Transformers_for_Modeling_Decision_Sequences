@@ -6,6 +6,8 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')
 sys.path.insert(0, project_root)
 #so that I can import from a directory two levels up
 from evaluation.graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
+from scipy.stats import bootstrap
+
 
 global rflr
 
@@ -168,32 +170,73 @@ def align_events_with_predictions(events, predictions):
     return events
 
 def calculate_probabilities(events):
-    block_positions = list(range(-10, 21))  # This range includes both negative and positive
+    block_positions = list(range(-10, 21))  # This range includes both negative and positive positions
+
+    # Initialize lists to store probabilities and confidence intervals
     high_reward_prob = []
+    high_reward_ci_lower = []
+    high_reward_ci_upper = []
     switch_prob = []
+    switch_ci_lower = []
+    switch_ci_upper = []
 
     for pos in block_positions:
         selected_high = []
         switches = []
 
-        # Gather probabilities for both positive and negative positions
+        # Gather data for the current block position
         for event in events:
-            if pos in event['block_position']:  # If the position (either positive or negative) is in the list
+            if pos in event['block_position']:
                 selected_high.append(event['selected_high_prediction'])
                 switches.append(event['switch'])
 
-        # Calculate probabilities for each block position
+        # Calculate high-reward probabilities and bootstrap confidence intervals
         if selected_high:
-            high_reward_prob.append(np.mean(selected_high))
-        else:
-            high_reward_prob.append(np.nan)  # Use NaN for positions with no data
+            data = np.array(selected_high)
+            prob = np.mean(data)
+            high_reward_prob.append(prob)
 
+            # Check if there are enough data points for bootstrapping
+            if len(data) > 1:
+                res = bootstrap((data,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
+                ci_lower = res.confidence_interval.low
+                ci_upper = res.confidence_interval.high
+            else:
+                # If only one data point, set CI equal to the point estimate
+                ci_lower = prob
+                ci_upper = prob
+
+            high_reward_ci_lower.append(ci_lower)
+            high_reward_ci_upper.append(ci_upper)
+        else:
+            # No data for this position; append NaN
+            high_reward_prob.append(np.nan)
+            high_reward_ci_lower.append(np.nan)
+            high_reward_ci_upper.append(np.nan)
+
+        # Calculate switch probabilities and bootstrap confidence intervals
         if switches:
-            switch_prob.append(np.mean(switches))
-        else:
-            switch_prob.append(np.nan)  # Use NaN for positions with no data
+            data = np.array(switches)
+            prob = np.mean(data)
+            switch_prob.append(prob)
 
-    return block_positions, high_reward_prob, switch_prob
+            if len(data) > 1:
+                res = bootstrap((data,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
+                ci_lower = res.confidence_interval.low
+                ci_upper = res.confidence_interval.high
+            else:
+                ci_lower = prob
+                ci_upper = prob
+
+            switch_ci_lower.append(ci_lower)
+            switch_ci_upper.append(ci_upper)
+        else:
+            switch_prob.append(np.nan)
+            switch_ci_lower.append(np.nan)
+            switch_ci_upper.append(np.nan)
+
+    # Return the block positions, probabilities, and confidence intervals
+    return block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper
 
 # Main code
 
@@ -227,13 +270,13 @@ else:
     print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
     # Calculate probabilities for block positions
-    block_positions, high_reward_prob, switch_prob = calculate_probabilities(events)
+    block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper = calculate_probabilities(events)
 
     # Plot the probabilities
-    plot_probabilities(block_positions, high_reward_prob, switch_prob, prefix, "../")
+    plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix, "../")
 
     # Calculate switch probabilities
-    sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
+    sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
 
     # Plot the switch probabilities
-    plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts, prefix, "../")
+    plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix, "../")

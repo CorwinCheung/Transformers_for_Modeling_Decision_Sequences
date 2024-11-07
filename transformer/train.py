@@ -37,7 +37,7 @@ torch.manual_seed(42)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(1337)
 # Training setup
-total_batch_size = 3072
+total_batch_size = 6144
 B = 256
 T = 12
 assert total_batch_size % (B*T*ddp_world_size) == 0, "make sure total batch size is divisible by B * T * ddp_world_size"
@@ -45,6 +45,10 @@ grad_accum_steps = total_batch_size//(B*T*ddp_world_size)
 if master_process:
     print(f"total desired batch size: {total_batch_size}")
     print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
+
+print("I am GPU ", ddp_rank)
+print("Bye")
+import sys; sys.exit(0)
 
 train_loader = DataLoaderLite(B=B, T=T, run_number=run_number)
 # val_loader = DataLoaderLite(B=B, T=T) #to do

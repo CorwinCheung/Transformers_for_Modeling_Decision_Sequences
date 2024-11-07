@@ -1,34 +1,36 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import bootstrap
 
-def plot_probabilities(block_positions, high_reward_prob, switch_prob, prefix, directory_escape=""):
+
+def plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix, directory_escape=""):
     # Plot P(high port)
     plt.figure(figsize=(10, 5))
     plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
+    plt.fill_between(block_positions, high_reward_ci_lower, high_reward_ci_upper, color='blue', alpha=0.2)
     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
     plt.xlabel("Block Position")
     plt.ylabel("P(high port)")
-    plt.title("Probability of Selecting High-Reward Port")
+    plt.title("Probability of Selecting High-Reward Port with 95% CI")
     plt.legend()
-    plt.ylim(0, 1)  # Adjust y-axis limits as needed
+    plt.ylim(0, 1)
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(f'../{directory_escape}graphs/{prefix}_G_selecting_high_reward_port.png')
-    # plt.show()
 
     # Plot P(switch)
     plt.figure(figsize=(10, 5))
     plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
+    plt.fill_between(block_positions, switch_ci_lower, switch_ci_upper, color='blue', alpha=0.2)
     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
     plt.xlabel("Block Position")
     plt.ylabel("P(switch)")
-    plt.title("Probability of Switching")
+    plt.title("Probability of Switching with 95% CI")
     plt.legend()
-    plt.ylim(0, max(switch_prob) * 1.1) 
+    plt.ylim(0, 1.1 * max(switch_prob))
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(f'../{directory_escape}graphs/{prefix}_G_switch_probabilities.png')
-    # plt.show()
 
 def map_sequence_to_pattern(seq):
     action1, action2, action3 = seq
@@ -73,44 +75,65 @@ def calculate_switch_probabilities(events):
 
         # Update counts
         if pattern not in pattern_data:
-            pattern_data[pattern] = {'switches': 0, 'total': 0}
-        pattern_data[pattern]['total'] += 1
-        if switched:
-            pattern_data[pattern]['switches'] += 1
+            pattern_data[pattern] = []
+        pattern_data[pattern].append(switched)
 
-    # Calculate probabilities and prepare for sorting
     patterns = []
     probabilities = []
     counts = []
+    ci_lower = []
+    ci_upper = []
+
     for pattern, data in pattern_data.items():
-        total = data['total']
-        switches = data['switches']
+        data_array = np.array(data)
+        total = len(data_array)
+        switches = np.sum(data_array)
         prob = switches / total if total > 0 else 0
+        res = bootstrap((data_array,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
         patterns.append(pattern)
         probabilities.append(prob)
         counts.append(total)
+        ci_lower.append(res.confidence_interval.low)
+        ci_upper.append(res.confidence_interval.high)
 
     # Sort patterns alphabetically
     sorted_indices = np.argsort(patterns)
     sorted_patterns = [patterns[i] for i in sorted_indices]
     sorted_probabilities = [probabilities[i] for i in sorted_indices]
     sorted_counts = [counts[i] for i in sorted_indices]
+    sorted_ci_lower = [ci_lower[i] for i in sorted_indices]
+    sorted_ci_upper = [ci_upper[i] for i in sorted_indices]
 
-    return sorted_patterns, sorted_probabilities, sorted_counts
+    return sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts
 
-def plot_switch_probabilities(patterns, probabilities, counts, prefix, directory_escape = ""):
+
+def plot_switch_probabilities(patterns, probabilities, ci_lower, ci_upper, counts, prefix, directory_escape=""):
+    # Calculate error bars (asymmetric errors)
+    lower_errors = [probabilities[i] - ci_lower[i] for i in range(len(probabilities))]
+    upper_errors = [ci_upper[i] - probabilities[i] for i in range(len(probabilities))]
+    errors = [lower_errors, upper_errors]
+
     # Create the bar chart
     plt.figure(figsize=(18, 6))
-    bars = plt.bar(range(len(patterns)), probabilities, tick_label=patterns)
+    bars = plt.bar(range(len(patterns)), probabilities, yerr=errors, tick_label=patterns, capsize=5)
 
-    # Annotate bars with counts
-    for bar, count in zip(bars, counts):
+    # Annotate bars with counts, positioning the text above the error bars
+    for idx, (bar, count) in enumerate(zip(bars, counts)):
         height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2.0, height, f'n={count}', ha='center', va='bottom', fontsize=8)
+        upper_error = upper_errors[idx]
+        # Set the text position above the upper error bar
+        plt.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            height + upper_error + 0.02,  # Adjust 0.02 as needed for spacing
+            f'n={count}',
+            ha='center',
+            va='bottom',
+            fontsize=8
+        )
 
     plt.xlabel('History')
     plt.ylabel('Probability of Switching')
-    plt.title('Probability of Switching Given the Previous Three Actions')
+    plt.title('Probability of Switching Given the Previous Three Actions with 95% CI')
     plt.xticks(rotation=90)
     plt.ylim(0, 1)
     plt.tight_layout()
