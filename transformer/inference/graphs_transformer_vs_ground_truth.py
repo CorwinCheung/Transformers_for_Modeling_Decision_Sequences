@@ -1,7 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from ...evaluation.graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
+import sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+sys.path.insert(0, project_root)
+#so that I can import from a directory two levels up
+from evaluation.graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
 
 global rflr
 
@@ -193,12 +197,12 @@ def calculate_probabilities(events):
 
 # Main code
 
-prefix = 'model_100k'
+prefix = 'model_1M'
 
 # Define the file paths
-behavior_filename = "../../data/2ABT_behavior_run_3.txt"
-high_port_filename = "../../data/2ABT_high_port_run_3.txt"
-predictions_filename = "Preds_for_3_with_model_seen92M.txt"
+behavior_filename = "../../data/2ABT_behavior_run_4.txt"
+high_port_filename = "../../data/2ABT_high_port_run_4.txt"
+predictions_filename = "Preds_for_4_with_model_seen92M.txt"
 
 # Check if files exist
 if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(predictions_filename):
