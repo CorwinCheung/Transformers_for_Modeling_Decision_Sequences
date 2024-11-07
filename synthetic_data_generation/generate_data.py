@@ -24,7 +24,6 @@ def generate_data(num_steps, agent, environment):
     for step in range(num_steps):
         choice = agent.make_choice()
         reward, transitioned = environment.step(choice)
-        high_port_data.append(str(high_port))
         if choice == 0:  # Left choice
             behavior_data.append('L' if reward else 'l')
         else:  # Right choice
@@ -32,6 +31,7 @@ def generate_data(num_steps, agent, environment):
         # Update high port if a transition occurred
         if transitioned:
             high_port = 1 - high_port  # Switch high port
+        high_port_data.append(str(high_port))
         agent.update_phi(choice, reward)
     return behavior_data, high_port_data
 
@@ -39,7 +39,7 @@ def main():
     num_steps = 10000
 
     environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
-    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
+    agent = RFLR_mouse(alpha=-0.5, beta=2.1, tau=1.4, policy="greedy_policy")
 
     behavior_data, high_port_data = generate_data(num_steps, agent, environment)
 

@@ -165,22 +165,22 @@ def calculate_probabilities(events):
 # Main code
 
 prefix = ''
-ground_truth = False
+ground_truth = True
 if ground_truth:
     prefix = 'rflr_1M'
 else:
     prefix = 'new_gen'
 
 # Define the file paths
-behavior_filename = "../data/2ABT_behavior_run_3.txt"
-high_port_filename = "../data/2ABT_high_port_run_3.txt"
+behavior_filename = "../data/2ABT_behavior_run_4.txt"
+high_port_filename = "../data/2ABT_high_port_run_4.txt"
 
 # Check if files exist
 if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):
     print("Behavior file or high port file not found!")
 else:
     # Parse the files
-    events = parse_files(behavior_filename, high_port_filename, clip_short_blocks=True)
+    events = parse_files(behavior_filename, high_port_filename)
 
     if events is not None:
         # Calculate and print the percent of trials with a switch
@@ -204,4 +204,4 @@ else:
         sorted_patterns, sorted_probabilities, sorted_counts = calculate_switch_probabilities(events)
 
         # Plot the switch probabilities
-        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts)
+        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_counts, prefix)

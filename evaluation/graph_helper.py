@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def plot_probabilities(block_positions, high_reward_prob, switch_prob, prefix, directory_escape=""):
     # Plot P(high port)

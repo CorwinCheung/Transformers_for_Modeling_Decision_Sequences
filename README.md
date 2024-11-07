@@ -23,7 +23,7 @@ Project Organization
     ├── evaluation
     │   ├── basic_evaluation.py        <- Basic metrics: reward, choice correctness(selects high port?), transitions.
     │   ├── graphs_on_trial_block_transitions.py <- Graphs prob switch, high port, and conditional probs(last 3 steps).
-    │   └── switch_probabilities.py    <- Calculates switch percentage in sequences.
+    │   └── graph_helper.py            <- Functions shared between graphs_on_trial... and graphs_transformer_vs_...
 
     ├── transformer
     │   ├── inference
