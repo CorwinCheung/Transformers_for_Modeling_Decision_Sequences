@@ -4,3 +4,4 @@ pytorch==2.4.1
 torchvision==0.19.1
 transformers==4.44.1
 scipy==1.13.1
+wandb==0.17.5

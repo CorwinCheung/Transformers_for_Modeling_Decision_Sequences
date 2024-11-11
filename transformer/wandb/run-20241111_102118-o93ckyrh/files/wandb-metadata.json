@@ -1,0 +1,17 @@
+{
+  "os": "macOS-14.6.1-arm64-arm-64bit",
+  "python": "3.12.3",
+  "startedAt": "2024-11-11T15:21:18.995343Z",
+  "program": "/Users/corwin/Building/NeuroAI_Research/Transformers_for_Modeling_Decision_Sequences/transformer/train.py",
+  "codePath": "transformer/train.py",
+  "git": {
+    "remote": "https://github.com/CorwinCheung/Transformers_for_Modeling_Decision_Sequences.git",
+    "commit": "7b1f5b9ae1716a71087cece97805ee3fd5ac12b7"
+  },
+  "email": "corwincheung@college.harvard.edu",
+  "root": "/Users/corwin/Building/NeuroAI_Research/Transformers_for_Modeling_Decision_Sequences/transformer",
+  "host": "Corwins-MacBook-Pro.local",
+  "username": "corwin",
+  "executable": "/Users/corwin/anaconda3/envs/transformers/bin/python",
+  "codePathLocal": "train.py"
+}

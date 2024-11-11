@@ -2,6 +2,7 @@ import torch
 import math
 import os
 import time
+import wandb
 from torch.distributed import init_process_group, destroy_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
@@ -69,7 +70,7 @@ raw_model = model.module if ddp else model
 max_lr = 6e-4
 min_lr = max_lr * 0.1
 warmup_steps = 1000
-max_steps = 150000
+max_steps = 1500
 
 tokens_trained_on = total_batch_size * max_steps
 def format_tokens(tokens):
@@ -92,6 +93,24 @@ def get_lr(it):
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
 optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device, master_process=master_process)
+
+if master_process:
+    wandb.init(
+        project="gpt-training",   # Set your wandb project name
+        config={
+            "run_number": run_number,
+            "total_batch_size": total_batch_size,
+            "max_lr": max_lr,
+            "min_lr": min_lr,
+            "warmup_steps": warmup_steps,
+            "max_steps": max_steps,
+            "B": B,
+            "T": T,
+            "grad_accum_steps": grad_accum_steps,
+            "vocab_size": 4,
+        }
+    )
+    wandb.watch(model)
 
 # Training loop
 for step in range(max_steps):
@@ -134,12 +153,23 @@ for step in range(max_steps):
     # Print logging information every 100 steps
     if step % 100 == 0:
         if master_process:
-            print(f"step {step} | loss: {loss_accum.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
+            if master_process:
+                wandb.log({
+                    "step": step,
+                    "loss": loss_accum.item(),
+                    "lr": lr,
+                    "grad_norm": norm,
+                    "step_time_ms": dt,
+                    "tokens_per_sec": tokens_per_sec,
+                })
+                print(f"step {step} | loss: {loss_accum.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
+
 
 if compile:
     torch.save(model._orig_mod.state_dict(), f'{model_name}.pth')
 else:
     torch.save(model.state_dict(), f'{model_name}.pth')
+
 
 def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
     metadata_filename = "model_metadata.txt"
@@ -165,7 +195,10 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, config
     print(f"Metadata saved to {metadata_filename}")
 
 # Call this function after the model training code
-write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
+if master_process:
+    write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
+    wandb.save(f"{model_name}.pth")  # Save the model checkpoint to wandb
+    wandb.finish()
 
 if ddp:
     destroy_process_group()
