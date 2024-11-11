@@ -85,3 +85,91 @@ GPTConfig parameters:
   Number of layers: 2
   Number of heads: 2
   Embedding size: 64
+
+Model name: wandb_model_seen9M
+  Num Parameters: 101120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 9216000
+
+Total batch size: 6,144
+
+Max steps: 1,500
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
+
+Model name: wandb_model_seen9M
+  Num Parameters: 101120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 9216000
+
+Total batch size: 6,144
+
+Max steps: 1,500
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
+
+Model name: wandb_model_seen9M
+  Num Parameters: 101120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 9216000
+
+Total batch size: 6,144
+
+Max steps: 1,500
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
+
+Model name: wandb_model_seen92M
+  Num Parameters: 101120
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 92160000
+
+Total batch size: 6,144
+
+Max steps: 15,000
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 2
+  Number of heads: 2
+  Embedding size: 64
