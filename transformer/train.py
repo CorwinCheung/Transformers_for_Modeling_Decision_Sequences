@@ -1,3 +1,4 @@
+import argparse
 import torch
 import math
 import numpy as np
@@ -11,6 +12,19 @@ from transformer import GPT, GPTConfig, DataLoaderLite
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train GPT model with hyperparameter tuning.')
+    parser.add_argument('--sequence_length', type=int, default=12, help='Sequence length (T) for training.')
+    parser.add_argument('--n_layer', type=int, default=2, help='Number of transformer layers.')
+    parser.add_argument('--n_head', type=int, default=2, help='Number of attention heads.')
+    parser.add_argument('--n_embd', type=int, default=64, help='Embedding size.')
+    parser.add_argument('--epochs', type=int, default=921, help='Maximum number of training steps.')
+    parser.add_argument('--learning_rate', type=float, default=6e-4, help='Learning rate for the optimizer.')
+    parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
 
 run_number = 2
 compile = True
@@ -46,7 +60,7 @@ if torch.cuda.is_available():
 # Training setup
 total_batch_size = 6144
 B = 256
-T = 12
+T = args.sequence_length
 assert total_batch_size % (B*T*ddp_world_size) == 0, "make sure total batch size is divisible by B * T * ddp_world_size"
 grad_accum_steps = total_batch_size//(B*T*ddp_world_size)
 if master_process:
@@ -60,7 +74,7 @@ val_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_w
 torch.set_float32_matmul_precision('high')
 
 #create model
-model = GPT(GPTConfig(vocab_size=4))
+model = GPT(GPTConfig(vocab_size=4, block_size=T, n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd))
 model.to(device)
 
 if compile:
@@ -71,10 +85,10 @@ raw_model = model.module if ddp else model
 
 
 # Learning rate schedule
-max_lr = 6e-4
+max_lr = args.max_lr
 min_lr = max_lr * 0.1
 warmup_steps = 1000
-max_steps = 15000
+max_steps = (100000/6144) * args.epochs
 
 tokens_trained_on = total_batch_size * max_steps
 def format_tokens(tokens):
@@ -86,7 +100,7 @@ def format_tokens(tokens):
     else:
         return str(tokens)
 
-model_name = f"wandb_model_seen{format_tokens(tokens_trained_on)}"
+model_name = f"wandb_model_task_{args.task_id}_seen{format_tokens(tokens_trained_on)}"
 
 def get_lr(it):
     if it < warmup_steps:
@@ -96,11 +110,11 @@ def get_lr(it):
     decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=6e-4, device=device, master_process=master_process)
+optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=args.learning_rate, device=device, master_process=master_process)
 
 if master_process:
     wandb.init(
-        project="gpt-training",   # Set your wandb project name
+        project="gpt-training",
         config={
             "run_number": run_number,
             "total_batch_size": total_batch_size,
@@ -112,7 +126,13 @@ if master_process:
             "T": T,
             "grad_accum_steps": grad_accum_steps,
             "vocab_size": 4,
-        }
+            "n_layer": args.n_layer,
+            "n_head": args.n_head,
+            "n_embd": args.n_embd,
+            "learning_rate": args.learning_rate,
+            "task_id": args.task_id
+        },
+        name=f"run_task_{args.task_id}",  # Name the run based on the task ID
     )
     wandb.watch(model)
 
