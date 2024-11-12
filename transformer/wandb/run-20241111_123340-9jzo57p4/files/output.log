@@ -1,0 +1,165 @@
+step 0 | loss: 1.2247 | loss: 1.2098 | lr: 6.0000e-07 | norm: 2.7040 | dt: 6657.39 ms | tok/sec: 922.88
+step 100 | loss: 0.9227 | loss: 0.9036 | lr: 6.0600e-05 | norm: 1.2793 | dt: 5.07 ms | tok/sec: 1212582.52
+step 200 | loss: 0.8188 | loss: 0.8166 | lr: 1.2060e-04 | norm: 0.9649 | dt: 5.31 ms | tok/sec: 1156841.61
+step 300 | loss: 0.7787 | loss: 0.7692 | lr: 1.8060e-04 | norm: 0.5078 | dt: 5.03 ms | tok/sec: 1222650.46
+step 400 | loss: 0.7804 | loss: 0.7571 | lr: 2.4060e-04 | norm: 0.4026 | dt: 5.08 ms | tok/sec: 1208374.93
+step 500 | loss: 0.7674 | loss: 0.7622 | lr: 3.0060e-04 | norm: 0.3609 | dt: 5.90 ms | tok/sec: 1041540.85
+step 600 | loss: 0.7657 | loss: 0.7598 | lr: 3.6060e-04 | norm: 0.4420 | dt: 5.08 ms | tok/sec: 1209963.55
+step 700 | loss: 0.7684 | loss: 0.7549 | lr: 4.2060e-04 | norm: 0.3780 | dt: 5.06 ms | tok/sec: 1214754.59
+step 800 | loss: 0.7740 | loss: 0.7595 | lr: 4.8060e-04 | norm: 0.2206 | dt: 5.07 ms | tok/sec: 1211043.93
+step 900 | loss: 0.7650 | loss: 0.7586 | lr: 5.4060e-04 | norm: 0.2995 | dt: 5.02 ms | tok/sec: 1224044.26
+step 1000 | loss: 0.7624 | loss: 0.7614 | lr: 6.0000e-04 | norm: 0.3738 | dt: 5.48 ms | tok/sec: 1120767.35
+New best validation loss: 0.7614. Model checkpoint saved at step 1000.
+step 1100 | loss: 0.7644 | loss: 0.7525 | lr: 5.9993e-04 | norm: 0.2860 | dt: 6.91 ms | tok/sec: 889595.55
+step 1200 | loss: 0.7700 | loss: 0.7598 | lr: 5.9973e-04 | norm: 0.2183 | dt: 5.03 ms | tok/sec: 1222244.54
+step 1300 | loss: 0.7612 | loss: 0.7670 | lr: 5.9939e-04 | norm: 0.2362 | dt: 5.03 ms | tok/sec: 1222012.70
+step 1400 | loss: 0.7591 | loss: 0.7503 | lr: 5.9891e-04 | norm: 0.3350 | dt: 5.02 ms | tok/sec: 1224975.22
+step 1500 | loss: 0.7629 | loss: 0.7624 | lr: 5.9830e-04 | norm: 0.3517 | dt: 5.70 ms | tok/sec: 1078821.27
+step 1600 | loss: 0.7683 | loss: 0.7633 | lr: 5.9756e-04 | norm: 0.3060 | dt: 5.04 ms | tok/sec: 1219525.99
+step 1700 | loss: 0.7573 | loss: 0.7471 | lr: 5.9668e-04 | norm: 0.1981 | dt: 5.10 ms | tok/sec: 1205774.09
+step 1800 | loss: 0.7566 | loss: 0.7717 | lr: 5.9566e-04 | norm: 0.3114 | dt: 5.10 ms | tok/sec: 1204590.46
+step 1900 | loss: 0.7613 | loss: 0.7624 | lr: 5.9451e-04 | norm: 0.3547 | dt: 5.08 ms | tok/sec: 1208941.82
+step 2000 | loss: 0.7626 | loss: 0.7595 | lr: 5.9323e-04 | norm: 0.2733 | dt: 5.10 ms | tok/sec: 1204083.91
+New best validation loss: 0.7595. Model checkpoint saved at step 2000.
+step 2100 | loss: 0.7548 | loss: 0.7673 | lr: 5.9182e-04 | norm: 0.2488 | dt: 5.05 ms | tok/sec: 1215728.82
+step 2200 | loss: 0.7541 | loss: 0.7641 | lr: 5.9027e-04 | norm: 0.3184 | dt: 5.09 ms | tok/sec: 1206225.60
+step 2300 | loss: 0.7572 | loss: 0.7635 | lr: 5.8859e-04 | norm: 0.3782 | dt: 5.05 ms | tok/sec: 1217624.45
+step 2400 | loss: 0.7579 | loss: 0.7701 | lr: 5.8679e-04 | norm: 0.2897 | dt: 5.05 ms | tok/sec: 1215728.82
+step 2500 | loss: 0.7510 | loss: 0.7667 | lr: 5.8485e-04 | norm: 0.2937 | dt: 5.55 ms | tok/sec: 1106332.54
+step 2600 | loss: 0.7503 | loss: 0.7711 | lr: 5.8278e-04 | norm: 0.3398 | dt: 5.05 ms | tok/sec: 1217624.45
+step 2700 | loss: 0.7538 | loss: 0.7658 | lr: 5.8059e-04 | norm: 0.4290 | dt: 5.08 ms | tok/sec: 1208658.31
+step 2800 | loss: 0.7541 | loss: 0.7722 | lr: 5.7827e-04 | norm: 0.3723 | dt: 5.04 ms | tok/sec: 1219525.99
+step 2900 | loss: 0.7479 | loss: 0.7799 | lr: 5.7583e-04 | norm: 0.4398 | dt: 5.06 ms | tok/sec: 1214983.68
+step 3000 | loss: 0.7459 | loss: 0.7627 | lr: 5.7326e-04 | norm: 0.3573 | dt: 5.10 ms | tok/sec: 1204590.46
+Validation loss did not improve at step 3000. No checkpoint saved.
+step 3100 | loss: 0.7477 | loss: 0.7807 | lr: 5.7057e-04 | norm: 0.4336 | dt: 5.04 ms | tok/sec: 1220218.94
+step 3200 | loss: 0.7459 | loss: 0.7805 | lr: 5.6776e-04 | norm: 0.4007 | dt: 5.03 ms | tok/sec: 1221954.75
+step 3300 | loss: 0.7406 | loss: 0.7632 | lr: 5.6483e-04 | norm: 0.4592 | dt: 5.07 ms | tok/sec: 1212525.47
+step 3400 | loss: 0.7407 | loss: 0.7909 | lr: 5.6178e-04 | norm: 0.4486 | dt: 5.04 ms | tok/sec: 1219930.12
+step 3500 | loss: 0.7360 | loss: 0.7824 | lr: 5.5862e-04 | norm: 0.4537 | dt: 5.86 ms | tok/sec: 1048064.25
+step 3600 | loss: 0.7385 | loss: 0.7831 | lr: 5.5533e-04 | norm: 0.4705 | dt: 5.03 ms | tok/sec: 1222070.65
+step 3700 | loss: 0.7324 | loss: 0.7922 | lr: 5.5194e-04 | norm: 0.4307 | dt: 5.06 ms | tok/sec: 1215327.47
+step 3800 | loss: 0.7330 | loss: 0.7903 | lr: 5.4843e-04 | norm: 0.4605 | dt: 6.03 ms | tok/sec: 1019617.15
+step 3900 | loss: 0.7294 | loss: 0.7896 | lr: 5.4482e-04 | norm: 0.5328 | dt: 5.07 ms | tok/sec: 1211271.62
+step 4000 | loss: 0.7266 | loss: 0.8014 | lr: 5.4109e-04 | norm: 0.5034 | dt: 5.67 ms | tok/sec: 1083994.61
+Validation loss did not improve at step 4000. No checkpoint saved.
+step 4100 | loss: 0.7237 | loss: 0.8004 | lr: 5.3726e-04 | norm: 0.5169 | dt: 5.01 ms | tok/sec: 1226491.07
+step 4200 | loss: 0.7244 | loss: 0.8049 | lr: 5.3333e-04 | norm: 0.5271 | dt: 5.03 ms | tok/sec: 1220450.10
+step 4300 | loss: 0.7234 | loss: 0.8000 | lr: 5.2929e-04 | norm: 0.5842 | dt: 5.03 ms | tok/sec: 1221723.03
+step 4400 | loss: 0.7213 | loss: 0.8066 | lr: 5.2515e-04 | norm: 0.5372 | dt: 5.05 ms | tok/sec: 1216302.63
+step 4500 | loss: 0.7174 | loss: 0.8201 | lr: 5.2092e-04 | norm: 0.5587 | dt: 5.74 ms | tok/sec: 1071064.16
+step 4600 | loss: 0.7165 | loss: 0.8000 | lr: 5.1659e-04 | norm: 0.5663 | dt: 5.11 ms | tok/sec: 1201389.45
+step 4700 | loss: 0.7126 | loss: 0.8241 | lr: 5.1216e-04 | norm: 0.6442 | dt: 5.03 ms | tok/sec: 1221665.11
+step 4800 | loss: 0.7094 | loss: 0.8259 | lr: 5.0764e-04 | norm: 0.6405 | dt: 5.03 ms | tok/sec: 1220507.90
+step 4900 | loss: 0.7099 | loss: 0.8077 | lr: 5.0304e-04 | norm: 0.7310 | dt: 5.34 ms | tok/sec: 1150951.49
+step 5000 | loss: 0.7093 | loss: 0.8377 | lr: 4.9834e-04 | norm: 0.6840 | dt: 17.07 ms | tok/sec: 359933.57
+Validation loss did not improve at step 5000. No checkpoint saved.
+step 5100 | loss: 0.7020 | loss: 0.8310 | lr: 4.9356e-04 | norm: 0.7324 | dt: 5.05 ms | tok/sec: 1215442.12
+step 5200 | loss: 0.7007 | loss: 0.8273 | lr: 4.8870e-04 | norm: 0.6569 | dt: 5.07 ms | tok/sec: 1211670.29
+step 5300 | loss: 0.7008 | loss: 0.8434 | lr: 4.8376e-04 | norm: 0.7129 | dt: 5.05 ms | tok/sec: 1215786.18
+step 5400 | loss: 0.7056 | loss: 0.8365 | lr: 4.7874e-04 | norm: 0.7913 | dt: 5.12 ms | tok/sec: 1198930.11
+step 5500 | loss: 0.6996 | loss: 0.8322 | lr: 4.7365e-04 | norm: 0.8088 | dt: 5.13 ms | tok/sec: 1198261.13
+step 5600 | loss: 0.6955 | loss: 0.8517 | lr: 4.6848e-04 | norm: 0.7667 | dt: 5.10 ms | tok/sec: 1205322.91
+step 5700 | loss: 0.6917 | loss: 0.8535 | lr: 4.6325e-04 | norm: 0.7658 | dt: 5.03 ms | tok/sec: 1221433.49
+step 5800 | loss: 0.6955 | loss: 0.8583 | lr: 4.5794e-04 | norm: 0.9836 | dt: 5.08 ms | tok/sec: 1209282.20
+step 5900 | loss: 0.6827 | loss: 0.8585 | lr: 4.5258e-04 | norm: 0.8363 | dt: 5.07 ms | tok/sec: 1212982.06
+step 6000 | loss: 0.6819 | loss: 0.8636 | lr: 4.4715e-04 | norm: 0.8669 | dt: 5.12 ms | tok/sec: 1200661.78
+Validation loss did not improve at step 6000. No checkpoint saved.
+step 6100 | loss: 0.6847 | loss: 0.8805 | lr: 4.4166e-04 | norm: 0.8809 | dt: 5.07 ms | tok/sec: 1210702.55
+step 6200 | loss: 0.6869 | loss: 0.8466 | lr: 4.3612e-04 | norm: 0.8680 | dt: 5.09 ms | tok/sec: 1207865.19
+step 6300 | loss: 0.6794 | loss: 0.8710 | lr: 4.3052e-04 | norm: 0.9712 | dt: 5.06 ms | tok/sec: 1213267.60
+step 6400 | loss: 0.6757 | loss: 0.8841 | lr: 4.2487e-04 | norm: 0.9176 | dt: 5.98 ms | tok/sec: 1027545.11
+step 6500 | loss: 0.6739 | loss: 0.8589 | lr: 4.1918e-04 | norm: 0.8345 | dt: 5.11 ms | tok/sec: 1201389.45
+step 6600 | loss: 0.6734 | loss: 0.9038 | lr: 4.1343e-04 | norm: 0.8395 | dt: 5.06 ms | tok/sec: 1213096.26
+step 6700 | loss: 0.6608 | loss: 0.8979 | lr: 4.0765e-04 | norm: 0.9013 | dt: 5.01 ms | tok/sec: 1227133.51
+step 6800 | loss: 0.6656 | loss: 0.8980 | lr: 4.0183e-04 | norm: 1.0546 | dt: 5.06 ms | tok/sec: 1214754.59
+step 6900 | loss: 0.6682 | loss: 0.9185 | lr: 3.9597e-04 | norm: 0.9722 | dt: 5.05 ms | tok/sec: 1216532.30
+step 7000 | loss: 0.6661 | loss: 0.8978 | lr: 3.9008e-04 | norm: 0.9050 | dt: 5.72 ms | tok/sec: 1073205.22
+Validation loss did not improve at step 7000. No checkpoint saved.
+step 7100 | loss: 0.6544 | loss: 0.9137 | lr: 3.8416e-04 | norm: 0.9533 | dt: 5.04 ms | tok/sec: 1219179.82
+step 7200 | loss: 0.6588 | loss: 0.9389 | lr: 3.7821e-04 | norm: 1.0441 | dt: 5.05 ms | tok/sec: 1216360.04
+step 7300 | loss: 0.6599 | loss: 0.9279 | lr: 3.7224e-04 | norm: 1.1250 | dt: 5.10 ms | tok/sec: 1205830.51
+step 7400 | loss: 0.6582 | loss: 0.9293 | lr: 3.6624e-04 | norm: 1.0727 | dt: 5.05 ms | tok/sec: 1217336.85
+step 7500 | loss: 0.6485 | loss: 0.9256 | lr: 3.6023e-04 | norm: 1.0120 | dt: 5.45 ms | tok/sec: 1127485.29
+step 7600 | loss: 0.6565 | loss: 0.9350 | lr: 3.5420e-04 | norm: 1.1134 | dt: 5.05 ms | tok/sec: 1216647.17
+step 7700 | loss: 0.6542 | loss: 0.9556 | lr: 3.4816e-04 | norm: 1.1226 | dt: 5.08 ms | tok/sec: 1210475.07
+step 7800 | loss: 0.6563 | loss: 0.9383 | lr: 3.4211e-04 | norm: 1.1009 | dt: 5.05 ms | tok/sec: 1216245.22
+step 7900 | loss: 0.6369 | loss: 0.9526 | lr: 3.3606e-04 | norm: 1.1200 | dt: 5.13 ms | tok/sec: 1197926.91
+step 8000 | loss: 0.6406 | loss: 0.9640 | lr: 3.3000e-04 | norm: 1.0720 | dt: 5.14 ms | tok/sec: 1194539.65
+Validation loss did not improve at step 8000. No checkpoint saved.
+step 8100 | loss: 0.6443 | loss: 0.9436 | lr: 3.2394e-04 | norm: 1.1147 | dt: 5.00 ms | tok/sec: 1228830.47
+step 8200 | loss: 0.6473 | loss: 0.9919 | lr: 3.1789e-04 | norm: 1.1563 | dt: 5.06 ms | tok/sec: 1215098.25
+step 8300 | loss: 0.6333 | loss: 0.9661 | lr: 3.1184e-04 | norm: 1.1192 | dt: 5.02 ms | tok/sec: 1223521.21
+step 8400 | loss: 0.6383 | loss: 0.9653 | lr: 3.0580e-04 | norm: 1.2057 | dt: 5.08 ms | tok/sec: 1210418.21
+step 8500 | loss: 0.6420 | loss: 0.9932 | lr: 2.9977e-04 | norm: 1.6361 | dt: 5.12 ms | tok/sec: 1200997.52
+step 8600 | loss: 0.6479 | loss: 0.9866 | lr: 2.9376e-04 | norm: 1.2269 | dt: 5.06 ms | tok/sec: 1214239.45
+step 8700 | loss: 0.6253 | loss: 0.9896 | lr: 2.8776e-04 | norm: 1.0880 | dt: 5.08 ms | tok/sec: 1209849.94
+step 8800 | loss: 0.6250 | loss: 1.0080 | lr: 2.8179e-04 | norm: 0.9939 | dt: 5.07 ms | tok/sec: 1212126.24
+step 8900 | loss: 0.6290 | loss: 1.0089 | lr: 2.7584e-04 | norm: 1.1205 | dt: 5.09 ms | tok/sec: 1206846.99
+step 9000 | loss: 0.6350 | loss: 1.0130 | lr: 2.6992e-04 | norm: 1.2672 | dt: 5.18 ms | tok/sec: 1185581.70
+Validation loss did not improve at step 9000. No checkpoint saved.
+step 9100 | loss: 0.6196 | loss: 1.0096 | lr: 2.6403e-04 | norm: 1.1606 | dt: 5.03 ms | tok/sec: 1221317.71
+step 9200 | loss: 0.6211 | loss: 1.0150 | lr: 2.5817e-04 | norm: 1.2137 | dt: 5.05 ms | tok/sec: 1216762.07
+step 9300 | loss: 0.6264 | loss: 1.0393 | lr: 2.5235e-04 | norm: 1.2550 | dt: 5.03 ms | tok/sec: 1220797.00
+step 9400 | loss: 0.6358 | loss: 1.0236 | lr: 2.4657e-04 | norm: 1.5769 | dt: 5.07 ms | tok/sec: 1211043.93
+step 9500 | loss: 0.6176 | loss: 1.0323 | lr: 2.4082e-04 | norm: 1.4556 | dt: 5.09 ms | tok/sec: 1207582.18
+step 9600 | loss: 0.6193 | loss: 1.0384 | lr: 2.3513e-04 | norm: 1.2094 | dt: 5.07 ms | tok/sec: 1212810.80
+step 9700 | loss: 0.6197 | loss: 1.0188 | lr: 2.2948e-04 | norm: 1.2126 | dt: 6.13 ms | tok/sec: 1001780.59
+step 9800 | loss: 0.6230 | loss: 1.0718 | lr: 2.2388e-04 | norm: 1.2265 | dt: 5.07 ms | tok/sec: 1212468.42
+step 9900 | loss: 0.6089 | loss: 1.0436 | lr: 2.1834e-04 | norm: 1.2988 | dt: 5.04 ms | tok/sec: 1219006.80
+step 10000 | loss: 0.6128 | loss: 1.0456 | lr: 2.1285e-04 | norm: 1.2325 | dt: 5.43 ms | tok/sec: 1131197.22
+Validation loss did not improve at step 10000. No checkpoint saved.
+step 10100 | loss: 0.6190 | loss: 1.0846 | lr: 2.0742e-04 | norm: 1.4068 | dt: 5.11 ms | tok/sec: 1203015.91
+step 10200 | loss: 0.6208 | loss: 1.0665 | lr: 2.0206e-04 | norm: 1.3641 | dt: 4.98 ms | tok/sec: 1232945.97
+step 10300 | loss: 0.6038 | loss: 1.0648 | lr: 1.9675e-04 | norm: 1.2872 | dt: 5.07 ms | tok/sec: 1211784.25
+step 10400 | loss: 0.6044 | loss: 1.0836 | lr: 1.9152e-04 | norm: 1.2246 | dt: 5.09 ms | tok/sec: 1207978.43
+step 10500 | loss: 0.6164 | loss: 1.0838 | lr: 1.8635e-04 | norm: 1.4317 | dt: 5.08 ms | tok/sec: 1209225.46
+step 10600 | loss: 0.6181 | loss: 1.0881 | lr: 1.8126e-04 | norm: 1.4545 | dt: 5.08 ms | tok/sec: 1208601.62
+step 10700 | loss: 0.5997 | loss: 1.0901 | lr: 1.7624e-04 | norm: 1.3300 | dt: 5.04 ms | tok/sec: 1218257.64
+step 10800 | loss: 0.5985 | loss: 1.0968 | lr: 1.7130e-04 | norm: 1.2322 | dt: 5.06 ms | tok/sec: 1214697.33
+step 10900 | loss: 0.6099 | loss: 1.1150 | lr: 1.6644e-04 | norm: 1.4114 | dt: 5.00 ms | tok/sec: 1228361.88
+step 11000 | loss: 0.6135 | loss: 1.0874 | lr: 1.6166e-04 | norm: 1.4493 | dt: 8.33 ms | tok/sec: 737671.14
+Validation loss did not improve at step 11000. No checkpoint saved.
+step 11100 | loss: 0.5975 | loss: 1.1091 | lr: 1.5696e-04 | norm: 1.3943 | dt: 4.99 ms | tok/sec: 1230708.43
+step 11200 | loss: 0.5966 | loss: 1.1173 | lr: 1.5236e-04 | norm: 1.2775 | dt: 5.05 ms | tok/sec: 1216934.44
+step 11300 | loss: 0.6094 | loss: 1.0915 | lr: 1.4784e-04 | norm: 1.5766 | dt: 5.01 ms | tok/sec: 1226724.60
+step 11400 | loss: 0.6085 | loss: 1.1496 | lr: 1.4341e-04 | norm: 1.5405 | dt: 5.06 ms | tok/sec: 1215098.25
+step 11500 | loss: 0.5920 | loss: 1.1162 | lr: 1.3908e-04 | norm: 1.3685 | dt: 5.11 ms | tok/sec: 1202118.01
+step 11600 | loss: 0.5932 | loss: 1.1180 | lr: 1.3485e-04 | norm: 1.3280 | dt: 5.09 ms | tok/sec: 1207073.11
+step 11700 | loss: 0.6063 | loss: 1.1494 | lr: 1.3071e-04 | norm: 1.5742 | dt: 19.89 ms | tok/sec: 308879.35
+step 11800 | loss: 0.6083 | loss: 1.1293 | lr: 1.2667e-04 | norm: 1.6039 | dt: 5.05 ms | tok/sec: 1216130.43
+step 11900 | loss: 0.5898 | loss: 1.1375 | lr: 1.2274e-04 | norm: 1.4455 | dt: 5.09 ms | tok/sec: 1207525.60
+step 12000 | loss: 0.5887 | loss: 1.1573 | lr: 1.1891e-04 | norm: 1.3586 | dt: 5.08 ms | tok/sec: 1209906.75
+Validation loss did not improve at step 12000. No checkpoint saved.
+step 12100 | loss: 0.6030 | loss: 1.1471 | lr: 1.1518e-04 | norm: 1.6221 | dt: 5.12 ms | tok/sec: 1200158.52
+step 12200 | loss: 0.6100 | loss: 1.1419 | lr: 1.1157e-04 | norm: 1.8261 | dt: 5.08 ms | tok/sec: 1208318.27
+step 12300 | loss: 0.5885 | loss: 1.1441 | lr: 1.0806e-04 | norm: 1.5309 | dt: 5.06 ms | tok/sec: 1215327.47
+step 12400 | loss: 0.5897 | loss: 1.1531 | lr: 1.0467e-04 | norm: 1.4753 | dt: 5.06 ms | tok/sec: 1213039.15
+step 12500 | loss: 0.6014 | loss: 1.1713 | lr: 1.0138e-04 | norm: 1.6675 | dt: 5.69 ms | tok/sec: 1079861.04
+step 12600 | loss: 0.6052 | loss: 1.1434 | lr: 9.8219e-05 | norm: 1.7271 | dt: 5.04 ms | tok/sec: 1219641.43
+step 12700 | loss: 0.5855 | loss: 1.1632 | lr: 9.5170e-05 | norm: 1.5637 | dt: 5.05 ms | tok/sec: 1215671.47
+step 12800 | loss: 0.5862 | loss: 1.1713 | lr: 9.2239e-05 | norm: 1.4677 | dt: 5.07 ms | tok/sec: 1212525.47
+step 12900 | loss: 0.6014 | loss: 1.1411 | lr: 8.9428e-05 | norm: 1.7966 | dt: 5.03 ms | tok/sec: 1220276.72
+step 13000 | loss: 0.6024 | loss: 1.2006 | lr: 8.6738e-05 | norm: 1.7551 | dt: 5.47 ms | tok/sec: 1123650.64
+Validation loss did not improve at step 13000. No checkpoint saved.
+step 13100 | loss: 0.5836 | loss: 1.1550 | lr: 8.4171e-05 | norm: 1.5973 | dt: 5.09 ms | tok/sec: 1206395.01
+step 13200 | loss: 0.5838 | loss: 1.1689 | lr: 8.1728e-05 | norm: 1.4957 | dt: 5.06 ms | tok/sec: 1213839.09
+step 13300 | loss: 0.6006 | loss: 1.1990 | lr: 7.9409e-05 | norm: 1.8691 | dt: 5.02 ms | tok/sec: 1224160.55
+step 13400 | loss: 0.6009 | loss: 1.1689 | lr: 7.7217e-05 | norm: 1.8178 | dt: 15.75 ms | tok/sec: 390120.56
+step 13500 | loss: 0.5823 | loss: 1.1744 | lr: 7.5152e-05 | norm: 1.6559 | dt: 8.40 ms | tok/sec: 731411.00
+step 13600 | loss: 0.5821 | loss: 1.2007 | lr: 7.3215e-05 | norm: 1.5433 | dt: 8.77 ms | tok/sec: 700875.86
+step 13700 | loss: 0.5999 | loss: 1.1867 | lr: 7.1407e-05 | norm: 1.9402 | dt: 5.05 ms | tok/sec: 1216073.04
+step 13800 | loss: 0.6001 | loss: 1.1863 | lr: 6.9730e-05 | norm: 1.8902 | dt: 5.06 ms | tok/sec: 1213953.45
+step 13900 | loss: 0.5811 | loss: 1.1889 | lr: 6.8184e-05 | norm: 1.7031 | dt: 5.41 ms | tok/sec: 1135984.30
+step 14000 | loss: 0.5811 | loss: 1.1923 | lr: 6.6769e-05 | norm: 1.5922 | dt: 5.11 ms | tok/sec: 1201445.46
+Validation loss did not improve at step 14000. No checkpoint saved.
+step 14100 | loss: 0.5991 | loss: 1.2125 | lr: 6.5488e-05 | norm: 1.9985 | dt: 5.02 ms | tok/sec: 1223927.99
+step 14200 | loss: 0.5993 | loss: 1.1816 | lr: 6.4339e-05 | norm: 1.9544 | dt: 5.12 ms | tok/sec: 1199264.88
+step 14300 | loss: 0.5804 | loss: 1.2011 | lr: 6.3324e-05 | norm: 1.7588 | dt: 5.74 ms | tok/sec: 1070574.71
+step 14400 | loss: 0.5802 | loss: 1.2060 | lr: 6.2444e-05 | norm: 1.6474 | dt: 5.03 ms | tok/sec: 1220797.00
+step 14500 | loss: 0.5985 | loss: 1.1762 | lr: 6.1698e-05 | norm: 2.0570 | dt: 5.17 ms | tok/sec: 1188479.63
+step 14600 | loss: 0.5987 | loss: 1.2359 | lr: 6.1087e-05 | norm: 2.0059 | dt: 5.03 ms | tok/sec: 1220507.90
+step 14700 | loss: 0.5800 | loss: 1.1853 | lr: 6.0612e-05 | norm: 1.8129 | dt: 5.06 ms | tok/sec: 1214125.03
+step 14800 | loss: 0.5793 | loss: 1.2006 | lr: 6.0272e-05 | norm: 1.6910 | dt: 5.12 ms | tok/sec: 1200829.63
+step 14900 | loss: 0.5982 | loss: 1.2329 | lr: 6.0068e-05 | norm: 2.1195 | dt: 5.06 ms | tok/sec: 1214754.59
+Metadata saved to model_metadata.txt

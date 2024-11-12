@@ -1,0 +1,16 @@
+step 0 | loss: 1.2247 | lr: 6.0000e-07 | norm: 2.7040 | dt: 22297.96 ms | tok/sec: 275.54
+step 100 | loss: 0.9227 | lr: 6.0600e-05 | norm: 1.2793 | dt: 5.61 ms | tok/sec: 1095142.74
+step 200 | loss: 0.8188 | lr: 1.2060e-04 | norm: 0.9639 | dt: 11.26 ms | tok/sec: 545485.03
+step 300 | loss: 0.7787 | lr: 1.8060e-04 | norm: 0.5076 | dt: 5.14 ms | tok/sec: 1194927.38
+step 400 | loss: 0.7804 | lr: 2.4060e-04 | norm: 0.4027 | dt: 9.04 ms | tok/sec: 679726.84
+step 500 | loss: 0.7674 | lr: 3.0060e-04 | norm: 0.3606 | dt: 5.81 ms | tok/sec: 1057830.29
+step 600 | loss: 0.7657 | lr: 3.6060e-04 | norm: 0.4421 | dt: 5.17 ms | tok/sec: 1187822.25
+step 700 | loss: 0.7684 | lr: 4.2060e-04 | norm: 0.3786 | dt: 5.19 ms | tok/sec: 1183893.22
+step 800 | loss: 0.7740 | lr: 4.8060e-04 | norm: 0.2209 | dt: 5.14 ms | tok/sec: 1194207.51
+step 900 | loss: 0.7650 | lr: 5.4060e-04 | norm: 0.3001 | dt: 5.73 ms | tok/sec: 1072579.86
+step 1000 | loss: 0.7624 | lr: 6.0000e-04 | norm: 0.3734 | dt: 5.23 ms | tok/sec: 1174879.36
+step 1100 | loss: 0.7640 | lr: 5.4843e-04 | norm: 0.2661 | dt: 5.20 ms | tok/sec: 1180422.51
+step 1200 | loss: 0.7697 | lr: 4.1343e-04 | norm: 0.2018 | dt: 5.19 ms | tok/sec: 1183349.58
+step 1300 | loss: 0.7593 | lr: 2.4657e-04 | norm: 0.1732 | dt: 5.19 ms | tok/sec: 1183186.58
+step 1400 | loss: 0.7563 | lr: 1.1157e-04 | norm: 0.1832 | dt: 5.16 ms | tok/sec: 1189961.39
+Metadata saved to model_metadata.txt

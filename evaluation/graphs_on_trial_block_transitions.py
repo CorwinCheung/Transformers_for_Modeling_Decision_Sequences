@@ -199,8 +199,8 @@ else:
     prefix = 'new_gen'
 
 # Define the file paths
-behavior_filename = "../data/2ABT_behavior_run_4.txt"
-high_port_filename = "../data/2ABT_high_port_run_4.txt"
+behavior_filename = "../data/2ABT_behavior_run_2.txt"
+high_port_filename = "../data/2ABT_high_port_run_2.txt"
 
 # Check if files exist
 if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):
@@ -223,12 +223,14 @@ else:
 
         # Calculate probabilities for block positions
         block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper = calculate_probabilities(events)
+        print(high_reward_prob)
+        print(switch_prob)
 
         # Plot the probabilities
-        plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix)
+        # plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix)
 
         # Calculate switch probabilities
         sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
 
         # Plot the switch probabilities
-        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix)
+        # plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix)
