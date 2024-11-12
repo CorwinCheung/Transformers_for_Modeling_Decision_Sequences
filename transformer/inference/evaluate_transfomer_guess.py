@@ -4,8 +4,8 @@ import numpy as np
 from collections import Counter
 
 # Define run number and model number
-run_number = '3'
-model_name = 'seen92M'
+run_number = '2'
+model_name = 'seen92K'
 
 # File paths
 ground_truth_path = f'../../data/2ABT_behavior_run_{run_number}.txt'
@@ -24,7 +24,7 @@ min_length = min(len(ground_truth), len(predictions))
 ground_truth = ground_truth[:min_length]
 predictions = predictions[:min_length]
 
-# Compute accuracy
+# Compute accuracy of all 4 possible characters
 correct = sum(gt == pred for gt, pred in zip(ground_truth, predictions))
 total = len(ground_truth)
 accuracy = correct / total if total > 0 else 0
