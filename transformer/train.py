@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--n_head', type=int, default=2, help='Number of attention heads.')
     parser.add_argument('--n_embd', type=int, default=64, help='Embedding size.')
     parser.add_argument('--epochs', type=int, default=921, help='Maximum number of training steps.')
-    parser.add_argument('--learning_rate', type=float, default=6e-4, help='Learning rate for the optimizer.')
+    parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
     return parser.parse_args()
 
