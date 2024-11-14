@@ -66,7 +66,7 @@ def generate_predictions(model, tokens, max_context_length=12):
             logits, _ = model(input_ids)
 
         last_logits = logits[0, -1, :]
-        predicted_index = torch.argmax(last_logits).item()
+        predicted_index = torch.argmax(last_logits).item() #draw from it?
         predicted_indices.append(predicted_index)
 
         if i % 1000 == 0 and i > 0:

@@ -29,7 +29,7 @@ vocab = ['R', 'r', 'L', 'l']
 stoi = {ch: i for i, ch in enumerate(vocab)}
 # Prepare the input sequence for the model
 
-input_sequence = "RRRRRrLLLLLL"
+input_sequence = "RRRRRRrLLLLL"
 tokenized_input = [stoi[char] for char in input_sequence]
 input_tensor = torch.tensor(tokenized_input, dtype=torch.long).unsqueeze(0)  # Add batch dimension
 
@@ -51,6 +51,7 @@ def plot_attention_matrix(attn_weights, layer, head, tokens):
 
 print("Type of attention_weights:", type(attention_weights))
 print("Content of attention_weights:", attention_weights)
+print(attention_weights)
 
 # Plot attention matrices for each layer and head
 tokens = list(input_sequence)
