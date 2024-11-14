@@ -34,29 +34,29 @@ compile = True
 
 master_process = None
 
-def main():
-    #regular undistributed one GPU/cpu python train.py
-    #launch ddp with
-    #torchrun --standalone --nproc_per_node=2 train.py
-    ddp = int(os.environ.get('RANK', -1)) != -1
-    if ddp:
-        assert torch.cuda.is_available(), "need CUDA for DDP"
-        init_process_group(backend="nccl")
-        ddp_rank = int(os.environ['RANK'])
-        ddp_local_rank = int(os.environ['LOCAL_RANK'])
-        ddp_world_size = int(os.environ['WORLD_SIZE'])
-        device = torch.device(f'cuda:{ddp_local_rank}')
-        torch.cuda.set_device(device)
-        master_process = ddp_rank == 0
-    else:
-        ddp_rank = 0
-        ddp_local_rank = 0
-        ddp_world_size = 1
-        master_process = True
-        device = torch.device('mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"using device: {device}")
+# def main():
+#regular undistributed one GPU/cpu python train.py
+#launch ddp with
+#torchrun --standalone --nproc_per_node=2 train.py
+ddp = int(os.environ.get('RANK', -1)) != -1
+if ddp:
+    assert torch.cuda.is_available(), "need CUDA for DDP"
+    init_process_group(backend="nccl")
+    ddp_rank = int(os.environ['RANK'])
+    ddp_local_rank = int(os.environ['LOCAL_RANK'])
+    ddp_world_size = int(os.environ['WORLD_SIZE'])
+    device = torch.device(f'cuda:{ddp_local_rank}')
+    torch.cuda.set_device(device)
+    master_process = ddp_rank == 0
+else:
+    ddp_rank = 0
+    ddp_local_rank = 0
+    ddp_world_size = 1
+    master_process = True
+    device = torch.device('mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"using device: {device}")
 
-    device_type = "cuda" if str(device).startswith("cuda") else "cpu"
+device_type = "cuda" if str(device).startswith("cuda") else "cpu"
 
 torch.manual_seed(42)
 if torch.cuda.is_available():
@@ -75,17 +75,17 @@ train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp
 val_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=3)
 
 
-    torch.set_float32_matmul_precision('high')
+torch.set_float32_matmul_precision('high')
 
 #create model
 model = GPT(GPTConfig(vocab_size=4, block_size=T, n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd))
 model.to(device)
 
-    if compile:
-        model = torch.compile(model)
-    if ddp:
-        model = DDP(model, device_ids = [ddp_local_rank])
-    raw_model = model.module if ddp else model
+if compile:
+    model = torch.compile(model)
+if ddp:
+    model = DDP(model, device_ids = [ddp_local_rank])
+raw_model = model.module if ddp else model
 
 
 # Learning rate schedule
@@ -94,25 +94,25 @@ min_lr = max_lr * 0.1
 warmup_steps = 1000
 max_steps = (100000/6144) * args.epochs
 
-    tokens_trained_on = total_batch_size * max_steps
-    def format_tokens(tokens):
-        """Format the number of tokens to nearest thousand (K) or million (M)."""
-        if tokens >= 1_000_000:
-            return f"{tokens // 1_000_000}M"  # Nearest million
-        elif tokens >= 1_000:
-            return f"{tokens // 1_000}K"      # Nearest thousand
-        else:
-            return str(tokens)
+tokens_trained_on = total_batch_size * max_steps
+def format_tokens(tokens):
+    """Format the number of tokens to nearest thousand (K) or million (M)."""
+    if tokens >= 1_000_000:
+        return f"{tokens // 1_000_000}M"  # Nearest million
+    elif tokens >= 1_000:
+        return f"{tokens // 1_000}K"      # Nearest thousand
+    else:
+        return str(tokens)
 
 model_name = f"wandb_model_task_{args.task_id}_seen{format_tokens(tokens_trained_on)}"
 
-    def get_lr(it):
-        if it < warmup_steps:
-            return max_lr * (it + 1) / warmup_steps
-        if it > max_steps:
-            return min_lr
-        decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
-        return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
+def get_lr(it):
+    if it < warmup_steps:
+        return max_lr * (it + 1) / warmup_steps
+    if it > max_steps:
+        return min_lr
+    decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
+    return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
 optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=args.learning_rate, device=device, master_process=master_process)
 
@@ -160,42 +160,6 @@ def estimate_loss():
     model.train()  # Switch back to training mode
     return avg_loss
 
-# def compute_validation_metric():
-#     model.eval()
-#     # Generate predictions on the validation dataset
-#     tokens = val_loader.tokens.to(device)
-#     with torch.no_grad():
-#         predicted_indices = generate_predictions(model, tokens, max_context_length=T)
-    
-#     # Convert predicted indices back to characters
-#     predicted_chars = [val_loader.itos[idx] for idx in predicted_indices]
-#     ground_truth_chars = [val_loader.itos[idx.item()] for idx in tokens[1:]]  # Exclude the first token
-    
-#     # Write predictions and ground truth to temporary files
-#     pred_filename = 'temp_predictions.txt'
-#     gt_filename = 'temp_ground_truth.txt'
-    
-#     with open(pred_filename, 'w') as f:
-#         f.write(''.join(predicted_chars))
-#     with open(gt_filename, 'w') as f:
-#         f.write(''.join(ground_truth_chars))
-    
-#     # Parse files and compute probabilities
-#     events_pred = parse_files(pred_filename, val_loader.high_port_data)
-#     events_gt = parse_files(gt_filename, val_loader.high_port_data)
-    
-#     _, _, _, _, switch_prob_pred, _, _ = calculate_probabilities(events_pred)
-#     _, _, _, _, switch_prob_gt, _, _ = calculate_probabilities(events_gt)
-    
-#     # Compute difference (e.g., mean squared error)
-#     switch_prob_pred = np.array(switch_prob_pred)
-#     switch_prob_gt = np.array(switch_prob_gt)
-#     valid_indices = ~np.isnan(switch_prob_pred) & ~np.isnan(switch_prob_gt)
-#     mse = np.mean((switch_prob_pred[valid_indices] - switch_prob_gt[valid_indices]) ** 2)
-    
-#     model.train()
-#     return mse
-
 
 best_val_loss = float('inf')
 checkpoint_interval = 1000
@@ -210,35 +174,35 @@ for step in range(max_steps):
     loss_accum = 0.0
 
         # Accumulate gradients over multiple mini-batches (micro_steps)
-        for micro_step in range(grad_accum_steps):
-            x, y = train_loader.next_batch()
-            x, y = x.to(device), y.to(device)
+    for micro_step in range(grad_accum_steps):
+        x, y = train_loader.next_batch()
+        x, y = x.to(device), y.to(device)
 
-            # Forward pass and loss computation
-            with torch.autocast(device_type=device, dtype=torch.bfloat16):
-                logits, loss = model(x, y)
-            loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
-            loss_accum += loss.detach()  # Track the total loss
-            if ddp:
-                model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
-            loss.backward()  # Backpropagate gradients
+        # Forward pass and loss computation
+        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+            logits, loss = model(x, y)
+        loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
+        loss_accum += loss.detach()  # Track the total loss
         if ddp:
-            dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
+            model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
+        loss.backward()  # Backpropagate gradients
+    if ddp:
+        dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
 
-        # Clip gradients to prevent exploding gradients
-        norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    # Clip gradients to prevent exploding gradients
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
-        lr = get_lr(step)
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
+    lr = get_lr(step)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
-        optimizer.step()
-        # Synchronize for CUDA
-        torch.cuda.synchronize()
-        # Time the step and calculate tokens processed per second
-        t1 = time.time()
-        dt = (t1 - t0) * 1000  # Time in milliseconds
-        tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp_world_size/ (t1 - t0)
+    optimizer.step()
+    # Synchronize for CUDA
+    torch.cuda.synchronize()
+    # Time the step and calculate tokens processed per second
+    t1 = time.time()
+    dt = (t1 - t0) * 1000  # Time in milliseconds
+    tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp_world_size/ (t1 - t0)
 
     # Print logging information every 100 steps
     if step % 100 == 0:
@@ -305,33 +269,33 @@ if master_process:
     wandb.save(f"{model_name}.pth")  # Save the model checkpoint to wandb
     wandb.finish()
 
-    if ddp:
-        destroy_process_group()
+if ddp:
+    destroy_process_group()
 
 
-if __name__ == "__main__":
-    with cProfile.Profile() as pr:
-        main()
+# if __name__ == "__main__":
+#     with cProfile.Profile() as pr:
+#         main()
 
-    stats = pstats.Stats(pr)
-    stats.sort_stats('cumtime')  # Sort by cumulative time
-    function_names = []
-    cumulative_times = []
+#     stats = pstats.Stats(pr)
+#     stats.sort_stats('cumtime')  # Sort by cumulative time
+#     function_names = []
+#     cumulative_times = []
 
-    # Extract top functions based on cumulative time
-    for func, stat in stats.stats.items():
-        filename, lineno, func_name = func
-        cumulative_time = stat[3]  # cumulative time is the 4th element in stat tuple
-        # Filter out irrelevant low-level functions by setting a threshold
-        if cumulative_time > 0.01:  # Adjust threshold as needed
-            function_names.append(f"{lineno}({func_name})")
-            cumulative_times.append(cumulative_time)
+#     # Extract top functions based on cumulative time
+#     for func, stat in stats.stats.items():
+#         filename, lineno, func_name = func
+#         cumulative_time = stat[3]  # cumulative time is the 4th element in stat tuple
+#         # Filter out irrelevant low-level functions by setting a threshold
+#         if cumulative_time > 0.01:  # Adjust threshold as needed
+#             function_names.append(f"{lineno}({func_name})")
+#             cumulative_times.append(cumulative_time)
 
-    # Plot the profiling results
-    plt.figure(figsize=(10, 6))
-    plt.barh(function_names, cumulative_times, color="skyblue")
-    plt.xlabel("Cumulative Time (s)")
-    plt.ylabel("Function")
-    plt.title("Cumulative Time of Key Functions in Profiled Code")
-    plt.gca().invert_yaxis()
-    plt.show()
+#     # Plot the profiling results
+#     plt.figure(figsize=(10, 6))
+#     plt.barh(function_names, cumulative_times, color="skyblue")
+#     plt.xlabel("Cumulative Time (s)")
+#     plt.ylabel("Function")
+#     plt.title("Cumulative Time of Key Functions in Profiled Code")
+#     plt.gca().invert_yaxis()
+#     plt.show()
