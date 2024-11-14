@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/transformer/train.py", line 314, in <module>
+    main()
+  File "/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/transformer/train.py", line 205, in main
+    for step in range(max_steps):
+                ^^^^^^^^^^^^^^^^
+TypeError: 'float' object cannot be interpreted as an integer
