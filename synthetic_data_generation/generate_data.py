@@ -27,13 +27,41 @@ def generate_data(num_steps, agent, environment):
         agent.update_phi(choice, reward)
     return behavior_data, high_port_data
 
-def main():
-    num_steps = 1000000
 
+def plot_profiling_results(stats):
+    function_names = []
+    cumulative_times = []
+
+    # Extract top functions based on cumulative time
+    for func, stat in stats.stats.items():
+        filename, lineno, func_name = func
+        cumulative_time = stat[3]  # cumulative time is the 4th element in stat tuple
+        if cumulative_time > 0.01:
+            function_names.append(f"{lineno}({func_name})")
+            cumulative_times.append(cumulative_time)
+
+    # Plot the profiling results
+    plt.figure(figsize=(10, 6))
+    plt.barh(function_names, cumulative_times, color="skyblue")
+    plt.xlabel("Cumulative Time (s)")
+    plt.ylabel("Function")
+    plt.title("Cumulative Time of Key Functions in Profiled Code")
+    plt.gca().invert_yaxis()
+    plt.savefig("cprofile of training")
+
+def main(num_steps=1000000, profile=False):
     environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
     agent = RFLR_mouse(alpha=-0.5, beta=2.1, tau=1.4, policy="greedy_policy")
 
-    behavior_data, high_port_data = generate_data(num_steps, agent, environment)
+    if profile:
+        with cProfile.Profile() as pr:
+            behavior_data, high_port_data = generate_data(num_steps, agent, environment)
+        stats = pstats.Stats(pr)
+        stats.sort_stats('cumtime')
+        plot_profiling_results(stats)
+    else:
+        behavior_data, high_port_data = generate_data(num_steps, agent, environment)
+
 
     def find_filename(base):
         if not os.path.exists(base):
@@ -45,69 +73,41 @@ def main():
             counter += 1
             new_filename = f"{file_root}_run_{counter}{file_ext}"
         return new_filename
-
     behavior_filename = find_filename("../data/2ABT_behavior.txt")
     high_port_filename = find_filename("../data/2ABT_high_port.txt")
 
-    # # Write behavior data to file
-    # with open(behavior_filename, 'w') as f:
-    #     counter = 0
-    #     for token in behavior_data:
-    #         if counter == 100:
-    #             f.write('\n')
-    #             counter = 0
-    #         f.write(token)
-    #         counter += 1
+    with open(behavior_filename, 'w') as f:
+        counter = 0
+        for token in behavior_data:
+            if counter == 100:
+                f.write('\n')
+                counter = 0
+            f.write(token)
+            counter += 1
 
-    # # Write high port data to file
-    # with open(high_port_filename, 'w') as f:
-    #     counter = 0
-    #     for token in high_port_data:
-    #         if counter == 100:
-    #             f.write('\n')
-    #             counter = 0
-    #         f.write(token)
-    #         counter += 1
+    # Save high port data to file
+    with open(high_port_filename, 'w') as f:
+        counter = 0
+        for token in high_port_data:
+            if counter == 100:
+                f.write('\n')
+                counter = 0
+            f.write(token)
+            counter += 1
+
+    with open("../data/metadata.txt", 'a') as meta_file:
+        meta_file.write(f"\nData files: {behavior_filename}, {high_port_filename}\n")
+        meta_file.write(f"Number of steps: {num_steps:,}\n")
+        meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, "
+                        f"low_reward_prob={environment.low_reward_prob}, "
+                        f"transition_prob={environment.transition_prob}\n")
+        meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
+        meta_file.write(f"Agent policy: {agent.policy}\n")
 
     print(f"Generated {num_steps} steps of behavior data and saved to {behavior_filename}")
     print(f"Generated {num_steps} steps of high port data and saved to {high_port_filename}")
-
-    # Save metadata
-    # with open("../data/metadata.txt", 'a') as meta_file:
-    #     meta_file.write(f"\nData files: {behavior_filename}, {high_port_filename}\n")
-    #     meta_file.write(f"Number of steps: {num_steps:,}\n")
-    #     meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, "
-    #                     f"low_reward_prob={environment.low_reward_prob}, "
-    #                     f"transition_prob={environment.transition_prob}\n")
-    #     meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
-    #     meta_file.write(f"Agent policy: {agent.policy}\n")
-
-    # print(f"Metadata saved to ../data/metadata.txt")
+    print("Metadata saved to ../data/metadata.txt")
 
 if __name__ == "__main__":
-    with cProfile.Profile() as pr:
-        main()
-
-    stats = pstats.Stats(pr)
-    stats.sort_stats('cumtime')  # Sort by cumulative time
-    function_names = []
-    cumulative_times = []
-
-    # Extract top functions based on cumulative time
-    for func, stat in stats.stats.items():
-        filename, lineno, func_name = func
-        cumulative_time = stat[3]  # cumulative time is the 4th element in stat tuple
-        # Filter out irrelevant low-level functions by setting a threshold
-        if cumulative_time > 0.01:  # Adjust threshold as needed
-            function_names.append(f"{lineno}({func_name})")
-            cumulative_times.append(cumulative_time)
-
-    # Plot the profiling results
-    plt.figure(figsize=(10, 6))
-    plt.barh(function_names, cumulative_times, color="skyblue")
-    plt.xlabel("Cumulative Time (s)")
-    plt.ylabel("Function")
-    plt.title("Cumulative Time of Key Functions in Profiled Code")
-    plt.gca().invert_yaxis()
-    plt.show()
-   
+    # Set profile to True to enable profiling, False to skip
+    main(profile=False)

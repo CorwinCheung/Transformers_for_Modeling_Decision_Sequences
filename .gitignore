@@ -1,2 +1,4 @@
 # *.txt
-# *.pth
+*.pth
+*.out
+transformer/wandb/*

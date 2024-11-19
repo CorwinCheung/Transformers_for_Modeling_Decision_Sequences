@@ -15,6 +15,8 @@ from transformer import GPT, GPTConfig, DataLoaderLite
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
 
+ENABLE_PROFILING = False
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Train GPT model with hyperparameter tuning.')
     parser.add_argument('--sequence_length', type=int, default=12, help='Sequence length (T) for training.')
@@ -34,7 +36,8 @@ compile = True
 
 master_process = None
 
-# def main():
+# def main(): for profiling if needed
+
 #regular undistributed one GPU/cpu python train.py
 #launch ddp with
 #torchrun --standalone --nproc_per_node=2 train.py
@@ -92,7 +95,7 @@ raw_model = model.module if ddp else model
 max_lr = args.max_lr
 min_lr = max_lr * 0.1
 warmup_steps = 1000
-max_steps = (100000/6144) * args.epochs
+max_steps = int((100000/6144) * args.epochs)
 
 tokens_trained_on = total_batch_size * max_steps
 def format_tokens(tokens):
@@ -114,7 +117,7 @@ def get_lr(it):
     decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=args.learning_rate, device=device, master_process=master_process)
+optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=max_lr, device=device, master_process=master_process)
 
 if master_process:
     wandb.init(
@@ -133,7 +136,7 @@ if master_process:
             "n_layer": args.n_layer,
             "n_head": args.n_head,
             "n_embd": args.n_embd,
-            "learning_rate": args.learning_rate,
+            "learning_rate": args.max_lr,
             "task_id": args.task_id
         },
         name=f"run_task_{args.task_id}",  # Name the run based on the task ID
@@ -179,7 +182,7 @@ for step in range(max_steps):
         x, y = x.to(device), y.to(device)
 
         # Forward pass and loss computation
-        with torch.autocast(device_type=device, dtype=torch.bfloat16):
+        with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
             logits, loss = model(x, y)
         loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
         loss_accum += loss.detach()  # Track the total loss
@@ -205,7 +208,7 @@ for step in range(max_steps):
     tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp_world_size/ (t1 - t0)
 
     # Print logging information every 100 steps
-    if step % 100 == 0:
+    if step % 100 == 0 or step == max_steps - 1:
         if master_process:
             val_loss = estimate_loss()
             wandb.log({
@@ -272,7 +275,34 @@ if master_process:
 if ddp:
     destroy_process_group()
 
+def profile_execution(function_to_profile, *args, **kwargs):
+    """Profiles the execution of a function and generates a performance plot."""
+    with cProfile.Profile() as pr:
+        function_to_profile(*args, **kwargs)
+    stats = pstats.Stats(pr)
+    stats.sort_stats('cumtime')
 
+    # Extract function statistics for plotting
+    function_names = []
+    cumulative_times = []
+    for func, stat in stats.stats.items():
+        filename, lineno, func_name = func
+        cumulative_time = stat[3]  # cumulative time is the 4th element in the tuple
+        if cumulative_time > 0.01:  # Threshold for relevance
+            function_names.append(f"{lineno}({func_name})")
+            cumulative_times.append(cumulative_time)
+
+    # Plot profiling results
+    plt.figure(figsize=(10, 6))
+    plt.barh(function_names, cumulative_times, color="skyblue")
+    plt.xlabel("Cumulative Time (s)")
+    plt.ylabel("Function")
+    plt.title("Cumulative Time of Key Functions in Profiled Code")
+    plt.gca().invert_yaxis()
+    plt.show()
+
+
+# for profiling if needed
 # if __name__ == "__main__":
 #     with cProfile.Profile() as pr:
 #         main()
