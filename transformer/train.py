@@ -221,21 +221,21 @@ for step in range(max_steps):
                 "tokens_per_sec": tokens_per_sec,
             })
             print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
-    if step % checkpoint_interval == 0 and step > 0:
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            if master_process:
-                # Save the model checkpoint
-                checkpoint_path = f"{model_name}_step{step}.pth"
-                if compile:
-                    torch.save(model._orig_mod.state_dict(), checkpoint_path)
-                else:
-                    torch.save(model.state_dict(), checkpoint_path)
-                wandb.save(checkpoint_path)
-                print(f"New best validation loss: {best_val_loss.item():.4f}. Model checkpoint saved at step {step}.")
-        else:
-            if master_process:
-                print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
+    # if step % checkpoint_interval == 0 and step > 0:
+    #     if val_loss < best_val_loss:
+    #         best_val_loss = val_loss
+    #         if master_process:
+    #             # Save the model checkpoint
+    #             checkpoint_path = f"/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}_step{step}.pth"
+    #             if compile:
+    #                 torch.save(model._orig_mod.state_dict(), checkpoint_path)
+    #             else:
+    #                 torch.save(model.state_dict(), checkpoint_path)
+    #             wandb.save(checkpoint_path)
+    #             print(f"New best validation loss: {best_val_loss.item():.4f}. Model checkpoint saved at step {step}.")
+    #     else:
+    #         if master_process:
+    #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
 
 
 
@@ -265,9 +265,9 @@ for step in range(max_steps):
 # Call this function after the model training code
 if master_process:
     if compile:
-        torch.save(model._orig_mod.state_dict(), f'{model_name}.pth')
+        torch.save(model._orig_mod.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
     else:
-        torch.save(model.state_dict(), f'{model_name}.pth')
+        torch.save(model.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
     write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
     wandb.save(f"{model_name}.pth")  # Save the model checkpoint to wandb
     wandb.finish()

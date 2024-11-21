@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -30,31 +31,106 @@ stoi = {ch: i for i, ch in enumerate(vocab)}
 # Prepare the input sequence for the model
 
 input_sequence = "RRRRRRrLLLLL"
-tokenized_input = [stoi[char] for char in input_sequence]
-input_tensor = torch.tensor(tokenized_input, dtype=torch.long).unsqueeze(0)  # Add batch dimension
+long_sequence = "RRRRRRRRRRRRRRRRRRrLLLLL"
+
 
 model.eval()
-logits, loss, attention_weights = model(input_tensor, return_attn_weights=True)
+
 
 # Function to plot attention weights
 def plot_attention_matrix(attn_weights, layer, head, tokens):
-    attn_matrix = attn_weights[f"layer_{layer + 1}"][f"head_{head + 1}"][0].detach().cpu().numpy()
-    plt.figure(figsize=(10, 10))
-    sns.heatmap(attn_matrix, xticklabels=tokens, yticklabels=tokens, cmap="viridis", cbar=True)
-    plt.title(f"Attention Weights: Layer {layer + 1}, Head {head + 1}")
+    attn_matrix = attn_weights[f"layer_{layer}_head_{head}"]
+    plt.figure(figsize=(12, 6))  # Adjust the figure size for 24x12
+    sns.heatmap(
+        attn_matrix.reshape(24, 12),
+        xticklabels=tokens[:12],  # Use 12 tokens for x-axis
+        yticklabels=["Row " + str(i) for i in range(24)],  # Labels for the y-axis
+        cmap="viridis",
+        cbar=True
+    )
+    plt.title(f"Attention Weights: Layer {layer}, Head {head}")
     plt.xlabel("Token")
-    plt.ylabel("Token")
+    plt.ylabel("Attention Dimension")
     plt.show()
-
 
 # print(f"Shape of attention weights: {len(attention_weights)} layers, each with heads: {[attention_weights[layer].size(0) for layer in range(len(attention_weights))]}")
 
-print("Type of attention_weights:", type(attention_weights))
-print("Content of attention_weights:", attention_weights)
-print(attention_weights)
+attention_dict = {}
+
+for i in range(12):  # Iterate over a sequence
+    sequence = long_sequence[i:i+12]
+    tokenized = [stoi[char] for char in sequence]
+    input_tensor = torch.tensor(tokenized, dtype=torch.long).unsqueeze(0)
+    
+    # Simulate the model's attention weights
+    _, _, curr_attention_weights = model(input_tensor, return_attn_weights=True)
+    
+    # Prepare tokens with padding
+    
+    for layer_name, heads_dict in curr_attention_weights.items():  # Iterate over layers
+        layer_idx = int(layer_name.split('_')[-1])  # Extract numeric layer index
+        for head_name, attn_matrix in heads_dict.items():  # Iterate over heads
+            head_idx = int(head_name.split('_')[-1])  # Extract numeric head index
+            # Extract and pad the last row
+            last_row = attn_matrix[0, -1, :].detach().cpu().numpy()
+            padded_last_row = np.pad(last_row, (i, 12 - i), mode='constant')
+            
+            # Save padded last rows in the dictionary with consistent numeric keys
+            key = f"layer_{layer_idx}_head_{head_idx}_i_{i}"
+            attention_dict[key] = padded_last_row
+
+def plot_combined_heatmap(ax, attention_dict, layer, head):
+    # Filter keys for the specified layer and head
+    filtered_keys = [key for key in attention_dict if key.startswith(f"layer_{layer}_head_{head}_i_")]
+    
+    # Ensure keys are sorted by index
+    filtered_keys = sorted(filtered_keys, key=lambda x: int(x.split('_i_')[-1]))
+    
+    # Combine values into a single 12x24 grid
+    combined_matrix = np.row_stack([attention_dict[key] for key in filtered_keys])
+    
+    if combined_matrix.shape != (12, 24):
+        raise ValueError(f"Combined matrix has shape {combined_matrix.shape}, expected (12, 24)")
+    
+    # Plot the heatmap
+    im = ax.imshow(combined_matrix, cmap='viridis', aspect='auto')
+    
+    # Title and axis labels
+    ax.set_title(f"Layer {layer}, Head {head}")
+    ax.set_xlabel("Context Sequence")
+    ax.set_ylabel("(Index of): Token Predicting")
+    
+    # Label x-axis with the corresponding characters from long_sequence
+    ax.set_xticks(np.arange(24))
+    ax.set_xticklabels([long_sequence[i] for i in range(24)], rotation=45)
+    
+    # Label y-axis with tokens for predictions
+    ax.set_yticks(np.arange(12))
+    ax.set_yticklabels([f'{i+12}:{long_sequence[i+12]}' for i in range(12)])
+    
+    return im
+
+fig, axes = plt.subplots(2, 2, figsize=(18, 12))
+
+
+ims = []
+ims.append(plot_combined_heatmap(axes[0, 0], attention_dict, layer=1, head=1))
+ims.append(plot_combined_heatmap(axes[0, 1], attention_dict, layer=1, head=2))
+ims.append(plot_combined_heatmap(axes[1, 0], attention_dict, layer=2, head=1))
+ims.append(plot_combined_heatmap(axes[1, 1], attention_dict, layer=2, head=2))
+
+# Adjust layout
+fig.tight_layout()
+fig.subplots_adjust(hspace=0.3, wspace=0.2)
+
+# Add a shared colorbar for the heatmaps
+cbar = fig.colorbar(ims[0], ax=axes, orientation='horizontal', fraction=0.05, pad=0.1)
+cbar.set_label("Attention Weight")
+
+plt.show()
 
 # Plot attention matrices for each layer and head
-tokens = list(input_sequence)
-for layer_name, heads_dict in attention_weights.items():  # Iterate over layers in the dictionary
-    for head_name, attn_matrix in heads_dict.items():     # Iterate over heads in each layer
-        plot_attention_matrix(attention_weights, int(layer_name[-1]) - 1, int(head_name[-1]) - 1, tokens)
+# tokens = list(input_sequence)
+# for layer_name, heads_dict in attention_weights.items():  # Iterate over layers in the dictionary
+#     for head_name, attn_matrix in heads_dict.items():     # Iterate over heads in each layer
+#         plot_attention_matrix(attention_weights, int(layer_name[-1]) - 1, int(head_name[-1]) - 1, tokens)

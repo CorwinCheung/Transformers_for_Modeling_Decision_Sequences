@@ -1,7 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=gpt-hparam-sweep
 #SBATCH --account=kempner_bsabatini_lab
-#SBATCH --output=%A_%a.out
+#SBATCH --output=/n/holyscratch01/bsabatini_lab/Users/ccheung/output/%A_%a.out
+#SBATCH --error=/n/holyscratch01/bsabatini_lab/Users/ccheung/error/%A_%a.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
@@ -9,7 +10,7 @@
 #SBATCH --time=23:00:00  # Adjust based on your needs
 #SBATCH --mem=12GB
 #SBATCH --partition=kempner
-#SBATCH --array=1-1920%12
+#SBATCH --array=1-1261%12
 
 ~/.conda/envs/transformers/bin/python -c "import torch; print('Torch Version:', torch.__version__)"
 
