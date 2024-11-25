@@ -240,12 +240,12 @@ def calculate_probabilities(events):
 
 # Main code
 
-prefix = 'model_1M'
+prefix = 'bad_val'
 
 # Define the file paths
 behavior_filename = "../../data/2ABT_behavior_run_4.txt"
 high_port_filename = "../../data/2ABT_high_port_run_4.txt"
-predictions_filename = "Preds_for_4_with_model_seen92M.txt"
+predictions_filename = "Preds_for_4_with_model_bad_val_seen99M.txt"
 
 # Check if files exist
 if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(predictions_filename):

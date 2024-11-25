@@ -12,8 +12,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from transformer import GPT, GPTConfig
 
 # Define the run number and model number
-run_number = '2'
-model_name = "seen92K"
+run_number = '3'
+model_name = "original22_seen99M"
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -22,7 +22,8 @@ print(f"Using {device} device")
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load(f'../model_{model_name}.pth', map_location=device, weights_only=True))
+# model.load_state_dict(torch.load(f'../model_{model_name}.pth', map_location=device, weights_only=True))
+model.load_state_dict(torch.load(f'../{model_name}.pth', map_location=device, weights_only=True))
 model.to(device)
 model.eval()
 
@@ -52,7 +53,7 @@ start_token_idx = stoi[start_token_char]
 # Prepend the start token to the tokens
 tokens = torch.cat([torch.tensor([start_token_idx], dtype=torch.long), tokens]).to(device)
 
-def generate_predictions(model, tokens, max_context_length=12):
+def generate_predictions(model, tokens, max_context_length=8):
     model.eval()
     predicted_indices = []
     N = len(tokens)
@@ -76,7 +77,7 @@ def generate_predictions(model, tokens, max_context_length=12):
     return predicted_indices
 
 # Generate predictions
-predicted_indices = generate_predictions(model, tokens, max_context_length=12)
+predicted_indices = generate_predictions(model, tokens, max_context_length=8)
 predicted_chars = [itos[idx] for idx in predicted_indices]
 print(f"Generated {len(predicted_chars)} predicted characters.")
 

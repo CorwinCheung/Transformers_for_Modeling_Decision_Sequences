@@ -18,19 +18,23 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                              .view(1, 1, config.block_size, config.block_size))
 
-    def forward(self, x):
+    def forward(self, x, return_attn_weights=False):
         B, T, C = x.size()
         qkv = self.c_attn(x)
         q, k, v = qkv.split(self.n_embd, dim=2)
         q, k, v = [tensor.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) for tensor in (q, k, v)]
         
-        self.attn_weights = torch.matmul(q, k.transpose(-2, -1)) / (C ** 0.5)
-        self.attn_weights = self.attn_weights.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
-        self.attn_weights = torch.softmax(self.attn_weights, dim=-1)
-    
-        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        attn_weights = torch.matmul(q, k.transpose(-2, -1)) / (C ** 0.5)
+        attn_weights = attn_weights.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+        attn_weights = torch.softmax(attn_weights, dim=-1)
+        
+        y = torch.matmul(attn_weights, v)
         y = y.transpose(1, 2).contiguous().view(B, T, C)
-        return self.c_proj(y)
+        y = self.c_proj(y)
+        
+        if return_attn_weights:
+            return y, attn_weights
+        return y
 
 
 class MLP(nn.Module):
@@ -54,10 +58,16 @@ class Block(nn.Module):
         self.mlp = MLP(config)
 
     def forward(self, x, return_attn_weights=False):
-        x = x + self.attn(self.ln_1(x))
         if return_attn_weights:
-            return x, self.attn.attn_weights
-        return x + self.mlp(self.ln_2(x))
+            x_residual = x
+            x, attn_weights = self.attn(self.ln_1(x), return_attn_weights=True)
+            x = x_residual + x
+            x = x + self.mlp(self.ln_2(x))
+            return x, attn_weights
+        else:
+            x = x + self.attn(self.ln_1(x))
+            x = x + self.mlp(self.ln_2(x))
+            return x
 
 
 @dataclass
@@ -103,28 +113,16 @@ class GPT(nn.Module):
         for block in self.transformer.h:
             if return_attn_weights:
                 x, attn_weights = block(x, return_attn_weights=True)
-                attn_weights_all_layers.append(attn_weights)
+                attn_weights_all_layers.append(attn_weights.detach())
             else:
                 x = block(x)
 
         logits = self.lm_head(self.transformer.ln_f(x))
         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
-        if return_attn_weights:
-        # Extract attention weights for layers 1 and 2, heads 1 and 2
-            attn_weights_layer_1_head_1 = attn_weights_all_layers[0][:, 0] if len(attn_weights_all_layers) > 0 else None
-            attn_weights_layer_1_head_2 = attn_weights_all_layers[0][:, 1] if len(attn_weights_all_layers) > 0 else None
-            attn_weights_layer_2_head_1 = attn_weights_all_layers[1][:, 0] if len(attn_weights_all_layers) > 1 else None
-            attn_weights_layer_2_head_2 = attn_weights_all_layers[1][:, 1] if len(attn_weights_all_layers) > 1 else None
 
-            # Return the logits, loss, and the specific attention weights
-            return (
-                logits,
-                loss,
-                {
-                    "layer_1": {"head_1": attn_weights_layer_1_head_1, "head_2": attn_weights_layer_1_head_2},
-                    "layer_2": {"head_1": attn_weights_layer_2_head_1, "head_2": attn_weights_layer_2_head_2},
-                }
-            )
+        if return_attn_weights:
+            # Each attn_weights is of shape (batch_size, num_heads, seq_len, seq_len)
+            return logits, loss, attn_weights_all_layers
         return logits, loss
 
     @classmethod

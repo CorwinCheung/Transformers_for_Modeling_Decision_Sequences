@@ -67,9 +67,11 @@ print(len(test_sequences))
 print(len(test_only_unique))
 print(len(train_only_unique))
 test_only_indices = [i for i, seq in enumerate(test_sequences) if seq in test_only_unique]
+print("the number of sequences in test that are unique to test is ", len(test_only_indices))
 test_only_correct = [correct_predictions[i] for i in test_only_indices]
 test_only_accuracy = sum(test_only_correct) / len(test_only_correct)
 train_only_indices = [i for i, seq in enumerate(train_sequences) if seq in train_only_unique]
+print("the number of sequences in train that are unique to train is ", len(train_only_indices))
 train_only_correct = [correct_predictions_train[i] for i in train_only_indices]
 train_only_accuracy = sum(train_only_correct) / len(train_only_correct)
 

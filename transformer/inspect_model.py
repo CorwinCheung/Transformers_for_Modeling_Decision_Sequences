@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from dataclasses import dataclass
 from transformer import GPT, GPTConfig, DataLoaderLite
+from bertviz import head_view
+
 # Define the model classes as provided
 
 # Load the model
@@ -28,10 +30,14 @@ print(f"Total number of parameters: {total_params}")
 # Initialize DataLoaderLite (using batch size B=1, sequence length T=16, process_rank=0 for simplicity)
 vocab = ['R', 'r', 'L', 'l']
 stoi = {ch: i for i, ch in enumerate(vocab)}
+itos = {i: ch for i, ch in enumerate(vocab)}
 # Prepare the input sequence for the model
 
 input_sequence = "RRRRRRrLLLLL"
 long_sequence = "RRRRRRRRRRRRRRRRRRrLLLLL"
+tokenized = [stoi[char] for char in input_sequence]
+input_tensor = torch.tensor(tokenized, dtype=torch.long).unsqueeze(0)
+tokens = [itos[token_id.item()] for token_id in input_tensor[0]]
 
 
 model.eval()
@@ -55,29 +61,29 @@ def plot_attention_matrix(attn_weights, layer, head, tokens):
 
 # print(f"Shape of attention weights: {len(attention_weights)} layers, each with heads: {[attention_weights[layer].size(0) for layer in range(len(attention_weights))]}")
 
-attention_dict = {}
+# attention_dict = {}
 
-for i in range(12):  # Iterate over a sequence
-    sequence = long_sequence[i:i+12]
-    tokenized = [stoi[char] for char in sequence]
-    input_tensor = torch.tensor(tokenized, dtype=torch.long).unsqueeze(0)
+# for i in range(12):  # Iterate over a sequence
+#     sequence = long_sequence[i:i+12]
+#     tokenized = [stoi[char] for char in sequence]
+#     input_tensor = torch.tensor(tokenized, dtype=torch.long).unsqueeze(0)
     
-    # Simulate the model's attention weights
-    _, _, curr_attention_weights = model(input_tensor, return_attn_weights=True)
+#     # Simulate the model's attention weights
+#     _, _, curr_attention_weights = model(input_tensor, return_attn_weights=True)
     
-    # Prepare tokens with padding
+#     # Prepare tokens with padding
     
-    for layer_name, heads_dict in curr_attention_weights.items():  # Iterate over layers
-        layer_idx = int(layer_name.split('_')[-1])  # Extract numeric layer index
-        for head_name, attn_matrix in heads_dict.items():  # Iterate over heads
-            head_idx = int(head_name.split('_')[-1])  # Extract numeric head index
-            # Extract and pad the last row
-            last_row = attn_matrix[0, -1, :].detach().cpu().numpy()
-            padded_last_row = np.pad(last_row, (i, 12 - i), mode='constant')
+#     for layer_name, heads_dict in curr_attention_weights.items():  # Iterate over layers
+#         layer_idx = int(layer_name.split('_')[-1])  # Extract numeric layer index
+#         for head_name, attn_matrix in heads_dict.items():  # Iterate over heads
+#             head_idx = int(head_name.split('_')[-1])  # Extract numeric head index
+#             # Extract and pad the last row
+#             last_row = attn_matrix[0, -1, :].detach().cpu().numpy()
+#             padded_last_row = np.pad(last_row, (i, 12 - i), mode='constant')
             
-            # Save padded last rows in the dictionary with consistent numeric keys
-            key = f"layer_{layer_idx}_head_{head_idx}_i_{i}"
-            attention_dict[key] = padded_last_row
+#             # Save padded last rows in the dictionary with consistent numeric keys
+#             key = f"layer_{layer_idx}_head_{head_idx}_i_{i}"
+#             attention_dict[key] = padded_last_row
 
 def plot_combined_heatmap(ax, attention_dict, layer, head):
     # Filter keys for the specified layer and head
@@ -113,21 +119,32 @@ def plot_combined_heatmap(ax, attention_dict, layer, head):
 fig, axes = plt.subplots(2, 2, figsize=(18, 12))
 
 
-ims = []
-ims.append(plot_combined_heatmap(axes[0, 0], attention_dict, layer=1, head=1))
-ims.append(plot_combined_heatmap(axes[0, 1], attention_dict, layer=1, head=2))
-ims.append(plot_combined_heatmap(axes[1, 0], attention_dict, layer=2, head=1))
-ims.append(plot_combined_heatmap(axes[1, 1], attention_dict, layer=2, head=2))
+# ims = []
+# ims.append(plot_combined_heatmap(axes[0, 0], attention_dict, layer=1, head=1))
+# ims.append(plot_combined_heatmap(axes[0, 1], attention_dict, layer=1, head=2))
+# ims.append(plot_combined_heatmap(axes[1, 0], attention_dict, layer=2, head=1))
+# ims.append(plot_combined_heatmap(axes[1, 1], attention_dict, layer=2, head=2))
 
-# Adjust layout
-fig.tight_layout()
-fig.subplots_adjust(hspace=0.3, wspace=0.2)
+# # Adjust layout
+# fig.tight_layout()
+# fig.subplots_adjust(hspace=0.3, wspace=0.2)
 
-# Add a shared colorbar for the heatmaps
-cbar = fig.colorbar(ims[0], ax=axes, orientation='horizontal', fraction=0.05, pad=0.1)
-cbar.set_label("Attention Weight")
+# # Add a shared colorbar for the heatmaps
+# cbar = fig.colorbar(ims[0], ax=axes, orientation='horizontal', fraction=0.05, pad=0.1)
+# cbar.set_label("Attention Weight")
 
-plt.show()
+# plt.show()
+
+logits, loss, attn_weights_all_layers = model(input_tensor, return_attn_weights=True)
+
+# `attn_weights_all_layers` is a list where each element is of shape (batch_size, num_heads, seq_len, seq_len)
+# Ensure it's on the CPU and detached from the computation graph
+attention = [layer_attn_weights.cpu() for layer_attn_weights in attn_weights_all_layers]
+
+# Visualize using BertViz
+print(attention)
+print(tokens)
+head_view(attention, tokens)
 
 # Plot attention matrices for each layer and head
 # tokens = list(input_sequence)

@@ -1,9 +1,0 @@
-Traceback (most recent call last):
-  File "/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/transformer/train.py", line 314, in <module>
-    main()
-  File "/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/transformer/train.py", line 218, in main
-    with torch.autocast(device_type=device, dtype=torch.bfloat16):
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/n/home10/ccheung/.conda/envs/transformers/lib/python3.12/site-packages/torch/amp/autocast_mode.py", line 225, in __init__
-    raise ValueError(
-ValueError: Expected `device_type` of type `str`, got: `<class 'torch.device'>`

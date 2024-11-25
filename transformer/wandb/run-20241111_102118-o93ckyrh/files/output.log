@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/corwin/Building/NeuroAI_Research/Transformers_for_Modeling_Decision_Sequences/transformer/train.py", line 118, in <module>
-    torch.cuda.synchronize()
-  File "/Users/corwin/anaconda3/envs/transformers/lib/python3.12/site-packages/torch/cuda/__init__.py", line 890, in synchronize
-    _lazy_init()
-  File "/Users/corwin/anaconda3/envs/transformers/lib/python3.12/site-packages/torch/cuda/__init__.py", line 305, in _lazy_init
-    raise AssertionError("Torch not compiled with CUDA enabled")
-AssertionError: Torch not compiled with CUDA enabled

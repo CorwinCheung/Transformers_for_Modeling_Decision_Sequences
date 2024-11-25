@@ -4,8 +4,8 @@ import numpy as np
 from collections import Counter
 
 # Define run number and model number
-run_number = '2'
-model_name = 'seen92K'
+run_number = '3'
+model_name = 'original_seen9M'
 
 # File paths
 ground_truth_path = f'../../data/2ABT_behavior_run_{run_number}.txt'
@@ -95,4 +95,4 @@ sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
 plt.xlabel("Predicted Label")
 plt.ylabel("Ground Truth Label")
 plt.title("Confusion Matrix")
-plt.savefig("Conf_matrix")
+plt.savefig("Conf_matrix_bal")
