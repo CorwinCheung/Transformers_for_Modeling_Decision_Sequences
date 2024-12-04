@@ -13,7 +13,7 @@ from transformer import GPT, GPTConfig
 
 # Define the run number and model number
 run_number = '3'
-model_name = "original22_seen99M"
+model_name = "org_seen92M"
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
