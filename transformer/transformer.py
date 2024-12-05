@@ -1,11 +1,11 @@
-import math
 import inspect
-import time
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from dataclasses import dataclass
 
+seed = 200
+torch.manual_seed(seed)
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
@@ -192,4 +192,3 @@ class DataLoaderLite:
         if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
             self.current_position = self.B * self.T * self.process_rank
         return x, y
-

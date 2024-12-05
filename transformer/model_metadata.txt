@@ -1,137 +1,5 @@
-Model name: model_seen92K
-  Num Parameters: 101,120
 
-File trained on: ../data/2ABT_behavior_run_2.txt
-
-Tokens seen: 92,160
-
-Total batch size: 3,072
-
-Max steps: 30
-
-Dataloader parameters:
-  Batch size (B): 256
-  Sequence length (T): 12
-
-GPTConfig parameters:
-  Block size: 12
-  Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
-
-Model name: model_seen921K
-  Num Parameters: 101,120
-
-File trained on: ../data/2ABT_behavior_run_2.txt
-
-Tokens seen: 921,600
-
-Total batch size: 3,072
-
-Max steps: 300
-
-Dataloader parameters:
-  Batch size (B): 256
-  Sequence length (T): 12
-
-GPTConfig parameters:
-  Block size: 12
-  Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
-
-Model name: model_seen92M
-  Num Parameters: 101120
-
-File trained on: ../data/2ABT_behavior_run_2.txt
-
-Tokens seen: 92,160,000
-
-Total batch size: 3,072
-
-Max steps: 30,000
-
-Dataloader parameters:
-  Batch size (B): 256
-  Sequence length (T): 12
-
-GPTConfig parameters:
-  Block size: 12
-  Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
-
-Model name: model_seen921M
-  Num Parameters: 101120
-
-File trained on: ../data/2ABT_behavior_run_2.txt
-
-Tokens seen: 921600000
-
-Total batch size: 3,072
-
-Max steps: 300,000
-
-Dataloader parameters:
-  Batch size (B): 256
-  Sequence length (T): 12
-
-GPTConfig parameters:
-  Block size: 12
-  Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
-
-
-Model name: org_seen9M
-  Num Parameters: 101120
-
-File trained on: ../data/2ABT_behavior_run_2.txt
-
-Tokens seen: 9216000
-
-Total batch size: 6,144
-
-Max steps: 1,500
-
-Dataloader parameters:
-  Batch size (B): 256
-  Sequence length (T): 12
-
-GPTConfig parameters:
-  Block size: 12
-  Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
-
-Model name: org_seen92M
-  Num Parameters: 101120
-
-File trained on: ../data/2ABT_behavior_run_2.txt
-
-Tokens seen: 92160000
-
-Total batch size: 6,144
-
-Max steps: 15,000
-
-Dataloader parameters:
-  Batch size (B): 256
-  Sequence length (T): 12
-
-GPTConfig parameters:
-  Block size: 12
-  Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
-
-Model name: model_seen92M
+Model name: old_seen92M
   Num Parameters: 101120
 
 File trained on: ../data/2ABT_behavior_run_2.txt
@@ -152,3 +20,223 @@ GPTConfig parameters:
   Number of layers: 2
   Number of heads: 2
   Embedding size: 64
+
+Model name: sweep_seen9M
+  Num Parameters: 39
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 8
+
+GPTConfig parameters:
+  Block size: 8
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 1
+
+Model name: sweep_seen995K
+  Num Parameters: 39
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 995328
+
+Total batch size: 6,144
+
+Max steps: 162
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 8
+
+GPTConfig parameters:
+  Block size: 8
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 1
+
+Model name: sweep_seen995K
+  Num Parameters: 316
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 995328
+
+Total batch size: 6,144
+
+Max steps: 162
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 4
+
+Model name: sweep_seen995K
+  Num Parameters: 43
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 995328
+
+Total batch size: 6,144
+
+Max steps: 162
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 1
+
+Model name: sweep_seen9M
+  Num Parameters: 43
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 1
+
+Model name: sweep_seen9M
+  Num Parameters: 316
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 4
+
+Model name: sweep_seen99M
+  Num Parameters: 43
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 99999744
+
+Total batch size: 6,144
+
+Max steps: 16,276
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 1
+
+Model name: sweep_seen99M
+  Num Parameters: 39
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 99999744
+
+Total batch size: 6,144
+
+Max steps: 16,276
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 8
+
+GPTConfig parameters:
+  Block size: 8
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 1
+
+Model name: sweep_seen99M
+  Num Parameters: 110
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 99999744
+
+Total batch size: 6,144
+
+Max steps: 16,276
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 2
+
+Model name: sweep_seen99M
+  Num Parameters: 316
+
+File trained on: ../data/2ABT_behavior_run_2.txt
+
+Tokens seen: 99999744
+
+Total batch size: 6,144
+
+Max steps: 16,276
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 4

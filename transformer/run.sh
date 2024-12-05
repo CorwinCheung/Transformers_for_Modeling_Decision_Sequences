@@ -10,7 +10,7 @@
 #SBATCH --time=23:00:00  # Adjust based on your needs
 #SBATCH --mem=12GB
 #SBATCH --partition=kempner
-#SBATCH --array=1-1261%12
+#SBATCH --array=1-1261%11
 
 ~/.conda/envs/transformers/bin/python -c "import torch; print('Torch Version:', torch.__version__)"
 

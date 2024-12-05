@@ -15,15 +15,20 @@ from transformer import GPT, GPTConfig, DataLoaderLite
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
 
+seed = 200
+np.random.seed(seed)
+torch.manual_seed(seed)
+
+
 ENABLE_PROFILING = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train GPT model with hyperparameter tuning.')
     parser.add_argument('--sequence_length', type=int, default=12, help='Sequence length (T) for training.')
-    parser.add_argument('--n_layer', type=int, default=2, help='Number of transformer layers.')
-    parser.add_argument('--n_head', type=int, default=2, help='Number of attention heads.')
+    parser.add_argument('--n_layer', type=int, default=1, help='Number of transformer layers.')
+    parser.add_argument('--n_head', type=int, default=1, help='Number of attention heads.')
     parser.add_argument('--n_embd', type=int, default=64, help='Embedding size.')
-    parser.add_argument('--epochs', type=int, default=1000, help='Number of Epochs looping through the training data.')
+    parser.add_argument('--epochs', type=int, default=100, help='Number of Epochs looping through the training data.')
     parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
     return parser.parse_args()
@@ -108,7 +113,7 @@ def format_tokens(tokens):
     else:
         return str(tokens)
 
-model_name = f"original22_seen{format_tokens(tokens_trained_on)}"
+model_name = f"sweep_seen{format_tokens(tokens_trained_on)}"
 
 def get_lr(it):
     if it < warmup_steps:
@@ -120,30 +125,30 @@ def get_lr(it):
 
 optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=max_lr, device=device, master_process=master_process)
 
-# if master_process:
-#     wandb.init(
-#         project="gpt-training",
-#         config={
-#             "run_number": run_number,
-#             "total_batch_size": total_batch_size,
-#             "max_lr": max_lr,
-#             "min_lr": min_lr,
-#             "warmup_steps": warmup_steps,
-#             "max_steps": max_steps,
-#             "B": B,
-#             "T": T,
-#             "grad_accum_steps": grad_accum_steps,
-#             "vocab_size": 4,
-#             "n_layer": args.n_layer,
-#             "n_head": args.n_head,
-#             "n_embd": args.n_embd,
-#             "learning_rate": args.max_lr,
-#             "task_id": args.task_id
-#         },
-#         name=f"run_task_{args.task_id}",  # Name the run based on the task ID
-#         dir="/tmp",
-#     )
-#     wandb.watch(model)
+if master_process:
+    wandb.init(
+        project="gpt-training",
+        config={
+            "run_number": run_number,
+            "total_batch_size": total_batch_size,
+            "max_lr": max_lr,
+            "min_lr": min_lr,
+            "warmup_steps": warmup_steps,
+            "max_steps": max_steps,
+            "B": B,
+            "T": T,
+            "grad_accum_steps": grad_accum_steps,
+            "vocab_size": 4,
+            "n_layer": args.n_layer,
+            "n_head": args.n_head,
+            "n_embd": args.n_embd,
+            "learning_rate": args.max_lr,
+            "task_id": args.task_id
+        },
+        name=f"run_task_{args.task_id}",  # Name the run based on the task ID
+        dir="/tmp",
+    )
+    wandb.watch(model)
 
 eval_interval = 100  # Evaluate every 100 steps
 max_eval_iters = 10  # Use 10 batches for validation
@@ -213,15 +218,15 @@ for step in range(max_steps):
     if step % 100 == 0 or step == max_steps - 1:
         if master_process:
             val_loss = estimate_loss()
-            # wandb.log({
-            #     "step": step,
-            #     "loss": loss_accum.item(),
-            #     "val_loss": val_loss.item(),
-            #     "lr": lr,
-            #     "grad_norm": norm,
-            #     "step_time_ms": dt,
-            #     "tokens_per_sec": tokens_per_sec,
-            # })
+            wandb.log({
+                "step": step,
+                "loss": loss_accum.item(),
+                "val_loss": val_loss.item(),
+                "lr": lr,
+                "grad_norm": norm,
+                "step_time_ms": dt,
+                "tokens_per_sec": tokens_per_sec,
+            })
             print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
     # if step % checkpoint_interval == 0 and step > 0:
     #     if val_loss < best_val_loss:
@@ -272,8 +277,8 @@ if master_process:
     else:
         torch.save(model.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
     write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
-    # wandb.save(f"{model_name}.pth")  # Save the model checkpoint to wandb
-    # wandb.finish()
+    wandb.save(f"{model_name}.pth")  # Save the model checkpoint to wandb
+    wandb.finish()
 
 if ddp:
     destroy_process_group()

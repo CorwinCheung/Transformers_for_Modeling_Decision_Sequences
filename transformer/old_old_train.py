@@ -46,7 +46,7 @@ if master_process:
     print(f"total desired batch size: {total_batch_size}")
     print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
 
-train_loader = DataLoaderLite(B=B, T=T, run_number=run_number, process_rank=0, num_processes=1)
+train_loader = DataLoaderLite(B=B, T=T, run_number=run_number)
 # val_loader = DataLoaderLite(B=B, T=T) #to do
 
 torch.set_float32_matmul_precision('high')
@@ -75,7 +75,7 @@ def format_tokens(tokens):
     else:
         return str(tokens)
 
-model_name = f"model_seen{format_tokens(tokens_trained_on)}"
+model_name = f"old_seen{format_tokens(tokens_trained_on)}"
 
 def get_lr(it):
     if it < warmup_steps:
