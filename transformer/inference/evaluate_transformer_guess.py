@@ -5,7 +5,7 @@ from collections import Counter
 
 # Define run number and model number
 run_number = '3'
-model_name = 'old_seen92M'
+model_name = 'wandb_model_task_782_seen999M'
 
 # File paths
 ground_truth_path = f'../../data/2ABT_behavior_run_{run_number}.txt'
@@ -95,4 +95,4 @@ sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
 plt.xlabel("Predicted Label")
 plt.ylabel("Ground Truth Label")
 plt.title("Confusion Matrix")
-plt.savefig("Conf_matrix_bal")
+plt.savefig("Conf_matrix_low_val")

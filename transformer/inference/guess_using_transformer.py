@@ -17,7 +17,7 @@ torch.manual_seed(seed)
 
 # Define the run number and model number
 run_number = '3'
-model_name = "old_seen92M"
+model_name = "wandb_model_task_782_seen999M"
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -81,7 +81,7 @@ def generate_predictions(model, tokens, max_context_length=8):
     return predicted_indices
 
 # Generate predictions
-predicted_indices = generate_predictions(model, tokens, max_context_length=8)
+predicted_indices = generate_predictions(model, tokens, max_context_length=12)
 predicted_chars = [itos[idx] for idx in predicted_indices]
 print(f"Generated {len(predicted_chars)} predicted characters.")
 

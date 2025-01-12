@@ -1,12 +1,12 @@
 
-Filename: 'Preds_for_3_with_model_old_seen92M.txt'
-Model used for guessing: old_seen92M
+Filename: 'Preds_for_3_with_model_wandb_model_task_782_seen999M.txt'
+Model used for guessing: wandb_model_task_782_seen999M
 
 Data guessed on: ../../data/2ABT_behavior_run_3.txt
 
 GPTConfig parameters:
   Block size: 12
   Vocab size: 4
-  Number of layers: 2
-  Number of heads: 2
-  Embedding size: 64
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 768
