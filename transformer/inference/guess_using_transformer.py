@@ -26,7 +26,6 @@ print(f"Using {device} device")
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-# model.load_state_dict(torch.load(f'../model_{model_name}.pth', map_location=device, weights_only=True))
 model.load_state_dict(torch.load(f'../{model_name}.pth', map_location=device, weights_only=True))
 model.to(device)
 model.eval()
@@ -57,7 +56,7 @@ start_token_idx = stoi[start_token_char]
 # Prepend the start token to the tokens
 tokens = torch.cat([torch.tensor([start_token_idx], dtype=torch.long), tokens]).to(device)
 
-def generate_predictions(model, tokens, max_context_length=8):
+def generate_predictions(model, tokens, max_context_length):
     model.eval()
     predicted_indices = []
     N = len(tokens)
@@ -81,7 +80,8 @@ def generate_predictions(model, tokens, max_context_length=8):
     return predicted_indices
 
 # Generate predictions
-predicted_indices = generate_predictions(model, tokens, max_context_length=12)
+context_length = 12
+predicted_indices = generate_predictions(model, tokens, max_context_length=context_length)
 predicted_chars = [itos[idx] for idx in predicted_indices]
 print(f"Generated {len(predicted_chars)} predicted characters.")
 

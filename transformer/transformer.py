@@ -76,7 +76,7 @@ class GPTConfig:
     vocab_size: int = 4
     n_layer: int = 1
     n_head: int = 1
-    n_embd: int = 768
+    n_embd: int = 64
 
 
 class GPT(nn.Module):
