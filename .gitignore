@@ -2,3 +2,4 @@
 *.pth
 *.out
 transformer/wandb/*
+**/.DS_Store
