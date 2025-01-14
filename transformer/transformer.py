@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from dataclasses import dataclass
+import os
 
 seed = 200
 torch.manual_seed(seed)
@@ -173,7 +174,9 @@ class DataLoaderLite:
         self.T = T
         self.process_rank = process_rank
         self.num_processes = num_processes
-        with open(f'../data/2ABT_behavior_run_{run_number}.txt', 'r') as f:
+        filename = os.path.join(os.path.dirname(os.path.dirname(__file__, )),
+                                f'data/2ABT_behavior_run_{run_number}.txt')
+        with open(filename, 'r') as f:
             text = f.read().replace("\n", "")
         
         vocab = ['R', 'r', 'L', 'l']

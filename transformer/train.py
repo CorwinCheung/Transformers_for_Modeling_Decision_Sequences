@@ -15,10 +15,12 @@ from transformer import GPT, GPTConfig, DataLoaderLite
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
 
+import getpass
+username = getpass.getuser()
+
 seed = 200
 np.random.seed(seed)
 torch.manual_seed(seed)
-
 
 ENABLE_PROFILING = False
 
@@ -36,8 +38,8 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-run_number = 2
-compile = True
+run_number = 7
+compile = False
 
 master_process = None
 
@@ -80,9 +82,8 @@ if master_process:
     print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
     print(f"=> calculated steps: {int((100000/6144) * args.epochs)}")
 
-train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=run_number)
-val_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=3)
-
+train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=f'{run_number}tr')
+val_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=f'{run_number}v')
 
 torch.set_float32_matmul_precision('high')
 
@@ -95,7 +96,6 @@ if compile:
 if ddp:
     model = DDP(model, device_ids = [ddp_local_rank])
 raw_model = model.module if ddp else model
-
 
 # Learning rate schedule
 max_lr = args.max_lr
@@ -169,7 +169,6 @@ def estimate_loss():
         avg_loss = avg_loss / ddp_world_size
     model.train()  # Switch back to training mode
     return avg_loss
-
 
 best_val_loss = float('inf')
 checkpoint_interval = 1000
@@ -247,7 +246,7 @@ for step in range(max_steps):
 
 
     def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
-        metadata_filename = "model_metadata.txt"
+        metadata_filename = os.path.join(os.path.dirname(__file__), "models/model_metadata.txt")
         tokens_trained_on = total_batch_size * max_steps
 
         with open(metadata_filename, 'a') as meta_file:
@@ -271,13 +270,18 @@ for step in range(max_steps):
 
 # Call this function after the model training code
 if master_process:
+
+    filename = os.path.join(os.path.dirname(__file__), 'models', f'{model_name}.pth')
     if compile:
         # torch.save(model._orig_mod.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
-        torch.save(model._orig_mod.state_dict(), f'{model_name}.pth')
+        torch.save(model._orig_mod.state_dict(), filename)
     else:
-        torch.save(model.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
+        # switch to saving in scratch?
+        # f'/n/holyscratch01/bsabatini_lab/Users/{username}/models/{model_name}.pth'
+        torch.save(model.state_dict(), filename)
+    
     write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
-    wandb.save(f"{model_name}.pth")  # Save the model checkpoint to wandb
+    wandb.save(filename)  # Save the model checkpoint to wandb
     wandb.finish()
 
 if ddp:
