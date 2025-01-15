@@ -2,22 +2,27 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from collections import Counter
+import os
 
 # Define run number and model number
-run_number = '3'
-model_name = 'wandb_model_task_782_seen999M'
+run_number = 1
+model_name = f"sweep_seen9M_run{run_number}"
 
 # File paths
-ground_truth_path = f'../../data/2ABT_behavior_run_{run_number}.txt'
-predictions_path = f'Preds_for_{run_number}_with_model_{model_name}.txt'
+root = os.path.dirname(os.path.dirname(__file__))
+ground_truth_path = os.path.join(os.path.dirname(root), 'data', f'2ABT_behavior_run_{run_number}v.txt')
+predictions_path = os.path.join(os.path.dirname(__file__), 'predicted_seqs', f'Preds_model_{model_name}.txt')
+
+def read_file(path):
+    with open(path, 'r') as f:
+        seq = f.read().replace('\n', '').replace(' ', '')
+    return seq
 
 # Load ground truth data
-with open(ground_truth_path, 'r') as f:
-    ground_truth = f.read().replace('\n', '').replace(' ', '')
+ground_truth = read_file(ground_truth_path)
 
 # Load model predictions
-with open(predictions_path, 'r') as f:
-    predictions = f.read().replace('\n', '').replace(' ', '')
+predictions = read_file(predictions_path)
 
 # Ensure both sequences have the same length
 min_length = min(len(ground_truth), len(predictions))

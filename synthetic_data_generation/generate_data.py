@@ -6,6 +6,7 @@ import numpy as np
 from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
 import os
+import glob
 
 def generate_data(num_steps, agent, environment):
     behavior_data = []
@@ -49,17 +50,14 @@ def plot_profiling_results(stats):
     plt.gca().invert_yaxis()
     plt.savefig("cprofile of training")
 
-def find_filename(base, suffix=''):
-    if not os.path.exists(base):
-        return base
+def find_filename(base, suffix='tr'):
     file_root, file_ext = os.path.splitext(base)
-    counter = 2
-    new_filename = f"{file_root}_run_{counter}{suffix}{file_ext}"
-    while os.path.exists(new_filename):
+    counter = 0
+    new_filename = f"{file_root}_run_{counter}*{file_ext}"
+    while glob.glob(new_filename):
         counter += 1
-        new_filename = f"{file_root}_run_{counter}{suffix}{file_ext}"
-    print(new_filename)
-    return new_filename
+        new_filename = f"{file_root}_run_{counter}*{file_ext}"
+    return f"{file_root}_run_{counter}{file_ext}"
 
 def write_file(filename, data):
     with open(filename, 'w') as f:

@@ -7,7 +7,9 @@ import os
 import random
 
 # Add the path to the transformer module if needed
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+root = os.path.dirname(os.path.dirname(__file__))
+print(root)
+sys.path.append(root)
 
 from transformer import GPT, GPTConfig
 
@@ -16,8 +18,8 @@ random.seed(seed)
 torch.manual_seed(seed)
 
 # Define the run number and model number
-run_number = '3'
-model_name = "wandb_model_task_782_seen999M"
+run_number = 1
+model_name = f"sweep_seen9M_run{run_number}"
 
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -26,7 +28,8 @@ print(f"Using {device} device")
 # Load the trained model
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load(f'../{model_name}.pth', map_location=device, weights_only=True))
+model.load_state_dict(torch.load(os.path.join(root, 'models', f'{model_name}.pth'),
+                                 map_location=device, weights_only=True))
 model.to(device)
 model.eval()
 
@@ -40,7 +43,7 @@ def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
 
 # Load and preprocess the new data
-behavior_filename = f'../../data/2ABT_behavior_run_{run_number}.txt'
+behavior_filename = os.path.join(os.path.dirname(root), 'data', f'2ABT_behavior_run_{run_number}v.txt')
 
 with open(behavior_filename, 'r') as f:
     text = f.read().replace("\n", "").replace(" ", "")
@@ -86,15 +89,16 @@ predicted_chars = [itos[idx] for idx in predicted_indices]
 print(f"Generated {len(predicted_chars)} predicted characters.")
 
 # Write predictions to a file
-output_filename = f'Preds_for_{run_number}_with_model_{model_name}.txt'
+output_path = os.path.join(os.path.dirname(__file__), 'predicted_seqs')
+output_filename = os.path.join(output_path, f'Preds_model_{model_name}.txt')
 with open(output_filename, 'w') as f:
     for i, char in enumerate(predicted_chars):
         if i % 100 == 0 and i > 0:
             f.write('\n')
         f.write(char)
 
-def write_guess_metadata(model_name, data_file, config):
-    metadata_filename = f"guess_metadata.txt"
+def write_guess_metadata(model_name, data_file, output_path, config):
+    metadata_filename = os.path.join(output_path, "guess_metadata.txt")
 
     with open(metadata_filename, 'w') as meta_file:
         meta_file.write(f"\nFilename: 'Preds_for_{run_number}_with_model_{model_name}.txt'")
@@ -109,6 +113,6 @@ def write_guess_metadata(model_name, data_file, config):
 
     print(f"Guess metadata saved to {metadata_filename}")
 
-write_guess_metadata(model_name, behavior_filename, config)
+write_guess_metadata(model_name, behavior_filename, output_path, config)
 
 print(f"Model predictions saved to {output_filename}")
