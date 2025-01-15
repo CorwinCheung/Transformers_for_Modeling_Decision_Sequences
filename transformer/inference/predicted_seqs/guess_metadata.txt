@@ -1,0 +1,12 @@
+
+Filename: 'Preds_for_1_with_model_sweep_seen9M_run1.txt'
+Model used for guessing: sweep_seen9M_run1
+
+Data guessed on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/data/2ABT_behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64

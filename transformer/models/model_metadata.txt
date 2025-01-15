@@ -240,3 +240,69 @@ GPTConfig parameters:
   Number of layers: 1
   Number of heads: 1
   Embedding size: 4
+
+Model name: sweep_seen9M
+  Num Parameters: 51136
+
+File trained on: ../data/2ABT_behavior_run_1.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+Model name: sweep_seen9M_run1
+  Num Parameters: 51136
+
+File trained on: ../data/2ABT_behavior_run_1.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+Model name: sweep_seen9M_run0
+  Num Parameters: 51136
+
+File trained on: ../data/2ABT_behavior_run_0.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
