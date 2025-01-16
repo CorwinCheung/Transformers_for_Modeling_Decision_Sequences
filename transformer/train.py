@@ -1,28 +1,34 @@
 import argparse
-import torch
-import math
-import numpy as np
-import os
 import cProfile
+import getpass
+import math
+import os
 import pstats
 import time
-import wandb
+
 import matplotlib.pyplot as plt
-from torch.distributed import init_process_group, destroy_process_group
-from torch.nn.parallel import DistributedDataParallel as DDP
+import numpy as np
+import torch
 import torch.distributed as dist
-from transformer import GPT, GPTConfig, DataLoaderLite
+import utils
+import wandb
+from torch.distributed import destroy_process_group, init_process_group
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+from transformer import GPT, DataLoaderLite, GPTConfig
+
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
 
-import getpass
 username = getpass.getuser()
 
 seed = 200
 np.random.seed(seed)
 torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
+torch.set_float32_matmul_precision('high')
 
-ENABLE_PROFILING = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train GPT model with hyperparameter tuning.')
@@ -33,87 +39,85 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100, help='Number of Epochs looping through the training data.')
     parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
+    parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
+    parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
+
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
 
-run_number = 7
-compile = False
+# Training parameters
+ENABLE_PROFILING = False
 
-master_process = None
-
-# def main(): for profiling if needed
-
-#regular undistributed one GPU/cpu python train.py
-#launch ddp with
-#torchrun --standalone --nproc_per_node=2 train.py
-ddp = int(os.environ.get('RANK', -1)) != -1
-if ddp:
-    assert torch.cuda.is_available(), "need CUDA for DDP"
-    init_process_group(backend="nccl")
-    ddp_rank = int(os.environ['RANK'])
-    ddp_local_rank = int(os.environ['LOCAL_RANK'])
-    ddp_world_size = int(os.environ['WORLD_SIZE'])
-    device = torch.device(f'cuda:{ddp_local_rank}')
-    torch.cuda.set_device(device)
-    master_process = ddp_rank == 0
-else:
-    ddp_rank = 0
-    ddp_local_rank = 0
-    ddp_world_size = 1
-    master_process = True
-    device = torch.device('mps' if torch.backends.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"using device: {device}")
-
-device_type = "cuda" if str(device).startswith("cuda") else "cpu"
-
-torch.manual_seed(42)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(1337)
-# Training setup
-total_batch_size = 6144
-B = 256
-T = args.sequence_length
-assert total_batch_size % (B*T*ddp_world_size) == 0, "make sure total batch size is divisible by B * T * ddp_world_size"
-grad_accum_steps = total_batch_size//(B*T*ddp_world_size)
-if master_process:
-    print(f"total desired batch size: {total_batch_size}")
-    print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
-    print(f"=> calculated steps: {int((100000/6144) * args.epochs)}")
-
-train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=f'{run_number}tr')
-val_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp_world_size, run_number=f'{run_number}v')
-
-torch.set_float32_matmul_precision('high')
-
-#create model
-model = GPT(GPTConfig(vocab_size=4, block_size=T, n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd))
-model.to(device)
-
-if compile:
-    model = torch.compile(model)
-if ddp:
-    model = DDP(model, device_ids = [ddp_local_rank])
-raw_model = model.module if ddp else model
+# Loss calculation parameters
+eval_interval = 100  # Evaluate every 100 steps
+max_eval_iters = 10  # Use 10 batches for validation
+checkpoint_interval = 1000
 
 # Learning rate schedule
 max_lr = args.max_lr
 min_lr = max_lr * 0.1
 warmup_steps = 1000
-max_steps = int((100000/6144) * args.epochs)
 
+# Data parameters
+run_number = args.run_number or 0  # TODO: default to getting newest generated data
+
+#regular undistributed one GPU/cpu python train.py
+#launch ddp with
+#torchrun --standalone --nproc_per_node=2 train.py
+
+# Set up DDP if using, mimic it if not.
+ddp = utils.DDPConfig()
+
+# Training setup
+total_batch_size = 6144  # number of tokens per batch
+B = 256  # number of samples per batch
+T = args.sequence_length  # number of trials per sample
+assert total_batch_size % (B * T * ddp.world_size) == 0, (
+    "make sure total batch size is divisible by B * T * ddp.world_size")
+grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
+max_steps = int((100000 / total_batch_size) * args.epochs)
 tokens_trained_on = total_batch_size * max_steps
-def format_tokens(tokens):
-    """Format the number of tokens to nearest thousand (K) or million (M)."""
-    if tokens >= 1_000_000:
-        return f"{tokens // 1_000_000}M"  # Nearest million
-    elif tokens >= 1_000:
-        return f"{tokens // 1_000}K"      # Nearest thousand
-    else:
-        return str(tokens)
+model_name = f"sweep_seen{utils.format_tokens(tokens_trained_on)}"
 
-model_name = f"sweep_seen{format_tokens(tokens_trained_on)}"
+if ddp.master_process:
+    print(f"total desired batch size: {total_batch_size}")
+    print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
+    print(f"=> calculated steps: {max_steps}")
+
+# Configure train and validation dataloaders.
+train_loader = DataLoaderLite(
+    B=B,
+    T=T,
+    process_rank=ddp.rank,
+    num_processes=ddp.world_size,
+    run_number=f'{run_number}tr'
+)
+val_loader = DataLoaderLite(
+    B=B,
+    T=T,
+    process_rank=ddp.rank,
+    num_processes=ddp.world_size,
+    run_number=f'{run_number}v'
+)
+
+# Create model.
+model = GPT(GPTConfig(
+    vocab_size=4,
+    block_size=T,
+    n_layer=args.n_layer,
+    n_head=args.n_head,
+    n_embd=args.n_embd
+))
+model.to(ddp.device)
+
+if args.compile:
+    model = torch.compile(model)
+if ddp.ddp:
+    model = DDP(model, device_ids=[ddp.local_rank])
+raw_model = model.module if ddp.ddp else model
+
 
 def get_lr(it):
     if it < warmup_steps:
@@ -123,9 +127,15 @@ def get_lr(it):
     decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-optimizer = raw_model.configure_optimizers(weight_decay=0.1, learning_rate=max_lr, device=device, master_process=master_process)
 
-if master_process:
+optimizer = raw_model.configure_optimizers(
+    weight_decay=0.1,
+    learning_rate=max_lr,
+    device=ddp.device,
+    master_process=ddp.master_process
+)
+
+if ddp.master_process:
     wandb.init(
         project="gpt-training",
         config={
@@ -150,52 +160,65 @@ if master_process:
     )
     wandb.watch(model)
 
-eval_interval = 100  # Evaluate every 100 steps
-max_eval_iters = 10  # Use 10 batches for validation
 
-def estimate_loss():
+def estimate_loss(predict=False):
     model.eval()
     losses = []
-    for _ in range(max_eval_iters):
+    if predict:
+        predictions = {'x':[], 'y':[], 'yhat':[]}
+    for _ in range(val_loader.batches_per_epoch):
         x, y = val_loader.next_batch()
-        x, y = x.to(device), y.to(device)
+        if predict:
+            predictions['x'].append(x)
+            predictions['y'].append(y)
+        x, y = x.to(ddp.device), y.to(ddp.device)
         with torch.no_grad():
-            _, loss = model(x, y)
+            logits, loss = model(x, y)
+            print(logits.shape)
+            if predict:
+                last_logits = logits[:, -1, :]
+                print(last_logits.shape)
+                print(torch.argmax(last_logits, axis=1))
+                predictions['yhat'].append(torch.argmax(last_logits).item())
         losses.append(loss)
     avg_loss = torch.stack(losses).mean()
     # Reduce the loss across all processes if using DDP
-    if ddp:
+    if ddp.ddp:
         dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
-        avg_loss = avg_loss / ddp_world_size
+        avg_loss = avg_loss / ddp.world_size
     model.train()  # Switch back to training mode
+    if predict:
+        return avg_loss
     return avg_loss
 
-best_val_loss = float('inf')
-checkpoint_interval = 1000
 
+best_val_loss = float('inf')
 val_loss = None
+
 # Training loop
 for step in range(max_steps):
-    # Synchronize for CUDA
-    torch.cuda.synchronize()
+
+    if ddp.device_type == 'cuda':
+        # Synchronize for CUDA
+        torch.cuda.synchronize()
     t0 = time.time()
     optimizer.zero_grad()
     loss_accum = 0.0
 
-        # Accumulate gradients over multiple mini-batches (micro_steps)
+    # Accumulate gradients over multiple mini-batches (micro_steps)
     for micro_step in range(grad_accum_steps):
         x, y = train_loader.next_batch()
-        x, y = x.to(device), y.to(device)
+        x, y = x.to(ddp.device), y.to(ddp.device)
 
         # Forward pass and loss computation
-        with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
-            logits, loss = model(x, y)
+        with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
+            _, loss = model(x, y)
         loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
         loss_accum += loss.detach()  # Track the total loss
-        if ddp:
+        if ddp.ddp:
             model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
         loss.backward()  # Backpropagate gradients
-    if ddp:
+    if ddp.ddp:
         dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
 
     # Clip gradients to prevent exploding gradients
@@ -206,17 +229,18 @@ for step in range(max_steps):
         param_group['lr'] = lr
 
     optimizer.step()
-    # Synchronize for CUDA
-    torch.cuda.synchronize()
+    if ddp.device_type == 'cuda':
+        # Synchronize for CUDA
+        torch.cuda.synchronize()
     # Time the step and calculate tokens processed per second
     t1 = time.time()
     dt = (t1 - t0) * 1000  # Time in milliseconds
-    tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp_world_size/ (t1 - t0)
+    tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp.world_size/ (t1 - t0)
 
     # Print logging information every 100 steps
     if step % 100 == 0 or step == max_steps - 1:
-        if master_process:
-            val_loss = estimate_loss()
+        if ddp.master_process:
+            val_loss = estimate_loss(predict=True)
             wandb.log({
                 "step": step,
                 "loss": loss_accum.item(),
@@ -243,8 +267,6 @@ for step in range(max_steps):
     #         if master_process:
     #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
 
-
-
     def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
         metadata_filename = os.path.join(os.path.dirname(__file__), "models/model_metadata.txt")
         tokens_trained_on = total_batch_size * max_steps
@@ -259,6 +281,7 @@ for step in range(max_steps):
             meta_file.write(f"\nDataloader parameters:\n")
             meta_file.write(f"  Batch size (B): {train_loader.B}\n")
             meta_file.write(f"  Sequence length (T): {train_loader.T}\n")
+            meta_file.write(f"  Steps per epoch: {train_loader.batches_per_epoch}")
             meta_file.write(f"\nGPTConfig parameters:\n")
             meta_file.write(f"  Block size: {config.block_size}\n")
             meta_file.write(f"  Vocab size: {config.vocab_size}\n")
@@ -268,11 +291,12 @@ for step in range(max_steps):
 
         print(f"Metadata saved to {metadata_filename}")
 
+
 # Call this function after the model training code
-if master_process:
+if ddp.master_process:
 
     filename = os.path.join(os.path.dirname(__file__), 'models', f'{model_name}.pth')
-    if compile:
+    if args.compile:
         # torch.save(model._orig_mod.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
         torch.save(model._orig_mod.state_dict(), filename)
     else:
@@ -284,8 +308,9 @@ if master_process:
     wandb.save(filename)  # Save the model checkpoint to wandb
     wandb.finish()
 
-if ddp:
+if ddp.ddp:
     destroy_process_group()
+
 
 def profile_execution(function_to_profile, *args, **kwargs):
     """Profiles the execution of a function and generates a performance plot."""
