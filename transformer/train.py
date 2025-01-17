@@ -76,15 +76,9 @@ B = 256  # number of samples per batch
 T = args.sequence_length  # number of trials per sample
 assert total_batch_size % (B * T * ddp.world_size) == 0, (
     "make sure total batch size is divisible by B * T * ddp.world_size")
-grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
-max_steps = int((100000 / total_batch_size) * args.epochs)
-tokens_trained_on = total_batch_size * max_steps
-model_name = f"sweep_seen{utils.format_tokens(tokens_trained_on)}"
 
-if ddp.master_process:
-    print(f"total desired batch size: {total_batch_size}")
-    print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
-    print(f"=> calculated steps: {max_steps}")
+# Number of micro steps to reach total batch size (inner training loop).
+grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
 # Configure train and validation dataloaders.
 train_loader = DataLoaderLite(
@@ -101,6 +95,16 @@ val_loader = DataLoaderLite(
     num_processes=ddp.world_size,
     run_number=f'{run_number}v'
 )
+
+# Number steps required to pass over full dataset x n_epochs.
+max_steps = int((len(train_loader.tokens) / total_batch_size) * args.epochs)
+tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
+model_name = f"sweep_seen{utils.format_tokens(tokens_trained_on)}"
+
+if ddp.master_process:
+    print(f"total desired batch size: {total_batch_size}")
+    print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
+    print(f"=> calculated steps: {max_steps}")
 
 # Create model.
 model = GPT(GPTConfig(
@@ -165,7 +169,7 @@ def estimate_loss(predict=False):
     model.eval()
     losses = []
     if predict:
-        predictions = {'x':[], 'y':[], 'yhat':[]}
+        predictions = {'x': [], 'y': [], 'yhat': []}
     for _ in range(val_loader.batches_per_epoch):
         x, y = val_loader.next_batch()
         if predict:
@@ -174,11 +178,8 @@ def estimate_loss(predict=False):
         x, y = x.to(ddp.device), y.to(ddp.device)
         with torch.no_grad():
             logits, loss = model(x, y)
-            print(logits.shape)
             if predict:
                 last_logits = logits[:, -1, :]
-                print(last_logits.shape)
-                print(torch.argmax(last_logits, axis=1))
                 predictions['yhat'].append(torch.argmax(last_logits).item())
         losses.append(loss)
     avg_loss = torch.stack(losses).mean()
@@ -188,7 +189,7 @@ def estimate_loss(predict=False):
         avg_loss = avg_loss / ddp.world_size
     model.train()  # Switch back to training mode
     if predict:
-        return avg_loss
+        return avg_loss, predictions
     return avg_loss
 
 
