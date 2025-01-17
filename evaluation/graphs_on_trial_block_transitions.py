@@ -1,7 +1,9 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-from graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
+from graph_helper import (calculate_switch_probabilities, plot_probabilities,
+                          plot_switch_probabilities)
 from scipy.stats import bootstrap
 
 global rflr
@@ -199,8 +201,10 @@ else:
     prefix = 'new_gen'
 
 # Define the file paths
-behavior_filename = "../data/2ABT_behavior_run_2.txt"
-high_port_filename = "../data/2ABT_high_port_run_2.txt"
+run_number = 0
+root = os.path.dirname(__file__)
+behavior_filename = os.path.join(os.path.dirname(root), 'data', f'2ABT_behavior_run_{run_number}v.txt')
+high_port_filename = os.path.join(os.path.dirname(root), 'data', f'2ABT_high_port_run_{run_number}v.txt')
 
 # Check if files exist
 if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):
@@ -208,7 +212,6 @@ if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filenam
 else:
     # Parse the files
     events = parse_files(behavior_filename, high_port_filename)
-
     if events is not None:
         # Calculate and print the percent of trials with a switch
         total_trials = len(events) - 1  # Exclude the first trial
@@ -227,10 +230,10 @@ else:
         print(switch_prob)
 
         # Plot the probabilities
-        # plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix)
+        plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix)
 
         # Calculate switch probabilities
         sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
 
         # Plot the switch probabilities
-        # plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix)
+        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix)
