@@ -1,9 +1,10 @@
 import inspect
+import os
+from dataclasses import dataclass
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from dataclasses import dataclass
-import os
 
 seed = 200
 torch.manual_seed(seed)
@@ -178,13 +179,14 @@ class DataLoaderLite:
                                 f'data/2ABT_behavior_run_{run_number}.txt')
         with open(filename, 'r') as f:
             text = f.read().replace("\n", "")
-        
+
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
         print(f"read in {len(tokens)} tokens")
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.current_position = self.B * self.T * self.process_rank
+        self.batches_per_epoch = len(self.tokens) // (self.B * self.T)
 
     def next_batch(self):
         B, T = self.B, self.T
