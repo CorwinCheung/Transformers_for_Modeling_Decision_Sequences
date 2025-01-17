@@ -14,6 +14,14 @@ def format_tokens(tokens):
         return str(tokens)
 
 
+def write_file(filename, data):
+    with open(filename, 'w') as f:
+        for i, token in enumerate(data):
+            if i % 100 == 0:
+                f.write('\n')
+            f.write(token)
+
+
 class DDPConfig:
 
     def __init__(self):

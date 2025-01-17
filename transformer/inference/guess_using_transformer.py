@@ -1,10 +1,13 @@
+import os
+import random
+import sys
+import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import time
-import sys
-import os
-import random
+
+from ..transformer import utils
 
 # Add the path to the transformer module if needed
 root = os.path.dirname(os.path.dirname(__file__))
@@ -91,11 +94,7 @@ print(f"Generated {len(predicted_chars)} predicted characters.")
 # Write predictions to a file
 output_path = os.path.join(os.path.dirname(__file__), 'predicted_seqs')
 output_filename = os.path.join(output_path, f'Preds_model_{model_name}.txt')
-with open(output_filename, 'w') as f:
-    for i, char in enumerate(predicted_chars):
-        if i % 100 == 0 and i > 0:
-            f.write('\n')
-        f.write(char)
+utils.write_file(output_filename, predicted_chars)
 
 def write_guess_metadata(model_name, data_file, output_path, config):
     metadata_filename = os.path.join(output_path, "guess_metadata.txt")
