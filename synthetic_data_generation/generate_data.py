@@ -1,18 +1,20 @@
 import cProfile
-import pstats
+import glob
 import io
+import os
+import pstats
+
 import matplotlib.pyplot as plt
 import numpy as np
 from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
-import os
-import glob
+
 
 def generate_data(num_steps, agent, environment):
     behavior_data = []
     high_port_data = []
     # Initialize high port based on the environment's first_bit
-    high_port = 1 if environment.first_bit else 0
+    high_port = environment.high_spout_position
 
     for step in range(num_steps):
         choice = agent.make_choice()
@@ -69,7 +71,7 @@ def write_file(filename, data):
 def main(num_steps=1000000, profile=False, include_val=True):
     
     environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
-    agent = RFLR_mouse(alpha=-0.5, beta=2.1, tau=1.4, policy="greedy_policy")
+    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
 
     datasets = ['tr', 'v'] if include_val else ['tr']
 

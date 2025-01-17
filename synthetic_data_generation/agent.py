@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class RFLR_mouse:
     def __init__(self, alpha=0.5, beta=2, tau=1.2, policy="probability_matching"):
         """
@@ -14,7 +15,7 @@ class RFLR_mouse:
         self.beta = beta    # influence of the reward
         self.tau = tau      # decay rate for the reward history
         self.phi_t = 0.5      # initial value of the recursive reward term
-        self.last_choice = np.random.choice([0,1])
+        self.last_choice = np.random.choice([0, 1])
         self.policy = policy
 
     def update_phi(self, c_t, r_t):

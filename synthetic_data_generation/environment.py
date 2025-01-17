@@ -16,7 +16,7 @@ class Original_2ABT_Spouts:
         
         # Initial positions of the spouts (0 = left, 1 = right)
         self.high_spout_position = int(random.random() < 0.5)
-        self.low_spout_position = 1  - self.high_spout_position 
+        self.low_spout_position = 1  - self.high_spout_position
         self.first_bit = self.high_spout_position
 
     def _transition_spouts(self):
