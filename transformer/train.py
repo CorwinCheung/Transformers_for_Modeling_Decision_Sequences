@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
     parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
+    parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
 
     return parser.parse_args()
 
@@ -200,7 +201,7 @@ def estimate_loss(predict=False):
 
 best_val_loss = float('inf')
 val_loss = None
-
+predictions_full = {}
 # Training loop
 for step in range(max_steps):
 
@@ -246,7 +247,11 @@ for step in range(max_steps):
     # Print logging information every 100 steps
     if step % 100 == 0 or step == max_steps - 1:
         if ddp.master_process:
-            val_loss = estimate_loss(predict=False)
+            if args.predict:
+                val_loss, predictions = estimate_loss(predict=True)
+                predictions_full[step] = predictions
+            else:
+                val_loss = estimate_loss(predict=False)
             wandb.log({
                 "step": step,
                 "loss": loss_accum.item(),
@@ -272,6 +277,16 @@ for step in range(max_steps):
     #     else:
     #         if master_process:
     #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
+
+    def write_predictions(model_name, predictions_full):
+
+        for step, predictions in predictions_full.items():
+
+            pred_filename = os.path.join(os.path.join(os.path.dirname(__file__),
+                                                      f"learning_seqs/{model_name}_preds_{step}.txt"))
+            with open(pred_filename, 'a') as f:
+                for p, base_seq in zip(predictions['yhat'], predictions['x']):
+                    f.write(f"{base_seq}{p}\n")
 
     def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
         metdata_file = get_experiment_file("metadata.txt", run_number)

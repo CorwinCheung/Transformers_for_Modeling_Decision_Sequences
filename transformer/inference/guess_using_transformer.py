@@ -1,10 +1,11 @@
+import os
+import random
+import sys
+import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import time
-import sys
-import os
-import random
 
 # Add the project root directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -115,7 +116,7 @@ def main(run=None, model_name=None):
     print(f"Generated {len(predicted_chars)} predicted characters.")
 
     # Write predictions to a file
-    pred_file = get_experiment_file("pred_run_{}_.txt", run, model_name)
+    pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
     with open(pred_file, 'w') as f:
         for i, char in enumerate(predicted_chars):
             if i % 100 == 0 and i > 0:
