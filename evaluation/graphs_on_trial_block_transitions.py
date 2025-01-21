@@ -9,6 +9,11 @@ from .graph_helper import (calculate_switch_probabilities, plot_probabilities,
 import pandas as pd
 import itertools
 
+# Add the project root directory to Python path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.file_management import get_experiment_file
+
 global rflr
 
 
@@ -126,7 +131,7 @@ def calculate_probabilities(events):
     return block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper
 
 
-def main():
+def main(run=None):
     prefix = ''
     ground_truth = True
     if ground_truth:
@@ -134,11 +139,9 @@ def main():
     else:
         prefix = 'new_gen'
 
-    # Define the file paths
-    run_number = 0
-    root = os.path.dirname(__file__)
-    behavior_filename = os.path.join(os.path.dirname(root), 'data', f'2ABT_behavior_run_{run_number}v.txt')
-    high_port_filename = os.path.join(os.path.dirname(root), 'data', f'2ABT_high_port_run_{run_number}v.txt')
+    # Get file paths using the new utility
+    behavior_filename = get_experiment_file("behavior_run_{}.txt", run, 'v')
+    high_port_filename = get_experiment_file("high_port_run_{}.txt", run, 'v')
 
     # Check if files exist
     if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):

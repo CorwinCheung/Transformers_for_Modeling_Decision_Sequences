@@ -7,6 +7,7 @@ import seaborn as sns
 from dataclasses import dataclass
 from transformer import GPT, GPTConfig, DataLoaderLite
 from bertviz import head_view
+from ..utils.file_management import get_experiment_file, get_latest_run
 
 # Define the model classes as provided
 
@@ -16,7 +17,12 @@ print(f"Using {device} device")
 
 config = GPTConfig()
 model = GPT(config)
-model.load_state_dict(torch.load('model_seen92M.pth', map_location=device))
+
+# Update model loading
+run = get_latest_run()
+model_path = get_experiment_file("model.pth", run)
+model.load_state_dict(torch.load(model_path, map_location=device))
+# model.load_state_dict(torch.load('model_seen92M.pth', map_location=device))
 
 # Print number of parameters and important metadata
 total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

@@ -2,11 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-sys.path.insert(0, project_root)
+# project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+# sys.path.insert(0, project_root)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 #so that I can import from a directory two levels up
 from evaluation.graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
 from scipy.stats import bootstrap
+
+from utils.file_management import get_file_path
 
 
 global rflr
@@ -238,45 +242,42 @@ def calculate_probabilities(events):
     # Return the block positions, probabilities, and confidence intervals
     return block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper
 
-# Main code
+def main(run=None):
+    # Files will automatically use latest run if run=None
+    behavior_filename = get_file_path(f"behavior_run_{run}tr.txt", run)
+    high_port_filename = get_file_path(f"high_port_run_{run}tr.txt", run)
+    predictions_filename = get_file_path(f"pred_run_{run}.txt", run)
 
-prefix = 'original'
+    # Check if files exist
+    if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(predictions_filename):
+        print("One or more files not found!")
+    else:
+        # Parse the ground truth events
+        events = parse_files(behavior_filename, high_port_filename)
 
-# Define the file paths
-behavior_filename = "../../data/2ABT_behavior_run_3.txt"
-high_port_filename = "../../data/2ABT_high_port_run_3.txt"
-predictions_filename = "Preds_for_3_with_model_o_seen92M.txt"
+        # Read predictions
+        predictions = read_predictions(predictions_filename)
+        print(f"Number of events: {len(events)}")
+        print(f"Number of predictions: {len(predictions)}")
 
-# Check if files exist
-if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(predictions_filename):
-    print("One or more files not found!")
-else:
-    # Parse the ground truth events
-    events = parse_files(behavior_filename, high_port_filename)
+        # Align events with predictions and adjust switches
+        events = align_events_with_predictions(events, predictions)
 
-    # Read predictions
-    predictions = read_predictions(predictions_filename)
-    print(f"Number of events: {len(events)}")
-    print(f"Number of predictions: {len(predictions)}")
+        # Calculate and print the percent of trials with a switch
+        total_trials = len(events) - 1  # Exclude the first trial
+        total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
+        percent_switches = (total_switches / total_trials) * 100 if total_trials > 0 else 0
 
-    # Align events with predictions and adjust switches
-    events = align_events_with_predictions(events, predictions)
+        print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-    # Calculate and print the percent of trials with a switch
-    total_trials = len(events) - 1  # Exclude the first trial
-    total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
-    percent_switches = (total_switches / total_trials) * 100 if total_trials > 0 else 0
+        # Calculate probabilities for block positions
+        block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper = calculate_probabilities(events)
 
-    print(f"Percent of trials with a switch: {percent_switches:.2f}%")
+        # Plot the probabilities
+        plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, f"run_{run}", "../")
 
-    # Calculate probabilities for block positions
-    block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper = calculate_probabilities(events)
+        # Calculate switch probabilities
+        sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
 
-    # Plot the probabilities
-    plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix, "../")
-
-    # Calculate switch probabilities
-    sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
-
-    # Plot the switch probabilities
-    plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix, "../")
+        # Plot the switch probabilities
+        plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, f"run_{run}", "../")
