@@ -10,12 +10,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.distributed as dist
-import utils
 import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from transformer import GPT, DataLoaderLite, GPTConfig
+from transformer import GPT, DataLoaderLite, GPTConfig, DDPConfig
+
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.file_management import get_latest_run, get_experiment_file, format_tokens
 
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
@@ -61,14 +64,14 @@ min_lr = max_lr * 0.1
 warmup_steps = 1000
 
 # Data parameters
-run_number = args.run_number or 0  # TODO: default to getting newest generated data
+run_number = args.run_number or get_latest_run()
 
 #regular undistributed one GPU/cpu python train.py
 #launch ddp with
 #torchrun --standalone --nproc_per_node=2 train.py
 
 # Set up DDP if using, mimic it if not.
-ddp = utils.DDPConfig()
+ddp = DDPConfig()
 
 # Training setup
 total_batch_size = 6144  # number of tokens per batch
@@ -86,20 +89,22 @@ train_loader = DataLoaderLite(
     T=T,
     process_rank=ddp.rank,
     num_processes=ddp.world_size,
-    run_number=f'{run_number}tr'
+    run_number=run_number,
+    suffix='tr'
 )
 val_loader = DataLoaderLite(
     B=B,
     T=T,
     process_rank=ddp.rank,
     num_processes=ddp.world_size,
-    run_number=f'{run_number}v'
+    run_number=run_number,
+    suffix='v'
 )
 
 # Number steps required to pass over full dataset x n_epochs.
 max_steps = int((len(train_loader.tokens) / total_batch_size) * args.epochs)
 tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
-model_name = f"sweep_seen{utils.format_tokens(tokens_trained_on)}"
+model_name = f"model_seen{format_tokens(tokens_trained_on)}"
 
 if ddp.master_process:
     print(f"total desired batch size: {total_batch_size}")
@@ -241,7 +246,7 @@ for step in range(max_steps):
     # Print logging information every 100 steps
     if step % 100 == 0 or step == max_steps - 1:
         if ddp.master_process:
-            val_loss = estimate_loss(predict=True)
+            val_loss = estimate_loss(predict=False)
             wandb.log({
                 "step": step,
                 "loss": loss_accum.item(),
@@ -269,13 +274,14 @@ for step in range(max_steps):
     #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
 
     def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
-        metadata_filename = os.path.join(os.path.dirname(__file__), "models/model_metadata.txt")
+        metdata_file = get_experiment_file("metadata.txt", run_number)
+        # metadata_filename = os.path.join(os.path.dirname(__file__), "models/model_metadata.txt")
         tokens_trained_on = total_batch_size * max_steps
 
-        with open(metadata_filename, 'a') as meta_file:
+        with open(metdata_file, 'a') as meta_file:
             meta_file.write(f"\nModel name: {model_name}\n")
             meta_file.write(f"  Num Parameters: {sum(p.numel() for p in model.parameters())}\n")
-            meta_file.write(f"\nFile trained on: ../data/2ABT_behavior_run_{run_number}.txt\n")
+            meta_file.write(f"\nFile trained on: {train_loader.behavior_file}\n")
             meta_file.write(f"\nTokens seen: {tokens_trained_on}\n")
             meta_file.write(f"\nTotal batch size: {total_batch_size:,}\n")
             meta_file.write(f"\nMax steps: {max_steps:,}\n")
@@ -289,24 +295,26 @@ for step in range(max_steps):
             meta_file.write(f"  Number of layers: {config.n_layer}\n")
             meta_file.write(f"  Number of heads: {config.n_head}\n")
             meta_file.write(f"  Embedding size: {config.n_embd}\n")
-
-        print(f"Metadata saved to {metadata_filename}")
+            meta_file.write(f"\n")
+        print(f"Metadata saved to {metdata_file}")
 
 
 # Call this function after the model training code
 if ddp.master_process:
 
-    filename = os.path.join(os.path.dirname(__file__), 'models', f'{model_name}.pth')
+    model_path = get_experiment_file(f'{model_name}.pth', run_number)
+    # model_file = get_experiment_file(f'{model_name}.pth', run_number)
+    # filename = os.path.join(os.path.dirname(__file__), 'models', f'{model_name}.pth')
     if args.compile:
         # torch.save(model._orig_mod.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
-        torch.save(model._orig_mod.state_dict(), filename)
+        torch.save(model._orig_mod.state_dict(), model_path)
     else:
         # switch to saving in scratch?
         # f'/n/holyscratch01/bsabatini_lab/Users/{username}/models/{model_name}.pth'
-        torch.save(model.state_dict(), filename)
+        torch.save(model.state_dict(), model_path)
     
     write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
-    wandb.save(filename)  # Save the model checkpoint to wandb
+    wandb.save(model_path)  # Save the model checkpoint to wandb
     wandb.finish()
 
 if ddp.ddp:

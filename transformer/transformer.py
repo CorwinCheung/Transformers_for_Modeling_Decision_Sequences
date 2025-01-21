@@ -5,6 +5,11 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch.distributed import init_process_group
+
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.file_management import get_experiment_file
 
 seed = 200
 torch.manual_seed(seed)
@@ -170,25 +175,40 @@ class GPT(nn.Module):
 
 
 class DataLoaderLite:
-    def __init__(self, B, T, process_rank, num_processes, run_number):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        """Initialize data loader for training or validation.
+        
+        Args:
+            B (int): Batch size
+            T (int): Sequence length
+            process_rank (int): Rank of current process for DDP
+            num_processes (int): Total number of processes for DDP
+            run_number (int, optional): Run number to load. Defaults to latest run.
+            suffix (str, optional): Dataset suffix ('tr' or 'v'). Defaults to 'tr'.
+        """
         self.B = B
         self.T = T
         self.process_rank = process_rank
         self.num_processes = num_processes
-        filename = os.path.join(os.path.dirname(os.path.dirname(__file__, )),
-                                f'data/2ABT_behavior_run_{run_number}.txt')
-        with open(filename, 'r') as f:
-            text = f.read().replace("\n", "")
-
+        
+        # Get the behavior file path using the file management utility
+        behavior_file = get_experiment_file(f"behavior_run_{{}}.txt", run_number, suffix)
+        
+        with open(behavior_file, 'r') as f:
+            text = f.read().replace("\n", "").replace(" ", "")
+            # text = f.read().replace("\n", "")
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
-        print(f"read in {len(tokens)} tokens")
+        print(f"read in {len(tokens)} tokens from {behavior_file}")
+        
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.current_position = self.B * self.T * self.process_rank
         self.batches_per_epoch = len(self.tokens) // (self.B * self.T)
+        self.behavior_file = behavior_file
 
     def next_batch(self):
+        """Get next batch of data."""
         B, T = self.B, self.T
         buf = self.tokens[self.current_position:self.current_position + B * T + 1]
         x = buf[:-1].view(B, T)
@@ -197,3 +217,28 @@ class DataLoaderLite:
         if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
             self.current_position = self.B * self.T * self.process_rank
         return x, y
+
+
+class DDPConfig:
+
+    def __init__(self):
+        self.ddp = int(os.environ.get('RANK', -1)) != -1
+
+        if self.ddp:
+            assert torch.cuda.is_available(), "need CUDA for DDP"
+            init_process_group(backend="nccl")
+            self.rank = int(os.environ['RANK'])
+            self.local_rank = int(os.environ['LOCAL_RANK'])
+            self.world_size = int(os.environ['WORLD_SIZE'])
+            self.device = torch.device(f'cuda:{self.local_rank}')
+            torch.cuda.set_device(self.device)
+            self.master_process = self.rank == 0
+        else:
+            self.rank = 0
+            self.local_rank = 0
+            self.world_size = 1
+            self.master_process = True
+            self.device = torch.device('mps' if torch.backends.mps.is_available() else 'cuda'
+                                       if torch.cuda.is_available() else 'cpu')
+        print(f"using device: {self.device}")
+        self.device_type = "cuda" if str(self.device).startswith("cuda") else "cpu"

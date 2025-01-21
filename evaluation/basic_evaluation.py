@@ -1,5 +1,10 @@
 import os
 
+# Add the project root directory to Python path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.file_management import get_experiment_file
+
 
 def analyze_data(behavior_filename, high_port_filename):
     def calculate_percentages(count, total):
@@ -81,15 +86,18 @@ def compute_switches(behavior_filename):
     print(f"Total switches: {switches:,}")
     print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-run_number = '0tr'
-root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-behavior_filename = os.path.join(root, f"2ABT_behavior_run_{run_number}.txt")
-high_port_filename = os.path.join(root, f"2ABT_high_port_run_{run_number}.txt")
+def main(run=None):
+    behavior_filename = get_experiment_file("behavior_run_{}.txt", run, 'tr')
+    high_port_filename = get_experiment_file("high_port_run_{}.txt", run, 'tr')
 
-if os.path.exists(behavior_filename) and os.path.exists(high_port_filename):
-    analysis = analyze_data(behavior_filename, high_port_filename)
-    if analysis:
-        print_table(analysis)
-        compute_switches(behavior_filename)
-else:
-    print(f"Files {behavior_filename} or {high_port_filename} not found!")
+    if os.path.exists(behavior_filename) and os.path.exists(high_port_filename):
+        print(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
+        analysis = analyze_data(behavior_filename, high_port_filename)
+        if analysis:
+            print_table(analysis)
+            compute_switches(behavior_filename)
+    else:
+        print(f"Files {behavior_filename} or {high_port_filename} not found!")
+
+if __name__ == "__main__":
+    main()

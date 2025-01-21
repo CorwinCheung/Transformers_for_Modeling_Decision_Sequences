@@ -9,6 +9,11 @@ import numpy as np
 from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
 
+# Add the project root directory to Python path
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.file_management import ensure_run_dir, get_latest_run
+
 
 def generate_data(num_steps, agent, environment):
     behavior_data = []
@@ -61,28 +66,27 @@ def find_filename(base, suffix='tr'):
         new_filename = f"{file_root}_run_{counter}*{file_ext}"
     return f"{file_root}_run_{counter}{file_ext}"
 
-def write_file(filename, data):
-    with open(filename, 'w') as f:
+def write_file(filepath, data):
+    with open(filepath, 'w') as f:
         for i, token in enumerate(data):
             if i % 100 == 0:
                 f.write('\n')
             f.write(token)
 
-def main(num_steps=1000000, profile=False, include_val=True):
+def main(num_steps=100000, profile=False, include_val=True):
+    # Get next run number
+    next_run = get_latest_run() + 1
+    run_dir = ensure_run_dir(next_run)
     
     environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
     agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
 
     datasets = ['tr', 'v'] if include_val else ['tr']
-
-    # Keep same root filenames to lock train and val sets to same ID.
-    base_path = os.path.dirname(os.path.dirname(__file__))
-    behavior_filename_base = find_filename(os.path.join(base_path, "data/2ABT_behavior.txt"))
-    high_port_filename_base = find_filename(os.path.join(base_path, "data/2ABT_high_port.txt"))
     
     for suffix in datasets:
-        behavior_filename = behavior_filename_base.replace('.txt', f'{suffix}.txt')
-        high_port_filename = high_port_filename_base.replace('.txt', f'{suffix}.txt')
+        behavior_filename = os.path.join(run_dir, f"behavior_run_{next_run}{suffix}.txt")
+        high_port_filename = os.path.join(run_dir, f"high_port_run_{next_run}{suffix}.txt")
+
         if profile:
             with cProfile.Profile() as pr:
                 behavior_data, high_port_data = generate_data(num_steps, agent, environment)
@@ -95,18 +99,22 @@ def main(num_steps=1000000, profile=False, include_val=True):
         write_file(behavior_filename, behavior_data)
         write_file(high_port_filename, high_port_data)
 
-        with open(os.path.join(base_path, "data/metadata.txt"), 'a') as meta_file:
-            meta_file.write(f"\nData files: {behavior_filename}, {high_port_filename}\n")
+        # Write metadata
+        metadata_path = os.path.join(run_dir, "metadata.txt")
+        with open(metadata_path, 'a') as meta_file:
+            meta_file.write(f"Run {next_run}\n")
+            meta_file.write(f"Dataset {suffix}\n")
             meta_file.write(f"Number of steps: {num_steps:,}\n")
             meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, "
                             f"low_reward_prob={environment.low_reward_prob}, "
                             f"transition_prob={environment.transition_prob}\n")
             meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
             meta_file.write(f"Agent policy: {agent.policy}\n")
+            meta_file.write(f"\n")
 
-        print(f"Generated {num_steps} steps of behavior data and saved to {behavior_filename}")
-        print(f"Generated {num_steps} steps of high port data and saved to {high_port_filename}")
-    print(f"Metadata saved to {os.path.join(base_path, 'data/metadata.txt')}")
+        print(f"Generated data for run_{next_run}")
+        print(f"Files saved to {run_dir}")
+    print(f"Metadata saved to {metadata_path}")
 
 if __name__ == "__main__":
     # Set profile to True to enable profiling, False to skip

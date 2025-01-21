@@ -6,32 +6,18 @@ import sys
 import os
 import random
 
-# Add the path to the transformer module if needed
-root = os.path.dirname(os.path.dirname(__file__))
-print(root)
-sys.path.append(root)
-
-from transformer import GPT, GPTConfig
+# Add the project root directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.file_management import get_experiment_file, get_latest_run, parse_model_info, get_latest_model_name
+from transformer.transformer import GPT, GPTConfig
 
 seed = 200
 random.seed(seed)
 torch.manual_seed(seed)
 
-# Define the run number and model number
-run_number = 1
-model_name = f"sweep_seen9M_run{run_number}"
-
 # Device setup
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using {device} device")
-
-# Load the trained model
-config = GPTConfig()
-model = GPT(config)
-model.load_state_dict(torch.load(os.path.join(root, 'models', f'{model_name}.pth'),
-                                 map_location=device, weights_only=True))
-model.to(device)
-model.eval()
 
 # Define the vocabulary and mappings
 vocab = ['R', 'r', 'L', 'l']
@@ -41,23 +27,6 @@ itos = {i: ch for i, ch in enumerate(vocab)}
 # Function to encode a sequence of characters to a tensor
 def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
-
-# Load and preprocess the new data
-behavior_filename = os.path.join(os.path.dirname(root), 'data', f'2ABT_behavior_run_{run_number}v.txt')
-
-with open(behavior_filename, 'r') as f:
-    text = f.read().replace("\n", "").replace(" ", "")
-
-tokens = encode_sequence(text)
-print(f"Loaded {len(tokens)} tokens from ground truth data.")
-
-# Set start_token_idx to 'R' or 'L' randomly half the time
-start_tokens = ['R', 'L']
-start_token_char = random.choice(start_tokens)
-start_token_idx = stoi[start_token_char]
-
-# Prepend the start token to the tokens
-tokens = torch.cat([torch.tensor([start_token_idx], dtype=torch.long), tokens]).to(device)
 
 def generate_predictions(model, tokens, max_context_length):
     model.eval()
@@ -82,28 +51,14 @@ def generate_predictions(model, tokens, max_context_length):
 
     return predicted_indices
 
-# Generate predictions
-context_length = 12
-predicted_indices = generate_predictions(model, tokens, max_context_length=context_length)
-predicted_chars = [itos[idx] for idx in predicted_indices]
-print(f"Generated {len(predicted_chars)} predicted characters.")
+def write_guess_metadata(model_name, run, behavior_file, pred_file, config):
+    metadata_file = get_experiment_file("metadata.txt", run)
 
-# Write predictions to a file
-output_path = os.path.join(os.path.dirname(__file__), 'predicted_seqs')
-output_filename = os.path.join(output_path, f'Preds_model_{model_name}.txt')
-with open(output_filename, 'w') as f:
-    for i, char in enumerate(predicted_chars):
-        if i % 100 == 0 and i > 0:
-            f.write('\n')
-        f.write(char)
-
-def write_guess_metadata(model_name, data_file, output_path, config):
-    metadata_filename = os.path.join(output_path, "guess_metadata.txt")
-
-    with open(metadata_filename, 'w') as meta_file:
-        meta_file.write(f"\nFilename: 'Preds_for_{run_number}_with_model_{model_name}.txt'")
+    with open(metadata_file, 'a') as meta_file:
+        meta_file.write(f"Run: {run}\n")
+        meta_file.write(f"\nFilename: '{pred_file}'")
         meta_file.write(f"\nModel used for guessing: {model_name}\n")
-        meta_file.write(f"\nData guessed on: {data_file}\n")
+        meta_file.write(f"\nData guessed on: {behavior_file}\n")
         meta_file.write(f"\nGPTConfig parameters:\n")
         meta_file.write(f"  Block size: {config.block_size}\n")
         meta_file.write(f"  Vocab size: {config.vocab_size}\n")
@@ -111,8 +66,73 @@ def write_guess_metadata(model_name, data_file, output_path, config):
         meta_file.write(f"  Number of heads: {config.n_head}\n")
         meta_file.write(f"  Embedding size: {config.n_embd}\n")
 
-    print(f"Guess metadata saved to {metadata_filename}")
+    print(f"Guess metadata saved to {metadata_file}")
 
-write_guess_metadata(model_name, behavior_filename, output_path, config)
+def main(run=None, model_name=None):
 
-print(f"Model predictions saved to {output_filename}")
+    if run is None:
+        run = get_latest_run()
+
+    # Get model info from metadata
+    model_info = parse_model_info(run, model_name=model_name)
+    model_name = model_info['model_name']
+
+    # Configure model using metadata
+    config = GPTConfig(
+        block_size=model_info['config'].get('Block size', 12),
+        vocab_size=model_info['config'].get('Vocab size', 4),
+        n_layer=model_info['config'].get('Number of layers', 1),
+        n_head=model_info['config'].get('Number of heads', 1),
+        n_embd=model_info['config'].get('Embedding size', 64)
+    )
+    # Load the trained model
+    # config = GPTConfig()
+    model = GPT(config)
+    model_path = get_experiment_file(f'{model_name}.pth', run)
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    model.to(device)
+    model.eval()
+
+    # Load and preprocess the new data
+    behavior_file = get_experiment_file("behavior_run_{}.txt", run, 'tr')
+    with open(behavior_file, 'r') as f:
+        text = f.read().replace("\n", "").replace(" ", "")
+    tokens = encode_sequence(text)
+    print(f"Loaded {len(tokens)} tokens from ground truth data.")
+
+    # Set start_token_idx to 'R' or 'L' randomly half the time
+    start_tokens = ['R', 'L']
+    start_token_char = random.choice(start_tokens)
+    start_token_idx = stoi[start_token_char]
+
+    # Prepend the start token to the tokens
+    tokens = torch.cat([torch.tensor([start_token_idx], dtype=torch.long), tokens]).to(device)
+
+    # Generate predictions
+    context_length = model_info['dataloader'].get('Sequence length (T)', 12)
+    predicted_indices = generate_predictions(model, tokens, max_context_length=context_length)
+    predicted_chars = [itos[idx] for idx in predicted_indices]
+    print(f"Generated {len(predicted_chars)} predicted characters.")
+
+    # Write predictions to a file
+    pred_file = get_experiment_file("pred_run_{}_.txt", run, model_name)
+    with open(pred_file, 'w') as f:
+        for i, char in enumerate(predicted_chars):
+            if i % 100 == 0 and i > 0:
+                f.write('\n')
+            f.write(char)
+
+    write_guess_metadata(model_name, run, behavior_file, pred_file, config)
+
+    print(f"Model predictions saved to {pred_file}")
+
+# Main code
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=int, default=None)
+    parser.add_argument('--model', type=str, default=None)
+    args = parser.parse_args()
+    
+    main(run=args.run, model_name=args.model)
+
