@@ -1,63 +1,27 @@
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-from collections import Counter
 import os
+import sys
+from collections import Counter
 
-# Define run number and model number
-run_number = 1
-model_name = f"sweep_seen9M_run{run_number}"
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 
-# File paths
-root = os.path.dirname(os.path.dirname(__file__))
-ground_truth_path = os.path.join(os.path.dirname(root), 'data', f'2ABT_behavior_run_{run_number}v.txt')
-predictions_path = os.path.join(os.path.dirname(__file__), 'predicted_seqs', f'Preds_model_{model_name}.txt')
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils.file_management import (get_experiment_file, get_latest_run,
+                                   parse_model_info, read_file)
 
-def read_file(path):
-    with open(path, 'r') as f:
-        seq = f.read().replace('\n', '').replace(' ', '')
-    return seq
 
-# Load ground truth data
-ground_truth = read_file(ground_truth_path)
-
-# Load model predictions
-predictions = read_file(predictions_path)
-
-# Ensure both sequences have the same length
-min_length = min(len(ground_truth), len(predictions))
-ground_truth = ground_truth[:min_length]
-predictions = predictions[:min_length]
-
-# Compute accuracy of all 4 possible characters
-correct = sum(gt == pred for gt, pred in zip(ground_truth, predictions))
-total = len(ground_truth)
-accuracy = correct / total if total > 0 else 0
-print(f"Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
-
-# Compute confusion matrix
-confusion = Counter((gt, pred) for gt, pred in zip(ground_truth, predictions))
-
-# Display confusion matrix
-print("\nConfusion Matrix:")
-print("Ground Truth -> Prediction: Count")
-for (gt_char, pred_char), count in sorted(confusion.items(), key=lambda x: x[1], reverse=True):
-    print(f"{gt_char} -> {pred_char}: {count}")
-
-# Calculate accuracy ignoring 'R'-'r' and 'L'-'l' differences
 def calculate_accuracy_ignore_case(ground_truth, predictions):
+    """Calculate accuracy ignoring 'R'-'r' and 'L'-'l' differences"""
     correct = sum(
         gt.upper() == pred.upper()
         for gt, pred in zip(ground_truth, predictions)
     )
     return correct / len(ground_truth) if len(ground_truth) > 0 else 0
 
-# Compute and print the adjusted accuracy
-adjusted_accuracy = calculate_accuracy_ignore_case(ground_truth, predictions)
-print(f"\nAdjusted Accuracy ('R'-'r','L'-'l' same): {adjusted_accuracy:.2%}")
 
-# Calculate switch percentage between 'R'/'r' and 'L'/'l'
 def calculate_switch_percentage_with_gt(predictions, ground_truth):
+    """ Calculate switch percentage between 'R'/'r' and 'L'/'l'"""
     upper_preds = [c.upper() for c in predictions]
     upper_gt = [c.upper() for c in ground_truth]
     switches = sum(
@@ -76,28 +40,74 @@ def calculate_switch_percentage_within_gt(ground_truth):
     total_transitions = len(upper_gt) - 1
     return (switches / total_transitions) * 100 if total_transitions > 0 else 0
 
-# Compute and print switch percentages
-switch_percentage = calculate_switch_percentage_with_gt(predictions, ground_truth)
-gt_switch_percentage = calculate_switch_percentage_within_gt(ground_truth)
-print(f"\nSwitch Percentage (model): {switch_percentage:.2f}%")
-print(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
 
-labels = sorted(set(ground_truth + predictions))
-label_map = {label: i for i, label in enumerate(labels)}
+def main(run=None, model_name=None):
 
-# Initialize the confusion matrix array
-conf_matrix = np.zeros((len(labels), len(labels)), dtype=int)
+    if run is None:
+        run = get_latest_run()
 
-# Populate the confusion matrix array
-for (gt_char, pred_char), count in confusion.items():
-    i, j = label_map[gt_char], label_map[pred_char]
-    conf_matrix[i, j] = count
+    # Get model info from metadata
+    model_info = parse_model_info(run, model_name=model_name)
+    model_name = model_info['model_name']
 
-# Plot the confusion matrix
-plt.figure(figsize=(8, 6))
-sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
-            xticklabels=labels, yticklabels=labels)
-plt.xlabel("Predicted Label")
-plt.ylabel("Ground Truth Label")
-plt.title("Confusion Matrix")
-plt.savefig("Conf_matrix_low_val")
+    # Load ground truth data
+    ground_truth_file = get_experiment_file("behavior_run_{}.txt", run, 'v')
+    ground_truth = read_file(ground_truth_file)
+
+    # Load model predictions
+    pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
+    predictions = read_file(pred_file)
+
+    # Ensure both sequences have the same length
+    min_length = min(len(ground_truth), len(predictions))
+    ground_truth = ground_truth[:min_length]
+    predictions = predictions[:min_length]
+
+    # Compute accuracy of all 4 possible characters
+    correct = sum(gt == pred for gt, pred in zip(ground_truth, predictions))
+    total = len(ground_truth)
+    accuracy = correct / total if total > 0 else 0
+    print(f"Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
+
+    # Compute confusion matrix
+    confusion = Counter((gt, pred) for gt, pred in zip(ground_truth, predictions))
+
+    # Display confusion matrix
+    print("\nConfusion Matrix:")
+    print("Ground Truth -> Prediction: Count")
+    for (gt_char, pred_char), count in sorted(confusion.items(), key=lambda x: x[1], reverse=True):
+        print(f"{gt_char} -> {pred_char}: {count}")
+
+    # Compute and print the adjusted accuracy
+    adjusted_accuracy = calculate_accuracy_ignore_case(ground_truth, predictions)
+    print(f"\nAdjusted Accuracy ('R'-'r','L'-'l' same): {adjusted_accuracy:.2%}")
+
+    # Compute and print switch percentages
+    switch_percentage = calculate_switch_percentage_with_gt(predictions, ground_truth)
+    gt_switch_percentage = calculate_switch_percentage_within_gt(ground_truth)
+    print(f"\nSwitch Percentage (model): {switch_percentage:.2f}%")
+    print(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
+
+    labels = sorted(set(ground_truth + predictions))
+    label_map = {label: i for i, label in enumerate(labels)}
+
+    # Initialize the confusion matrix array
+    conf_matrix = np.zeros((len(labels), len(labels)), dtype=int)
+
+    # Populate the confusion matrix array
+    for (gt_char, pred_char), count in confusion.items():
+        i, j = label_map[gt_char], label_map[pred_char]
+        conf_matrix[i, j] = count
+
+    # Plot the confusion matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
+                xticklabels=labels, yticklabels=labels)
+    plt.xlabel("Predicted Label")
+    plt.ylabel("Ground Truth Label")
+    plt.title("Confusion Matrix")
+    cm_file = get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}")
+    plt.savefig(cm_file)
+
+if __name__ == "__main__":
+    main()
