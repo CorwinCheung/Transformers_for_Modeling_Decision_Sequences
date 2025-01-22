@@ -1,15 +1,15 @@
 import inspect
 import os
+import sys
 from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-from torch.nn import functional as F
 from torch.distributed import init_process_group
+from torch.nn import functional as F
 
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import get_experiment_file
+from utils.file_management import get_experiment_file, read_file
 
 seed = 200
 torch.manual_seed(seed)
@@ -193,10 +193,8 @@ class DataLoaderLite:
         
         # Get the behavior file path using the file management utility
         behavior_file = get_experiment_file(f"behavior_run_{{}}.txt", run_number, suffix)
-        
-        with open(behavior_file, 'r') as f:
-            text = f.read().replace("\n", "").replace(" ", "")
-            # text = f.read().replace("\n", "")
+        text = read_file(behavior_file)
+
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]

@@ -1,5 +1,6 @@
-import os
 import glob
+import os
+
 
 def get_latest_run():
     """Find the highest numbered run directory."""
@@ -98,9 +99,14 @@ def parse_model_info(run=None, model_name=None):
     
     return model_info
 
+
 def get_latest_model_name(run=None):
     """Get the name of the latest model based on tokens seen."""
     model_info = parse_model_info(run)
     return model_info['model_name']
-    # tokens_m = format_tokens(model_info['tokens_seen'])
-    # return f"model_seen{tokens_m}.pth"
+
+
+def read_file(file_name):
+    with open(file_name, 'r') as f:
+        events = f.read().replace("\n", "").replace(" ", "")
+    return events

@@ -1,17 +1,17 @@
 import os
-
 # Add the project root directory to Python path
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import get_experiment_file
+from utils.file_management import get_experiment_file, read_file
 
 
 def analyze_data(behavior_filename, high_port_filename):
     def calculate_percentages(count, total):
         return (count / total) * 100 if total > 0 else 0
-
-    with open(behavior_filename, 'r') as bf, open(high_port_filename, 'r') as hf:
-        behavior_data, high_port_data = bf.read().replace('\n', ''), hf.read().replace('\n', '')
+    
+    behavior_data = read_file(behavior_filename)
+    high_port_data = read_file(high_port_filename)
     
     if len(behavior_data) != len(high_port_data):
         print("Error: Data lengths do not match.")
@@ -62,11 +62,8 @@ def print_table(analysis):
     print(f"{'Selected Correct (%):':<20} {analysis['selected_correct_percentage']:>10.2f}%")
 
 def compute_switches(behavior_filename):
-    with open(behavior_filename, 'r') as f:
-        data = f.read()
-
-    # Remove any whitespace or newlines
-    data = data.replace('\n', '').replace(' ', '')
+    
+    data = read_file(behavior_filename)
 
     # Convert to lowercase to standardize 'L'/'l' and 'R'/'r'
     data = data.lower()
