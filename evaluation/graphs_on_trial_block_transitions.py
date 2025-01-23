@@ -1,31 +1,30 @@
+import itertools
 import os
+# Add the project root directory to Python path
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy.stats import bootstrap
 
 from .graph_helper import (calculate_switch_probabilities, plot_probabilities,
                            plot_switch_probabilities)
-import pandas as pd
-import itertools
 
-# Add the project root directory to Python path
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import get_experiment_file
+from utils.file_management import get_experiment_file, read_file
 
 global rflr
 
 
 def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
 
-    with open(behavior_filename, 'r') as behavior_file:
-        behavior_data = behavior_file.read().replace('\n', '').replace(' ', '')
-    with open(high_port_filename, 'r') as high_port_file:
-        high_port_data = high_port_file.read().replace('\n', '').replace(' ', '')
+    behavior_data = read_file(behavior_filename)
+    high_port_data = read_file(high_port_filename)
     assert len(behavior_data) == len(high_port_data), (
         "Error: Behavior data and high port data have different lengths.")
 
+    token = list(behavior_data)
     choices = [int(c in ['R', 'r']) for c in behavior_data]
     choices_str = [c.upper() for c in behavior_data]
     rewards = [int(c.isupper()) for c in behavior_data]
@@ -37,6 +36,7 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
 
     events = pd.DataFrame(data={
         'trial_number': trials,
+        'k0': token,
         'choice': choices,
         'choice_str': choices_str,
         'reward': rewards,
