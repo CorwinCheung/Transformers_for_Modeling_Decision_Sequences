@@ -1,9 +1,12 @@
-import pandas as pd
-from utils.file_management import get_experiment_file
-import glob
-import os
+from pathlib import Path
 
-def analyze_predictions(run=None):
+import pandas as pd
+
+from utils.file_management import (get_experiment_file, get_latest_run,
+                                   parse_model_info)
+
+
+def load_predictions(run=None, model_name=None):
     # # Load predictions
     # pred_file = get_experiment_file("validation_predictions.txt", run)
     # df = pd.read_csv(pred_file, sep='\t')
@@ -23,27 +26,16 @@ def analyze_predictions(run=None):
     #     'predictions_df': df
     # }
 
-    run_dir = get_run_dir(run)
-    
-    # Find all prediction files using glob
-    pred_files = glob.glob(os.path.join(run_dir, "learning", "val_preds_*.txt"))
-    
+    """Load and process all prediction files for a run efficiently."""
+    run = run or get_latest_run()
+    # Load predictions    # Get model info from metadata
+    model_info = parse_model_info(run, model_name=model_name)
+    model_name = model_info['model_name']
 
-    # Load all prediction files for detailed analysis
-    all_predictions = []
-    for pred_file in pred_files:
-        pred_path = get_experiment_file(pred_file, run)
-        preds = pd.read_csv(pred_path, sep='\t')
-        all_predictions.append(preds)
+    pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run)
 
-    # Analyze how predictions for specific contexts change over training
-    context_evolution = pd.concat(all_predictions)
-    context_accuracy = context_evolution.groupby(['Step', 'Context']).agg({
-        'True': 'first',
-        'Predicted': lambda x: (x == context_evolution['True']).mean()
-    }).reset_index()
-    
-    return {
-        'context_evolution': context_evolution,
-        'context_accuracy': context_accuracy
-    }
+    predictions = pd.read_csv(pred_file, sep='\t')
+    # Sort by step and original index
+    predictions = predictions.sort_values(['Step', 'Idx'])
+
+    return predictions, model_info
