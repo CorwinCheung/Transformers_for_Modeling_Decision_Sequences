@@ -14,7 +14,7 @@ import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from transformer import GPT, DataLoaderLite, GPTConfig, DDPConfig
+from transformer import GPT, DataLoaderLite, GPTConfig, DDPConfig, DataLoaderHeavy
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -93,7 +93,7 @@ train_loader = DataLoaderLite(
     run_number=run_number,
     suffix='tr'
 )
-val_loader = DataLoaderLite(
+val_loader = DataLoaderHeavy(
     B=B,
     T=T,
     process_rank=ddp.rank,
@@ -175,13 +175,6 @@ def estimate_loss(predict=False):
     model.eval()
     losses = []
     if predict:
-        # Store sequences and predictions as flat lists
-        # predictions = {
-        #     'context': [],    # Input sequences (x)
-        #     'true_next': [],  # True next tokens (y)
-        #     'pred_next': [],  # Predicted next tokens (yhat)
-        #     'y_indices': []   # Original indices of true next tokens
-        # }
         predictions = {
             'step': [],
             'context': torch.empty((0, val_loader.T), dtype=torch.long),  # [total_samples, T]
@@ -203,22 +196,6 @@ def estimate_loss(predict=False):
                 # Get predicted next tokens
                 last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size]
                 pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
-                # predictions['yhat'].append(torch.argmax(last_logits).item())
-
-                # # For each sample in batch
-                # for i in range(x.shape[0]):
-                #     # Store context sequence
-                #     context = x[i].tolist()  # Convert tensor to list
-                #     predictions['context'].append(context)
-                    
-                #     # Store true next token
-                #     true_token = y[i, -1].item()  # Last token in target sequence
-                #     predictions['true_next'].append(true_token)
-                    
-                #     # Store predicted next token
-                #     pred_token = pred_tokens[i].item()
-                #     predictions['pred_next'].append(pred_token)
-                #     predictions['y_indices'].append(y_indices[i, -1])
 
                 # Store entire batch at once
                 predictions['context'] = torch.cat([predictions['context'], x.cpu()], dim=0)
