@@ -46,6 +46,21 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
         'high_port': high_ports,
     })
 
+    events = get_block_positions(events)
+
+    if clip_short_blocks: 
+        # ID of short blocks, and blocks immediately following short blocks (not back to baseline).
+        short_blocks = events.query('block_length < 20')['block_id'].unique()
+        post_short_blocks = short_blocks + 1
+        raise NotImplementedError
+        # For reference:
+        # sns.lineplot(data=events.query('block_position.between(0, 20) & ~block_id.isin(@post_short_blocks)'), x='block_position', y='switch', ax=ax)
+        # sns.lineplot(data=events.query('rev_block_position.between(-10, 1) & block_length > 20'), x='rev_block_position', y='switch', ax=ax)
+
+    return events
+
+
+def get_block_positions(events):
     # Calculate length of each block as num trial from previous transition. Prepend first block, and last
     # block is distance to end of sequence.
     block_lengths = [events.query('transition == 1')['trial_number'].values[0]]
@@ -66,18 +81,7 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
     # Unique ID for each block.
     events.loc[events['transition']==1, 'block_id'] = np.arange(1,len(block_lengths))
     events['block_id'] = events['block_id'].ffill()
-
-    if clip_short_blocks: 
-        # ID of short blocks, and blocks immediately following short blocks (not back to baseline).
-        short_blocks = events.query('block_length < 20')['block_id'].unique()
-        post_short_blocks = short_blocks + 1
-        raise NotImplementedError
-        # For reference:
-        # sns.lineplot(data=events.query('block_position.between(0, 20) & ~block_id.isin(@post_short_blocks)'), x='block_position', y='switch', ax=ax)
-        # sns.lineplot(data=events.query('rev_block_position.between(-10, 1) & block_length > 20'), x='rev_block_position', y='switch', ax=ax)
-
     return events
-
 
 def calculate_probabilities(events):
     block_positions = list(range(-10, 21))
@@ -151,23 +155,11 @@ def main(run=None):
         events = parse_files(behavior_filename, high_port_filename)
         if events is not None:
             # Calculate and print the percent of trials with a switch
-            total_trials = len(events) - 1  # Exclude the first trial
-            total_switches = sum(event['switch'] for event in events[1:])  # Exclude the first trial
-            percent_switches = (total_switches / total_trials) * 100 if total_trials > 0 else 0
-
+            percent_switches = events['Switch'].mean()*100
             print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-            # Uncomment to print the first 100 events for debugging
-            # for event in events[:100]:
-            #     print(event)
-
             # Calculate probabilities for block positions
-            block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper = calculate_probabilities(events)
-            print(high_reward_prob)
-            print(switch_prob)
-
-            # Plot the probabilities
-            plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix)
+            plot_probabilities(events, run)
 
             # Calculate switch probabilities
             sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
