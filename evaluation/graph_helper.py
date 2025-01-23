@@ -7,14 +7,17 @@ from scipy.stats import bootstrap
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.file_management import get_experiment_file
+from pathlib import Path
 
-sys.path.append('/Users/celiaberon/GitHub/behavior-helpers')
-from bh.visualization import plot_trials
+code_path = Path(__file__).parent.parent.parent.parent
+behavior_helpers_path = code_path / 'behavior-helpers'
+sys.path.append(f'{str(behavior_helpers_path)}/')
+from bh.visualization import plot_trials as pts
 
 
 def plot_probabilities(events, run):
-    bpos = plot_trials.calc_bpos_probs(events)
-    fig, axs = plot_trials.plot_bpos_behavior(bpos)
+    bpos = pts.calc_bpos_probs(events)
+    fig, axs = pts.plot_bpos_behavior(bpos)
     [ax.set(xlim=(-10, 20)) for ax in axs]
     axs[1].set(ylim=(0, 0.2))
     bpos_filename = get_experiment_file('bpos_behavior_{}.png', run, 'v')
@@ -51,30 +54,38 @@ def plot_probabilities(events, run):
 #     plt.savefig(f'../{directory_escape}graphs/{prefix}_G_switch_probabilities.png')
 
 def map_sequence_to_pattern(seq):
-    action1, action2, action3 = seq
+    action1, *actionN = seq
 
     # First action: 'A' if rewarded, 'a' if unrewarded
-    first_reward = 'A' if action1['rewarded'] else 'a'
+    first_letter = 'A' if action1['rewarded'] else 'a'
     first_choice = action1['choice_str']
+    pattern = first_letter
+    # Subsequent actions
 
-    # Second action
-    second_same_side = action2['choice_str'] == first_choice
-    if second_same_side:
-        second_letter = 'A' if action2['rewarded'] else 'a'
-    else:
-        second_letter = 'B' if action2['rewarded'] else 'b'
-
-    # Third action
-    third_same_side = action3['choice_str'] == first_choice
-    if third_same_side:
-        third_letter = 'A' if action3['rewarded'] else 'a'
-    else:
-        third_letter = 'B' if action3['rewarded'] else 'b'
-
-    # Combine letters to form the pattern
-    pattern = f"{first_reward}{second_letter}{third_letter}"
+    for i_action in actionN:
+        same_side = i_action['choice_str'] == first_choice
+        if same_side:
+            next_letter = 'A' if i_action['rewarded'] else 'a'
+        else:
+            next_letter = 'B' if i_action['rewarded'] else 'b'
+        pattern += next_letter
 
     return pattern
+
+def map_rl_to_pattern(seq):
+    action1, *actionN = seq
+    first_letter = 'A' if action1.isupper() else 'a'
+    first_choice = action1.upper()
+    pattern = first_letter
+    for i_action in actionN:
+        same_side = i_action.upper() == first_choice
+        if same_side:
+            next_letter = 'A' if i_action.isupper() else 'a'
+        else:
+            next_letter = 'B' if i_action.isupper() else 'b'
+        pattern += next_letter
+    return pattern
+
 
 def calculate_switch_probabilities(events):
     pattern_data = {}
