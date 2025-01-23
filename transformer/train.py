@@ -45,6 +45,7 @@ def parse_args():
     parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
     parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
+    parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
 
     return parser.parse_args()
 
@@ -55,7 +56,6 @@ if __name__ == "__main__":
 ENABLE_PROFILING = False
 
 # Loss calculation parameters
-eval_interval = 100  # Evaluate every 100 steps
 max_eval_iters = 10  # Use 10 batches for validation
 checkpoint_interval = 1000
 
@@ -322,11 +322,10 @@ for step in range(max_steps):
     
     """VALIDATION SAMPLING"""
     # Print logging information every 100 steps
-    if step % 100 == 0 or step == max_steps - 1:
+    if step % args.eval_interval == 0 or step == max_steps - 1:
         if ddp.master_process:
             if args.predict:
                 val_loss, predictions = estimate_loss(predict=True)
-                predictions['step'] = [step for i in range(len(predictions['pred_next']))]
                 write_predictions(model_name, predictions, step==(max_steps-1))
             else:
                 val_loss = estimate_loss(predict=False)
