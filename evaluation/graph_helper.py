@@ -1,36 +1,54 @@
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import bootstrap
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.file_management import get_experiment_file
 
-def plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix, directory_escape=""):
-    # Plot P(high port)
-    plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
-    plt.fill_between(block_positions, high_reward_ci_lower, high_reward_ci_upper, color='blue', alpha=0.2)
-    plt.axvline(0, color='black', linestyle='--', label="Block Transition")
-    plt.xlabel("Block Position")
-    plt.ylabel("P(high port)")
-    plt.title("Probability of Selecting High-Reward Port with 95% CI")
-    plt.legend()
-    plt.ylim(0, 1)
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'../{directory_escape}graphs/{prefix}_G_selecting_high_reward_port.png')
+sys.path.append('/Users/celiaberon/GitHub/behavior-helpers')
+from bh.visualization import plot_trials
 
-    # Plot P(switch)
-    plt.figure(figsize=(10, 5))
-    plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
-    plt.fill_between(block_positions, switch_ci_lower, switch_ci_upper, color='blue', alpha=0.2)
-    plt.axvline(0, color='black', linestyle='--', label="Block Transition")
-    plt.xlabel("Block Position")
-    plt.ylabel("P(switch)")
-    plt.title("Probability of Switching with 95% CI")
-    plt.legend()
-    plt.ylim(0, 1.1 * max(switch_prob))
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'../{directory_escape}graphs/{prefix}_G_switch_probabilities.png')
+
+def plot_probabilities(events, run):
+    bpos = plot_trials.calc_bpos_probs(events)
+    fig, axs = plot_trials.plot_bpos_behavior(bpos)
+    [ax.set(xlim=(-10, 20)) for ax in axs]
+    axs[1].set(ylim=(0, 0.2))
+    bpos_filename = get_experiment_file('bpos_behavior_{}.png', run, 'v')
+    fig.savefig(bpos_filename, bbox_inches='tight')
+
+
+# def plot_probabilities(block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper, prefix, directory_escape=""):
+#     # Plot P(high port)
+#     plt.figure(figsize=(10, 5))
+#     plt.plot(block_positions, high_reward_prob, label="P(high port)", marker='o', color='blue')
+#     plt.fill_between(block_positions, high_reward_ci_lower, high_reward_ci_upper, color='blue', alpha=0.2)
+#     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
+#     plt.xlabel("Block Position")
+#     plt.ylabel("P(high port)")
+#     plt.title("Probability of Selecting High-Reward Port with 95% CI")
+#     plt.legend()
+#     plt.ylim(0, 1)
+#     plt.grid(True)
+#     plt.tight_layout()
+#     plt.savefig(f'../{directory_escape}graphs/{prefix}_G_selecting_high_reward_port.png')
+
+#     # Plot P(switch)
+#     plt.figure(figsize=(10, 5))
+#     plt.plot(block_positions, switch_prob, label="P(switch)", marker='o', color='blue')
+#     plt.fill_between(block_positions, switch_ci_lower, switch_ci_upper, color='blue', alpha=0.2)
+#     plt.axvline(0, color='black', linestyle='--', label="Block Transition")
+#     plt.xlabel("Block Position")
+#     plt.ylabel("P(switch)")
+#     plt.title("Probability of Switching with 95% CI")
+#     plt.legend()
+#     plt.ylim(0, 1.1 * max(switch_prob))
+#     plt.grid(True)
+#     plt.tight_layout()
+#     plt.savefig(f'../{directory_escape}graphs/{prefix}_G_switch_probabilities.png')
 
 def map_sequence_to_pattern(seq):
     action1, action2, action3 = seq

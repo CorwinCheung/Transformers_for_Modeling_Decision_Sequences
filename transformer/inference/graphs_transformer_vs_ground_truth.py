@@ -1,17 +1,20 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import os
 import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
+
 # project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 # sys.path.insert(0, project_root)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-#so that I can import from a directory two levels up
-from evaluation.graph_helper import plot_probabilities, calculate_switch_probabilities, plot_switch_probabilities
 from scipy.stats import bootstrap
 
-from utils.file_management import get_file_path
-
+#so that I can import from a directory two levels up
+from evaluation.graph_helper import (calculate_switch_probabilities,
+                                     plot_probabilities,
+                                     plot_switch_probabilities)
+from utils.file_management import get_file_path, read_file
 
 global rflr
 
@@ -126,9 +129,8 @@ def read_predictions(filename):
     Returns:
     - predictions (str): The prediction sequence as a string.
     """
-    with open(filename, 'r') as f:
-        predictions = f.read().replace('\n', '').replace(' ', '')
-    return predictions
+
+    return read_file(filename)
 
 def align_events_with_predictions(events, predictions):
     """
