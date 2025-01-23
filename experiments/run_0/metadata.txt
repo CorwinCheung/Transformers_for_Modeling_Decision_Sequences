@@ -97,3 +97,351 @@ GPTConfig parameters:
   Number of layers: 1
   Number of heads: 1
   Embedding size: 64
+
+Model name: model_seen99M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 99999744
+
+Total batch size: 6,144
+
+Max steps: 16,276
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+Run: 0
+
+Filename: '/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/pred_run_0_model_seen99M.txt'
+Model used for guessing: model_seen99M
+
+Data guessed on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+Model name: model_seen999M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 999997440
+
+Total batch size: 6,144
+
+Max steps: 162,760
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+Run: 0
+
+Filename: '/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/pred_run_0_model_seen999M.txt'
+Model used for guessing: model_seen999M
+
+Data guessed on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+
+
+Model name: model_seen9M
+  Num Parameters: 51136
+
+File trained on: /n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_0/behavior_run_0tr.txt
+
+Tokens seen: 9996288
+
+Total batch size: 6,144
+
+Max steps: 1,627
+
+Dataloader parameters:
+  Batch size (B): 256
+  Sequence length (T): 12
+  Steps per epoch: 32
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+

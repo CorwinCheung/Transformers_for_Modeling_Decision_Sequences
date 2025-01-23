@@ -18,7 +18,7 @@ from transformer import GPT, DataLoaderLite, GPTConfig, DDPConfig
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import get_latest_run, get_experiment_file, format_tokens
+from utils.file_management import get_latest_run, get_experiment_file, format_tokens, get_run_dir
 
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
@@ -175,19 +175,58 @@ def estimate_loss(predict=False):
     model.eval()
     losses = []
     if predict:
-        predictions = {'x': [], 'y': [], 'yhat': []}
+        # Store sequences and predictions as flat lists
+        # predictions = {
+        #     'context': [],    # Input sequences (x)
+        #     'true_next': [],  # True next tokens (y)
+        #     'pred_next': [],  # Predicted next tokens (yhat)
+        #     'y_indices': []   # Original indices of true next tokens
+        # }
+        predictions = {
+            'step': [],
+            'context': torch.empty((0, val_loader.T), dtype=torch.long),  # [total_samples, T]
+            'true_next': torch.empty(0, dtype=torch.long),                # [total_samples]
+            'pred_next': torch.empty(0, dtype=torch.long),                # [total_samples]
+            'y_indices': torch.empty(0, dtype=torch.long),                # [total_samples]
+        }
     for _ in range(val_loader.batches_per_epoch):
-        x, y = val_loader.next_batch()
         if predict:
-            predictions['x'].append(x)
-            predictions['y'].append(y)
+            x, y, y_indices = val_loader.next_batch(return_indices=True)
+        else:
+            x, y = val_loader.next_batch()
         x, y = x.to(ddp.device), y.to(ddp.device)
         with torch.no_grad():
             logits, loss = model(x, y)
+            losses.append(loss)
+
             if predict:
-                last_logits = logits[:, -1, :]
-                predictions['yhat'].append(torch.argmax(last_logits).item())
-        losses.append(loss)
+                # Get predicted next tokens
+                last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size]
+                pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+                # predictions['yhat'].append(torch.argmax(last_logits).item())
+
+                # # For each sample in batch
+                # for i in range(x.shape[0]):
+                #     # Store context sequence
+                #     context = x[i].tolist()  # Convert tensor to list
+                #     predictions['context'].append(context)
+                    
+                #     # Store true next token
+                #     true_token = y[i, -1].item()  # Last token in target sequence
+                #     predictions['true_next'].append(true_token)
+                    
+                #     # Store predicted next token
+                #     pred_token = pred_tokens[i].item()
+                #     predictions['pred_next'].append(pred_token)
+                #     predictions['y_indices'].append(y_indices[i, -1])
+
+                # Store entire batch at once
+                predictions['context'] = torch.cat([predictions['context'], x.cpu()], dim=0)
+                predictions['true_next'] = torch.cat([predictions['true_next'], y[:, -1].cpu()])
+                predictions['pred_next'] = torch.cat([predictions['pred_next'], pred_tokens.cpu()])
+                predictions['y_indices'] = torch.cat([predictions['y_indices'], y_indices[:, -1].cpu()])
+                predictions['step'].extend([step] * x.shape[0])
+
     avg_loss = torch.stack(losses).mean()
     # Reduce the loss across all processes if using DDP
     if ddp.ddp:
@@ -201,7 +240,12 @@ def estimate_loss(predict=False):
 
 best_val_loss = float('inf')
 val_loss = None
-predictions_full = {}
+
+if args.predict:
+    pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
+    # Initialize the validation predictions file.
+    with open(pred_file, 'w') as f:
+        f.write("Step\tContext\tTrue\tPredicted\tIdx\n")
 # Training loop
 for step in range(max_steps):
 
@@ -244,12 +288,46 @@ for step in range(max_steps):
     dt = (t1 - t0) * 1000  # Time in milliseconds
     tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp.world_size/ (t1 - t0)
 
+    def write_predictions(model_name, predictions, last_step=False):
+
+        pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
+        
+        # Define the vocabulary and mappings
+        vocab = ['R', 'r', 'L', 'l']
+        itos = {i: ch for i, ch in enumerate(vocab)}
+
+        # Convert tensors to strings/values efficiently
+        contexts = [''.join([itos[t.item()] for t in ctx]) for ctx in predictions['context']]
+        true_tokens = [itos[t.item()] for t in predictions['true_next']]
+        pred_tokens = [itos[t.item()] for t in predictions['pred_next']]
+
+        with open(pred_file, 'a') as f:
+            # f.write("Step\tContext\tTrue\tPredicted\tIdx\n")
+            for s, ctx, true, pred, idx in zip(
+                predictions['step'],
+                # predictions['context'], 
+                contexts,
+                true_tokens,
+                pred_tokens,
+                # predictions['true_next'], 
+                # predictions['pred_next'],
+                predictions['y_indices'].numpy()
+            ):
+                # ctx_str = ''.join([itos[t] for t in ctx])
+                # true_str = itos[true]
+                # pred_str = itos[pred]
+                f.write(f"{s}\t{ctx}\t{true}\t{pred}\t{idx}\n")
+        if last_step:
+            print(f"Sampled validation predictions saved to {pred_file}")
+    
+    """VALIDATION SAMPLING"""
     # Print logging information every 100 steps
     if step % 100 == 0 or step == max_steps - 1:
         if ddp.master_process:
             if args.predict:
                 val_loss, predictions = estimate_loss(predict=True)
-                predictions_full[step] = predictions
+                predictions['step'] = [step for i in range(len(predictions['pred_next']))]
+                write_predictions(model_name, predictions, step==(max_steps-1))
             else:
                 val_loss = estimate_loss(predict=False)
             wandb.log({
@@ -277,16 +355,6 @@ for step in range(max_steps):
     #     else:
     #         if master_process:
     #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
-
-    def write_predictions(model_name, predictions_full):
-
-        for step, predictions in predictions_full.items():
-
-            pred_filename = os.path.join(os.path.join(os.path.dirname(__file__),
-                                                      f"learning_seqs/{model_name}_preds_{step}.txt"))
-            with open(pred_filename, 'a') as f:
-                for p, base_seq in zip(predictions['yhat'], predictions['x']):
-                    f.write(f"{base_seq}{p}\n")
 
     def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
         metdata_file = get_experiment_file("metadata.txt", run_number)
@@ -318,14 +386,10 @@ for step in range(max_steps):
 if ddp.master_process:
 
     model_path = get_experiment_file(f'{model_name}.pth', run_number)
-    # model_file = get_experiment_file(f'{model_name}.pth', run_number)
-    # filename = os.path.join(os.path.dirname(__file__), 'models', f'{model_name}.pth')
     if args.compile:
-        # torch.save(model._orig_mod.state_dict(), f'/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}.pth')
         torch.save(model._orig_mod.state_dict(), model_path)
     else:
         # switch to saving in scratch?
-        # f'/n/holyscratch01/bsabatini_lab/Users/{username}/models/{model_name}.pth'
         torch.save(model.state_dict(), model_path)
     
     write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
