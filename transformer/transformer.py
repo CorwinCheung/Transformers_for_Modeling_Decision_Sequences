@@ -224,6 +224,34 @@ class DataLoaderLite:
         if return_indices:
             return x, y, y_indices
         return x, y
+    
+class DataLoaderHeavy(DataLoaderLite):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+
+    def next_batch(self, return_indices=False):
+        """Get next batch of data."""
+        B, T = self.B, self.T
+        
+        # Get window of tokens for contexts (x) and targets (y)
+        x_indices = torch.arange(self.current_position, self.current_position + B) # Starting indices for each sequence
+        x_offsets = torch.arange(T).unsqueeze(0).expand(B, -1) # Offsets for each position in sequence
+        x_indices = x_indices.unsqueeze(1).expand(-1, T) # Expand indices to match offsets
+        x_positions = x_indices + x_offsets # [B, T] tensor of positions
+        
+        # Get the tokens at these positions
+        x = self.tokens[x_positions]  # [B, T]
+        y = self.tokens[x_positions + 1]  # [B, T] (shifted by 1)
+        y_indices = self.original_indices[x_positions + 1]  # [B, T]
+        
+        # Update position for next batch
+        self.current_position += B * self.num_processes
+        if self.current_position + B + T > len(self.tokens):
+            self.current_position = self.B * self.T * self.process_rank
+        
+        if return_indices:
+            return x, y, y_indices
+        return x, y
 
 
 class DDPConfig:
