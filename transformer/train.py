@@ -217,12 +217,6 @@ def estimate_loss(predict=False):
 
 best_val_loss = float('inf')
 val_loss = None
-
-if args.predict:
-    pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
-    # Initialize the validation predictions file.
-    with open(pred_file, 'w') as f:
-        f.write("Step\tContext\tTrue\tPredicted\tIdx\n")
 # Training loop
 for step in range(max_steps):
 
@@ -266,34 +260,43 @@ for step in range(max_steps):
     tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp.world_size/ (t1 - t0)
 
     def write_predictions(model_name, predictions, last_step=False):
-
-        pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
         
         # Define the vocabulary and mappings
         vocab = ['R', 'r', 'L', 'l']
         itos = {i: ch for i, ch in enumerate(vocab)}
+        
+        pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
+        
+        if predictions['step'][0] == 0:
+            # Initialize the validation predictions file.
+            with open(pred_file, 'w') as f:
+                f.write("Step\tPredicted\tIdx\n")
 
-        # Convert tensors to strings/values efficiently
-        contexts = [''.join([itos[t.item()] for t in ctx]) for ctx in predictions['context']]
-        true_tokens = [itos[t.item()] for t in predictions['true_next']]
+            context_file = get_experiment_file(f"learning_{model_name}_val_context.txt", run_number)
+            with open(context_file, 'w') as f:
+                f.write("Context\tTrue\tIdx\n")
+
+                # Convert tensors to strings/values efficiently
+                contexts = [''.join([itos[t.item()] for t in ctx]) for ctx in predictions['context']]
+                true_tokens = [itos[t.item()] for t in predictions['true_next']]
+
+                for ctx, true, idx in zip(
+                    predictions['step'],
+                    contexts,
+                    true_tokens,
+                ):
+                    f.write(f"{ctx}\t{true}\t{idx}\n")
+
+        # Convert tensors to strings/values
         pred_tokens = [itos[t.item()] for t in predictions['pred_next']]
 
         with open(pred_file, 'a') as f:
-            # f.write("Step\tContext\tTrue\tPredicted\tIdx\n")
-            for s, ctx, true, pred, idx in zip(
+            for s, pred, idx in zip(
                 predictions['step'],
-                # predictions['context'], 
-                contexts,
-                true_tokens,
                 pred_tokens,
-                # predictions['true_next'], 
-                # predictions['pred_next'],
                 predictions['y_indices'].numpy()
             ):
-                # ctx_str = ''.join([itos[t] for t in ctx])
-                # true_str = itos[true]
-                # pred_str = itos[pred]
-                f.write(f"{s}\t{ctx}\t{true}\t{pred}\t{idx}\n")
+                f.write(f"{s}\t{pred}\t{idx}\n")
         if last_step:
             print(f"Sampled validation predictions saved to {pred_file}")
     
