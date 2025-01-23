@@ -110,3 +110,20 @@ def read_file(file_name):
     with open(file_name, 'r') as f:
         events = f.read().replace("\n", "").replace(" ", "")
     return events
+
+
+def get_relative_path(full_path):
+    """# Get the repository name and relative path"""
+    repo_name = "Transformers_for_Modeling_Decision_Sequences"
+    try:
+        # Find the position of the repository name in the path
+        repo_index = full_path.index(repo_name)
+        # Return everything from the repo name onwards
+        return full_path[repo_index:]
+    except ValueError:
+        raise ValueError(f"Could not find {repo_name} in path: {full_path}")
+
+
+def convert_to_local_path(original_path):
+    relative_path = get_relative_path(original_path)
+    return os.path.join(os.path.expanduser("~"), "GitHub", relative_path)
