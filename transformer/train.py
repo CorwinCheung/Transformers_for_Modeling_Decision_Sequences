@@ -4,6 +4,7 @@ import getpass
 import math
 import os
 import pstats
+import sys
 import time
 
 import matplotlib.pyplot as plt
@@ -14,11 +15,12 @@ import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from transformer import GPT, DataLoaderLite, GPTConfig, DDPConfig, DataLoaderHeavy
+from transformer import (GPT, DataLoaderHeavy, DataLoaderLite, DDPConfig,
+                         GPTConfig)
 
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import get_latest_run, get_experiment_file, format_tokens, get_run_dir
+from utils.file_management import (format_tokens, get_experiment_file,
+                                   get_latest_run, get_run_dir)
 
 # from inference.guess_using_transformer import generate_predictions
 # from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
@@ -270,33 +272,20 @@ for step in range(max_steps):
         if predictions['step'][0] == 0:
             # Initialize the validation predictions file.
             with open(pred_file, 'w') as f:
-                f.write("Step\tPredicted\tIdx\n")
-
-            context_file = get_experiment_file(f"learning_{model_name}_val_context.txt", run_number)
-            with open(context_file, 'w') as f:
-                f.write("Context\tTrue\tIdx\n")
-
-                # Convert tensors to strings/values efficiently
-                contexts = [''.join([itos[t.item()] for t in ctx]) for ctx in predictions['context']]
-                true_tokens = [itos[t.item()] for t in predictions['true_next']]
-
-                for ctx, true, idx in zip(
-                    contexts,
-                    true_tokens,
-                    predictions['y_indices'].numpy()
-                ):
-                    f.write(f"{ctx}\t{true}\t{idx}\n")
+                f.write("Step\tTrue\tPredicted\tIdx\n")
 
         # Convert tensors to strings/values
+        true_tokens = [itos[t.item()] for t in predictions['true_next']]
         pred_tokens = [itos[t.item()] for t in predictions['pred_next']]
 
         with open(pred_file, 'a') as f:
-            for s, pred, idx in zip(
+            for s, true, pred, idx in zip(
                 predictions['step'],
+                true_tokens,
                 pred_tokens,
                 predictions['y_indices'].numpy()
             ):
-                f.write(f"{s}\t{pred}\t{idx}\n")
+                f.write(f"{s}\t{true}\t{pred}\t{idx}\n")
         if last_step:
             print(f"Sampled validation predictions saved to {pred_file}")
     
