@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100, help='Number of Epochs looping through the training data.')
     parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
-    parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
+    parser.add_argument('--run', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
     parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
@@ -67,7 +67,7 @@ min_lr = max_lr * 0.1
 warmup_steps = 1000
 
 # Data parameters
-run_number = args.run_number or get_latest_run()
+run_number = args.run or get_latest_run()
 
 #regular undistributed one GPU/cpu python train.py
 #launch ddp with
@@ -217,6 +217,62 @@ def estimate_loss(predict=False):
     return avg_loss
 
 
+def write_predictions(model_name, predictions, last_step=False):
+    
+    # Define the vocabulary and mappings
+    vocab = ['R', 'r', 'L', 'l']
+    itos = {i: ch for i, ch in enumerate(vocab)}
+    
+    pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
+    
+    if predictions['step'][0] == 0:
+        # Initialize the validation predictions file.
+        with open(pred_file, 'w') as f:
+            f.write("Step\tTrue\tPredicted\tIdx\n")
+
+    # Convert tensors to strings/values
+    true_tokens = [itos[t.item()] for t in predictions['true_next']]
+    pred_tokens = [itos[t.item()] for t in predictions['pred_next']]
+
+    with open(pred_file, 'a') as f:
+        for s, true, pred, idx in zip(
+            predictions['step'],
+            true_tokens,
+            pred_tokens,
+            predictions['y_indices'].numpy()
+        ):
+            f.write(f"{s}\t{true}\t{pred}\t{idx}\n")
+    if last_step:
+        print(f"Sampled validation predictions saved to {pred_file}")
+    
+
+def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, config):
+    metdata_file = get_experiment_file("metadata.txt", run_number)
+    # metadata_filename = os.path.join(os.path.dirname(__file__), "models/model_metadata.txt")
+    tokens_trained_on = total_batch_size * max_steps
+
+    with open(metdata_file, 'a') as meta_file:
+        meta_file.write(f"\nModel name: {model_name}\n")
+        meta_file.write(f"  Num Parameters: {sum(p.numel() for p in model.parameters())}\n")
+        meta_file.write(f"\nTokens seen: {tokens_trained_on}\n")
+        meta_file.write(f"\nTotal batch size: {total_batch_size:,}\n")
+        meta_file.write(f"\nMax steps: {max_steps:,}\n")
+        meta_file.write(f"\nDataloader parameters:\n")
+        meta_file.write(f"\nFile trained on: {train_loader.behavior_file}\n")
+        meta_file.write(f"\nFile validated on: {val_loader.behavior_file}\n")
+        meta_file.write(f"  Batch size (B): {train_loader.B}\n")
+        meta_file.write(f"  Sequence length (T): {train_loader.T}\n")
+        meta_file.write(f"  Steps per epoch: {train_loader.batches_per_epoch}")
+        meta_file.write(f"\nGPTConfig parameters:\n")
+        meta_file.write(f"  Block size: {config.block_size}\n")
+        meta_file.write(f"  Vocab size: {config.vocab_size}\n")
+        meta_file.write(f"  Number of layers: {config.n_layer}\n")
+        meta_file.write(f"  Number of heads: {config.n_head}\n")
+        meta_file.write(f"  Embedding size: {config.n_embd}\n")
+        meta_file.write(f"\n")
+    print(f"Metadata saved to {metdata_file}")
+
+
 best_val_loss = float('inf')
 val_loss = None
 # Training loop
@@ -261,34 +317,6 @@ for step in range(max_steps):
     dt = (t1 - t0) * 1000  # Time in milliseconds
     tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp.world_size/ (t1 - t0)
 
-    def write_predictions(model_name, predictions, last_step=False):
-        
-        # Define the vocabulary and mappings
-        vocab = ['R', 'r', 'L', 'l']
-        itos = {i: ch for i, ch in enumerate(vocab)}
-        
-        pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
-        
-        if predictions['step'][0] == 0:
-            # Initialize the validation predictions file.
-            with open(pred_file, 'w') as f:
-                f.write("Step\tTrue\tPredicted\tIdx\n")
-
-        # Convert tensors to strings/values
-        true_tokens = [itos[t.item()] for t in predictions['true_next']]
-        pred_tokens = [itos[t.item()] for t in predictions['pred_next']]
-
-        with open(pred_file, 'a') as f:
-            for s, true, pred, idx in zip(
-                predictions['step'],
-                true_tokens,
-                pred_tokens,
-                predictions['y_indices'].numpy()
-            ):
-                f.write(f"{s}\t{true}\t{pred}\t{idx}\n")
-        if last_step:
-            print(f"Sampled validation predictions saved to {pred_file}")
-    
     """VALIDATION SAMPLING"""
     # Print logging information every 100 steps
     if step % args.eval_interval == 0 or step == max_steps - 1:
@@ -324,30 +352,7 @@ for step in range(max_steps):
     #         if master_process:
     #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
 
-    def write_metadata(model_name, total_batch_size, max_steps, train_loader, config):
-        metdata_file = get_experiment_file("metadata.txt", run_number)
-        # metadata_filename = os.path.join(os.path.dirname(__file__), "models/model_metadata.txt")
-        tokens_trained_on = total_batch_size * max_steps
 
-        with open(metdata_file, 'a') as meta_file:
-            meta_file.write(f"\nModel name: {model_name}\n")
-            meta_file.write(f"  Num Parameters: {sum(p.numel() for p in model.parameters())}\n")
-            meta_file.write(f"\nFile trained on: {train_loader.behavior_file}\n")
-            meta_file.write(f"\nTokens seen: {tokens_trained_on}\n")
-            meta_file.write(f"\nTotal batch size: {total_batch_size:,}\n")
-            meta_file.write(f"\nMax steps: {max_steps:,}\n")
-            meta_file.write(f"\nDataloader parameters:\n")
-            meta_file.write(f"  Batch size (B): {train_loader.B}\n")
-            meta_file.write(f"  Sequence length (T): {train_loader.T}\n")
-            meta_file.write(f"  Steps per epoch: {train_loader.batches_per_epoch}")
-            meta_file.write(f"\nGPTConfig parameters:\n")
-            meta_file.write(f"  Block size: {config.block_size}\n")
-            meta_file.write(f"  Vocab size: {config.vocab_size}\n")
-            meta_file.write(f"  Number of layers: {config.n_layer}\n")
-            meta_file.write(f"  Number of heads: {config.n_head}\n")
-            meta_file.write(f"  Embedding size: {config.n_embd}\n")
-            meta_file.write(f"\n")
-        print(f"Metadata saved to {metdata_file}")
 
 
 # Call this function after the model training code
@@ -360,7 +365,7 @@ if ddp.master_process:
         # switch to saving in scratch?
         torch.save(model.state_dict(), model_path)
     
-    write_metadata(model_name, total_batch_size, max_steps, train_loader, model.config)
+    write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
     wandb.save(model_path)  # Save the model checkpoint to wandb
     wandb.finish()
 

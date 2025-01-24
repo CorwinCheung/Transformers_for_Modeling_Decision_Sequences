@@ -74,7 +74,7 @@ def main(run=None, model_name=None):
 
     predictions, model_info = load_predictions()
     try:
-        data_path = model_info['config']['Data guessed on']
+        data_path = model_info['dataloader']['File validated on']
         high_port_path = data_path.replace('behavior', 'high_port')
         events = parse_files(data_path, high_port_path)
     except FileNotFoundError:
@@ -128,4 +128,9 @@ def main(run=None, model_name=None):
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=int, default=None)
+    parser.add_argument('--model_name', type=str, default=None)
+    args = parser.parse_args()
+    main(run=args.run, model_name=args.model_name)

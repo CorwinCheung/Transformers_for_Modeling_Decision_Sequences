@@ -97,4 +97,8 @@ def main(run=None):
         print(f"Files {behavior_filename} or {high_port_filename} not found!")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=int, default=None)
+    args = parser.parse_args()
+    main(run=args.run)

@@ -73,10 +73,16 @@ def write_file(filepath, data):
                 f.write('\n')
             f.write(token)
 
-def main(num_steps=100000, profile=False, include_val=True):
+def main(
+        run=None,
+        num_steps=100000,
+        profile=False,
+        include_val=True,
+        overwrite=False):
+    
     # Get next run number
-    next_run = get_latest_run() + 1
-    run_dir = ensure_run_dir(next_run)
+    next_run = run or (get_latest_run() + 1)
+    run_dir = ensure_run_dir(next_run, overwrite=overwrite)
     
     environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
     agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
@@ -117,5 +123,12 @@ def main(num_steps=100000, profile=False, include_val=True):
     print(f"Metadata saved to {metadata_path}")
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=int, default=None)
+    parser.add_argument('--profile', type=bool, default=False)
+    parser.add_argument('--overwrite', type=bool, default=False)
+    args = parser.parse_args()
+    
     # Set profile to True to enable profiling, False to skip
-    main(profile=False)
+    main(run=args.run, profile=args.profile, overwrite=args.overwrite)

@@ -17,10 +17,10 @@ def get_run_dir(run=None):
         run = get_latest_run()
     return os.path.join(base_path, "experiments", f"run_{run}")
 
-def ensure_run_dir(run):
+def ensure_run_dir(run, overwrite=False):
     """Create run directory if it doesn't exist."""
     run_dir = get_run_dir(run)
-    os.makedirs(run_dir, exist_ok=True)
+    os.makedirs(run_dir, exist_ok=overwrite)
     return run_dir
 
 def get_file_path(filename, run=None, create_dir=False):
