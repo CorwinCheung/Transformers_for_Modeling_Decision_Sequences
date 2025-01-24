@@ -281,9 +281,9 @@ for step in range(max_steps):
                 true_tokens = [itos[t.item()] for t in predictions['true_next']]
 
                 for ctx, true, idx in zip(
-                    predictions['step'],
                     contexts,
                     true_tokens,
+                    predictions['y_indices'].numpy()
                 ):
                     f.write(f"{ctx}\t{true}\t{idx}\n")
 

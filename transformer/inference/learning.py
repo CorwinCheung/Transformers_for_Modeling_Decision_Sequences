@@ -26,10 +26,15 @@ def load_predictions(run=None, model_name=None):
     model_name = model_info['model_name']
 
     pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run)
+    context_file = get_experiment_file(f"learning_{model_name}_val_context.txt", run)
 
     predictions = pd.read_csv(pred_file, sep='\t')
     # Sort by step and original index
     predictions = predictions.sort_values(['Step', 'Idx'])
+
+    context = pd.read_csv(context_file, sep='\t')
+    predictions['Context'] = predictions['Idx'].map(context.set_index('Idx')['Context'])
+    predictions['True'] = predictions['Idx'].map(context.set_index('Idx')['True'])
 
     return predictions, model_info
 
