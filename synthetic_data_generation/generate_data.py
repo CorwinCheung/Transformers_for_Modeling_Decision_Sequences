@@ -3,14 +3,14 @@ import glob
 import io
 import os
 import pstats
+# Add the project root directory to Python path
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
 
-# Add the project root directory to Python path
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.file_management import ensure_run_dir, get_latest_run
 
@@ -57,6 +57,7 @@ def plot_profiling_results(stats):
     plt.gca().invert_yaxis()
     plt.savefig("cprofile of training")
 
+
 def find_filename(base, suffix='tr'):
     file_root, file_ext = os.path.splitext(base)
     counter = 0
@@ -66,6 +67,7 @@ def find_filename(base, suffix='tr'):
         new_filename = f"{file_root}_run_{counter}*{file_ext}"
     return f"{file_root}_run_{counter}{file_ext}"
 
+
 def write_file(filepath, data):
     with open(filepath, 'w') as f:
         for i, token in enumerate(data):
@@ -73,22 +75,36 @@ def write_file(filepath, data):
                 f.write('\n')
             f.write(token)
 
+
 def main(
         run=None,
         num_steps=100000,
         profile=False,
         include_val=True,
-        overwrite=False):
-    
-    # Get next run number
+        overwrite=False,
+        agent_params=None,
+        environment_params=None):
+
+    # Get next run number.
     next_run = run or (get_latest_run() + 1)
     run_dir = ensure_run_dir(next_run, overwrite=overwrite)
-    
-    environment = Original_2ABT_Spouts(0.8, 0.2, 0.02)
-    agent = RFLR_mouse(alpha=0.75, beta=2.1, tau=1.4, policy="probability_matching")
+
+    # Set up environment and agent.
+    if environment_params is None:
+        environment_params = {'high_reward_prob': 0.8,
+                              'low_reward_prob': 0.2,
+                              'transition_prob': 0.02}
+    environment = Original_2ABT_Spouts(**environment_params)
+
+    if agent_params is None:
+        agent_params = {'alpha': 0.75,
+                        'beta': 2.1,
+                        'tau': 1.4,
+                        'policy': "probability_matching"}
+    agent = RFLR_mouse(**agent_params)
 
     datasets = ['tr', 'v'] if include_val else ['tr']
-    
+
     for suffix in datasets:
         behavior_filename = os.path.join(run_dir, f"behavior_run_{next_run}{suffix}.txt")
         high_port_filename = os.path.join(run_dir, f"high_port_run_{next_run}{suffix}.txt")
@@ -128,7 +144,42 @@ if __name__ == "__main__":
     parser.add_argument('--run', type=int, default=None)
     parser.add_argument('--profile', type=bool, default=False)
     parser.add_argument('--overwrite', type=bool, default=False)
+    parser.add_argument('--num_steps', type=int, default=100000)
+
+    # Agent parameters
+    parser.add_argument('--alpha', type=float, default=None)
+    parser.add_argument('--beta', type=float, default=None)
+    parser.add_argument('--tau', type=float, default=None)
+    parser.add_argument('--policy', type=str, default=None)
+
+    # Environment parameters
+    parser.add_argument('--high_reward_prob', type=float, default=0.8)
+    parser.add_argument('--low_reward_prob', type=float, default=0.2)
+    parser.add_argument('--transition_prob', type=float, default=0.02)
     args = parser.parse_args()
-    
+
+    if all(v is None for v in [args.alpha, args.beta, args.tau, args.policy]):
+        agent_params = None
+    else:
+        agent_params = {
+            'alpha': args.alpha,
+            'beta': args.beta,
+            'tau': args.tau,
+            'policy': args.policy
+        }
+
+    if all(v is None for v in [args.high_reward_prob,
+                               args.low_reward_prob,
+                               args.transition_prob]):
+        environment_params = None
+    else:
+        environment_params = {
+            'high_reward_prob': args.high_reward_prob,
+            'low_reward_prob': args.low_reward_prob,
+            'transition_prob': args.transition_prob
+        }   
+
     # Set profile to True to enable profiling, False to skip
-    main(run=args.run, profile=args.profile, overwrite=args.overwrite)
+    main(run=args.run, profile=args.profile, overwrite=args.overwrite,
+         num_steps=args.num_steps, agent_params=agent_params,
+         environment_params=environment_params)
