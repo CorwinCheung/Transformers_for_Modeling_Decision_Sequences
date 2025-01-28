@@ -103,7 +103,9 @@ def main(run=None, model_name=None):
         'k0': 'k0',  # Verify true choices match
         'block_position': 'iInBlock',
         'block_length': 'blockLength',
-        'high_port': 'high_port'
+        'high_port': 'high_port',
+        'context': 'context',
+        'session': 'session'
     }
     for event_col, pred_col in behavioral_cols.items():
         predictions[pred_col] = predictions['Idx'].map(events[event_col])
