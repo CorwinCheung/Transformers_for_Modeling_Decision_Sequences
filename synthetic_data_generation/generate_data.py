@@ -112,12 +112,10 @@ def configure_task_params(task_params, multiple_contexts=False):
                      'beta': 2.1,
                      'tau': 1.4,
                      'policy': 'probability_matching'}
-
     if not multiple_contexts:
         task_params['environment'] = task_params.get('environment', default_environment)
         task_params['agent'] = task_params.get('agent', default_agent)
         task_params = {'B': task_params}
-
     return task_params
 
 
@@ -218,8 +216,7 @@ def main(
     for suffix in datasets:
         behavior_filename = get_experiment_file("behavior_run_{}.txt", next_run, suffix)
         high_port_filename = get_experiment_file("high_port_run_{}.txt", next_run, suffix)
-        if multiple_contexts:
-            context_filename = get_experiment_file("context_transitions_run_{}.txt", next_run, suffix)
+        context_filename = get_experiment_file("context_transitions_run_{}.txt", next_run, suffix)
         if profile:
             with cProfile.Profile() as pr:
                 behavior_data, high_port_data, context_transitions = generate_data(num_steps, task_params, multiple_contexts)
@@ -263,11 +260,11 @@ if __name__ == "__main__":
 
     if args.multiple_contexts:
         task_params = load_param_sets()
-        multiple_contexts = True
 
     else:
+        task_params = {}
         if all(v is None for v in [args.alpha, args.beta, args.tau, args.policy]):
-            agent_params = None
+            pass
         else:
             agent_params = {
                 'alpha': args.alpha,
@@ -275,21 +272,20 @@ if __name__ == "__main__":
                 'tau': args.tau,
                 'policy': args.policy
         }
+            task_params['agent'] = agent_params
+
 
         if all(v is None for v in [args.high_reward_prob,
                                    args.low_reward_prob,
                                    args.transition_prob]):
-            environment_params = None
+            pass
         else:
             environment_params = {
                 'high_reward_prob': args.high_reward_prob,
                 'low_reward_prob': args.low_reward_prob,
                 'transition_prob': args.transition_prob
             }
-        task_params = {}
-        task_params['environment'] = environment_params
-        task_params['agent'] = agent_params
-        multiple_contexts = False
+            task_params['environment'] = environment_params
 
     # Set profile to True to enable profiling, False to skip
     main(run=args.run,
@@ -297,4 +293,4 @@ if __name__ == "__main__":
          overwrite=args.overwrite,
          num_steps=args.num_steps,
          task_params=task_params,
-         multiple_contexts=multiple_contexts)
+         multiple_contexts=args.multiple_contexts)
