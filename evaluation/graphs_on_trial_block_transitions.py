@@ -18,7 +18,7 @@ from utils.file_management import get_experiment_file, read_file
 global rflr
 
 
-def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
+def parse_files(behavior_filename, high_port_filename, context_filename, clip_short_blocks=False):
 
     behavior_data = read_file(behavior_filename)
     high_port_data = read_file(high_port_filename)
@@ -47,6 +47,21 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
         'high_port': high_ports,
     })
 
+    context_df = pd.read_csv(context_filename, names=['trial_number', 'context'])
+    # Forward fill contexts for all trials
+    full_context = pd.merge_asof(
+        events[['trial_number']],
+        context_df.assign(session=np.arange(len(context_df))),
+        on='trial_number',
+        direction='backward'
+    )
+    events['context'] = full_context['context']
+    events['session'] = full_context['session']
+
+    # First trial in a session cannot be a switch or transition.
+    events.loc[events['trial_number'].isin(context_df['trial_number']), 'switch'] = np.nan
+    events.loc[events['trial_number'].isin(context_df['trial_number']), 'transition'] = np.nan
+
     events = get_block_positions(events)
     events = add_sequence_columns(events, seq_length=2)
     events = add_sequence_columns(events, seq_length=3)
@@ -64,28 +79,66 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
 
 
 def get_block_positions(events):
+
+    """Calculate block-related metrics, treating each session independently."""
+    # Group by session and calculate block information
+    session_col = events['session'].copy()
+    events_with_blocks = (events
+                          .groupby('session', group_keys=False)
+                          .apply(lambda session_events: _get_session_block_positions(session_events), include_groups=False))
+    events_with_blocks['session'] = session_col
+
+
+    return events_with_blocks
+
+
+def _get_session_block_positions(session_events):
+    """Helper function to calculate block positions within a single session."""
+    # Get transition points within this session
+
+    first_trial = session_events.iloc[0]['trial_number']
+    transition_points = session_events.query('transition == 1')['trial_number'].values - first_trial
+
+    # Calculate block lengths
+    if len(transition_points) == 0:
+        # Single block session
+        block_lengths = [len(session_events)]
+    else:
+        # First block
+        block_lengths = [transition_points[0]]
+        # Middle blocks
+        block_lengths.extend(np.diff(transition_points).astype('int'))
+        # Last block
+        block_lengths.extend([len(session_events) - transition_points[-1]])
+    
     # Calculate length of each block as num trial from previous transition.
     # Prepend first block, and last block is distance to end of sequence.
-    block_lengths = [events.query('transition == 1')['trial_number'].values[0]]
-    block_lengths.extend(events.query('transition == 1')['trial_number'].diff().values[1:].astype('int'))
-    block_lengths.extend([len(events) - events.query('transition == 1')['trial_number'].values[-1]])
+    # block_lengths = [events.query('transition == 1')['trial_number'].values[0]]
+    # block_lengths.extend(events.query('transition == 1')['trial_number'].diff().values[1:].astype('int'))
+    # block_lengths.extend([len(events) - events.query('transition == 1')['trial_number'].values[-1]])
 
     # Store block lengths at transitions and fill backwards (so each trial can
     # reference ultimate block length).
-    events.loc[events.index[0], 'block_length'] = block_lengths[0]
-    events.loc[events['transition'] == 1, 'block_length'] = block_lengths[1:]
-    events['block_length'] = events['block_length'].ffill()
+    session_events.loc[session_events.index[0], 'block_length'] = block_lengths[0]
+    if len(transition_points) > 0:
+        session_events.loc[session_events['transition'] == 1, 'block_length'] = block_lengths[1:]
+    session_events['block_length'] = session_events['block_length'].ffill()
 
     # Counter for index position within each block. Forward and reverse
     # (negative, from end of block backwards).
     block_positions = list(itertools.chain(*[np.arange(i) for i in block_lengths]))
-    events['block_position'] = block_positions
-    events['rev_block_position'] = events['block_position'] - events['block_length']
+    session_events['block_position'] = block_positions
+    session_events['rev_block_position'] = session_events['block_position'] - session_events['block_length']
 
     # Unique ID for each block.
-    events.loc[events['transition'] == 1, 'block_id'] = np.arange(1, len(block_lengths))
-    events['block_id'] = events['block_id'].ffill()
-    return events
+    if len(transition_points) > 0:
+        session_events.loc[session_events.index[0], 'block_id'] = 0
+        session_events.loc[session_events['transition'] == 1, 'block_id'] = np.arange(1, len(block_lengths))
+        session_events['block_id'] = session_events['block_id'].ffill()
+
+    else:
+        session_events['block_id'] = 0
+    return session_events
 
 
 def main(run=None, suffix: str = 'v'):
@@ -93,13 +146,14 @@ def main(run=None, suffix: str = 'v'):
     # Get file paths using the new utility
     behavior_filename = get_experiment_file("behavior_run_{}.txt", run, suffix)
     high_port_filename = get_experiment_file("high_port_run_{}.txt", run, suffix)
-    print(behavior_filename, '\n', high_port_filename)
+    context_filename = get_experiment_file("context_transitions_run_{}.txt", run, suffix)
+    print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
     # Check if files exist
-    if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):
+    if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(context_filename):
         print("Behavior file or high port file not found!")
     else:
         # Parse the files
-        events = parse_files(behavior_filename, high_port_filename)
+        events = parse_files(behavior_filename, high_port_filename, context_filename)
         if events is not None:
             # Calculate and print the percent of trials with a switch
             percent_switches = events['switch'].mean()*100

@@ -12,22 +12,21 @@ from utils.file_management import get_experiment_file
 
 code_path = Path(__file__).parent.parent.parent
 behavior_helpers_path = code_path / 'behavior-helpers'
-print(behavior_helpers_path)
 sys.path.append(f'{str(behavior_helpers_path)}/')
 import seaborn as sns
 from bh.visualization import plot_trials as pts
 
 sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
-        'axes.titlesize': 12, 'savefig.transparent': False})
+              'axes.titlesize': 12, 'savefig.transparent': False})
 
 def plot_probabilities(events, run, suffix: str = 'v'):
 
     events = events.rename(columns={'block_position': 'iInBlock',
                                     'block_length': 'blockLength',
-                                    'high_port': 'selHigh',
+                                    'selected_high': 'selHigh',
                                     'switch': 'Switch'})
-    bpos = pts.calc_bpos_probs(events)
-    fig, axs = pts.plot_bpos_behavior(bpos)
+    bpos = pts.calc_bpos_probs(events, add_cond_cols=['context', 'session'])
+    fig, axs = pts.plot_bpos_behavior(bpos, hue='context', errorbar='se')
     [ax.set(xlim=(-10, 20)) for ax in axs]
     axs[1].set(ylim=(0, 0.2))
     bpos_filename = get_experiment_file('bpos_behavior_{}.png', run, suffix)
@@ -123,24 +122,47 @@ def add_sequence_columns(events, seq_length):
     """
 
     events[[f'seq{seq_length}_RL', f'seq{seq_length}']] = None
-    events.loc[seq_length:, f'seq{seq_length}_RL'] = [''.join(events['k0'].values[i-seq_length:i])
-                                                      for i in range(seq_length, len(events))]
-    events.loc[seq_length:, f'seq{seq_length}'] = (events.loc[seq_length:, f'seq{seq_length}_RL']
-                                                   .apply(map_rl_to_pattern))
+
+    # Group by session and calculate sequences
+    def get_session_sequences(session_events):
+        if len(session_events) >= seq_length:
+            start_idx = session_events.index[0] + seq_length
+            session_events.loc[start_idx:, f'seq{seq_length}_RL'] = [
+                ''.join(session_events['k0'].values[i-seq_length:i])
+                for i in range(seq_length, len(session_events))
+            ]
+            session_events.loc[start_idx:, f'seq{seq_length}'] = (
+                session_events.loc[start_idx:, f'seq{seq_length}_RL']
+                .apply(map_rl_to_pattern)
+            )
+        return session_events
+
+    events = events.groupby('session', group_keys=False).apply(get_session_sequences)
 
     return events
 
 
 def plot_conditional_switching(events, seq_length, run, suffix: str = 'v'):
 
-    policies_true = pts.calc_conditional_probs(
-        events, htrials=seq_length, sortby='pevent', pred_col='switch')
-    fig, ax = pts.plot_sequences(policies_true)
 
-    if seq_length > 2:
-        ax.set_xticks(ax.get_xticks())
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+    for context in events.context.unique():
+        policies = pts.calc_conditional_probs(
+            events.query('context == @context'), htrials=seq_length, sortby='pevent', pred_col='switch')
+        fig, ax = pts.plot_sequences(policies)
 
-    fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}.png", run)
-    fig.savefig(fig_path)
-    print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
+        if seq_length > 2:
+            ax.set_xticks(ax.get_xticks())
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+
+        fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}{context}.png", run)
+        fig.savefig(fig_path)
+        print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
+
+    if events.context.nunique() > 1:
+        fig, ax, _ = pts.plot_seq_bar_and_points(events, seq_length,
+                                        grp='context',
+                                        palette='deep',
+                                        pred_col='switch')
+        fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}_context_comparison.png", run)
+        fig.savefig(fig_path)
+        print(f'saved context comparison for {seq_length} trials to {fig_path}')
