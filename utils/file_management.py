@@ -7,7 +7,7 @@ def get_latest_run():
     base_path = os.path.dirname(os.path.dirname(__file__))
     run_dirs = glob.glob(os.path.join(base_path, "experiments", "run_*"))
     if not run_dirs:
-        return -1
+        return 0  # if no runs, return 0 so first run is 1
     return max([int(d.split('_')[-1]) for d in run_dirs])
 
 def get_run_dir(run=None):
