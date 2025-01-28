@@ -8,10 +8,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import bootstrap
 
-from .graph_helper import (calculate_switch_probabilities, plot_probabilities,
-                           plot_switch_probabilities)
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from evaluation.graph_helper import (add_sequence_columns,
+                                     plot_conditional_switching,
+                                     plot_probabilities)
 from utils.file_management import get_experiment_file, read_file
 
 global rflr
@@ -47,8 +48,10 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
     })
 
     events = get_block_positions(events)
+    events = add_sequence_columns(events, seq_length=2)
+    events = add_sequence_columns(events, seq_length=3)
 
-    if clip_short_blocks: 
+    if clip_short_blocks:
         # ID of short blocks, and blocks immediately following short blocks (not back to baseline).
         short_blocks = events.query('block_length < 20')['block_id'].unique()
         post_short_blocks = short_blocks + 1
@@ -61,92 +64,36 @@ def parse_files(behavior_filename, high_port_filename, clip_short_blocks=False):
 
 
 def get_block_positions(events):
-    # Calculate length of each block as num trial from previous transition. Prepend first block, and last
-    # block is distance to end of sequence.
+    # Calculate length of each block as num trial from previous transition.
+    # Prepend first block, and last block is distance to end of sequence.
     block_lengths = [events.query('transition == 1')['trial_number'].values[0]]
     block_lengths.extend(events.query('transition == 1')['trial_number'].diff().values[1:].astype('int'))
     block_lengths.extend([len(events) - events.query('transition == 1')['trial_number'].values[-1]])
 
-    # Store block lengths at transitions and fill backwards (so each trial can reference ultimate block length).
+    # Store block lengths at transitions and fill backwards (so each trial can
+    # reference ultimate block length).
     events.loc[events.index[0], 'block_length'] = block_lengths[0]
-    events.loc[events['transition']==1, 'block_length'] = block_lengths[1:]
-    # events.loc[events.index[-1], 'block_length'] = block_lengths[-1]
+    events.loc[events['transition'] == 1, 'block_length'] = block_lengths[1:]
     events['block_length'] = events['block_length'].ffill()
 
-    # Counter for index position within each block. Forward and reverse (negative, from end of block backwards).
+    # Counter for index position within each block. Forward and reverse
+    # (negative, from end of block backwards).
     block_positions = list(itertools.chain(*[np.arange(i) for i in block_lengths]))
     events['block_position'] = block_positions
     events['rev_block_position'] = events['block_position'] - events['block_length']
 
     # Unique ID for each block.
-    events.loc[events['transition']==1, 'block_id'] = np.arange(1,len(block_lengths))
+    events.loc[events['transition'] == 1, 'block_id'] = np.arange(1, len(block_lengths))
     events['block_id'] = events['block_id'].ffill()
     return events
 
-def calculate_probabilities(events):
-    block_positions = list(range(-10, 21))
 
-    # Initialize dictionaries to collect data
-    high_reward_data = {pos: [] for pos in block_positions}
-    switch_data = {pos: [] for pos in block_positions}
-
-    for event in events:
-        for pos in event['block_position']:
-            if pos in block_positions:
-                high_reward_data[pos].append(event['selected_high'])
-                switch_data[pos].append(event['switch'])
-
-    high_reward_prob = []
-    high_reward_ci_lower = []
-    high_reward_ci_upper = []
-    switch_prob = []
-    switch_ci_lower = []
-    switch_ci_upper = []
-
-    for pos in block_positions:
-        if high_reward_data[pos]:
-            data = np.array(high_reward_data[pos])
-            prob = np.mean(data)
-            res = bootstrap((data,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
-            ci_lower = res.confidence_interval.low
-            ci_upper = res.confidence_interval.high
-            high_reward_prob.append(prob)
-            high_reward_ci_lower.append(ci_lower)
-            high_reward_ci_upper.append(ci_upper)
-        else:
-            high_reward_prob.append(np.nan)
-            high_reward_ci_lower.append(np.nan)
-            high_reward_ci_upper.append(np.nan)
-
-        if switch_data[pos]:
-            data = np.array(switch_data[pos])
-            prob = np.mean(data)
-            res = bootstrap((data,), np.mean, confidence_level=0.95, n_resamples=1000, method='basic')
-            ci_lower = res.confidence_interval.low
-            ci_upper = res.confidence_interval.high
-            switch_prob.append(prob)
-            switch_ci_lower.append(ci_lower)
-            switch_ci_upper.append(ci_upper)
-        else:
-            switch_prob.append(np.nan)
-            switch_ci_lower.append(np.nan)
-            switch_ci_upper.append(np.nan)
-
-    return block_positions, high_reward_prob, high_reward_ci_lower, high_reward_ci_upper, switch_prob, switch_ci_lower, switch_ci_upper
-
-
-def main(run=None):
-    prefix = ''
-    ground_truth = True
-    if ground_truth:
-        prefix = 'rflr_1M'
-    else:
-        prefix = 'new_gen'
+def main(run=None, suffix: str = 'v'):
 
     # Get file paths using the new utility
-    behavior_filename = get_experiment_file("behavior_run_{}.txt", run, 'v')
-    high_port_filename = get_experiment_file("high_port_run_{}.txt", run, 'v')
-
+    behavior_filename = get_experiment_file("behavior_run_{}.txt", run, suffix)
+    high_port_filename = get_experiment_file("high_port_run_{}.txt", run, suffix)
+    print(behavior_filename, '\n', high_port_filename)
     # Check if files exist
     if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename):
         print("Behavior file or high port file not found!")
@@ -155,17 +102,13 @@ def main(run=None):
         events = parse_files(behavior_filename, high_port_filename)
         if events is not None:
             # Calculate and print the percent of trials with a switch
-            percent_switches = events['Switch'].mean()*100
+            percent_switches = events['switch'].mean()*100
             print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
             # Calculate probabilities for block positions
-            plot_probabilities(events, run)
-
-            # Calculate switch probabilities
-            sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
-
-            # Plot the switch probabilities
-            plot_switch_probabilities(sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts, prefix)
+            plot_probabilities(events, run, suffix=suffix)
+            plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix)
+            plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix)
 
 
 # Main code

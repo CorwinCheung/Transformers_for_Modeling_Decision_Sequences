@@ -14,7 +14,6 @@
 module load python/3.12.5-fasrc01
 mamba activate transformers
 
-
 # python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py --run=3 --overwrite=True
 # python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py --run=3
 
@@ -23,6 +22,8 @@ mamba activate transformers
 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py
+python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py
+
 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=100
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
