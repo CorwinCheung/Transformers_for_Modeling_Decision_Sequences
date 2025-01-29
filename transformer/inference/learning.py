@@ -29,7 +29,7 @@ def load_predictions(run=None, model_name=None):
     if model_name is not None:
         assert model_info['model_name'] == model_name, 'did not recover correct model'
     model_name = model_info['model_name']
-
+    print(model_info['model_name'])
     pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run)
     # context_file = get_experiment_file(f"learning_{model_name}_val_context.txt", run)
 
@@ -39,7 +39,11 @@ def load_predictions(run=None, model_name=None):
     return predictions, model_info
 
 
-def plot_bpos_behavior_learning(predictions, model_name, run, step_cutoff=None):
+def plot_bpos_behavior_learning(predictions,
+                                *,
+                                model_name=None,
+                                run=None,
+                                step_cutoff=None):
     """Plot behavioral position analysis of model predictions.
 
     Calculates and plots switch probability and high port selection probability
