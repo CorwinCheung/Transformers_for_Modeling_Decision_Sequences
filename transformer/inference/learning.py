@@ -29,7 +29,6 @@ def load_predictions(run=None, model_name=None):
     if model_name is not None:
         assert model_info['model_name'] == model_name, 'did not recover correct model'
     model_name = model_info['model_name']
-    print(model_info['model_name'])
     pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run)
     # context_file = get_experiment_file(f"learning_{model_name}_val_context.txt", run)
 
@@ -37,6 +36,21 @@ def load_predictions(run=None, model_name=None):
     predictions = predictions.sort_values(['Step', 'Idx'])
 
     return predictions, model_info
+
+
+def load_behavior_data(model_info):
+    try:
+        data_path = model_info['dataloader']['File validated on']
+        high_port_path = data_path.replace('behavior', 'high_port')
+        context_path = data_path.replace('behavior', 'context_transitions')
+        events = parse_files(data_path, high_port_path, context_path)
+    except FileNotFoundError:
+        data_path = convert_to_local_path(data_path)
+        high_port_path = data_path.replace('behavior', 'high_port')
+        context_path = data_path.replace('behavior', 'context_transitions')
+        events = parse_files(data_path, high_port_path, context_path)
+
+    return events
 
 
 def plot_bpos_behavior_learning(predictions,
@@ -64,11 +78,12 @@ def plot_bpos_behavior_learning(predictions,
     bpos = pts.calc_bpos_probs(predictions, add_cond_cols=['Step', 'session'],
                                add_agg_cols=['pred_Switch', 'pred_selHigh'])
     fig, axs = pts.plot_bpos_behavior(bpos, hue='Step', palette='viridis',
-                                      alpha=0.3,
+                                      alpha=0.8,
                                       plot_features={
                                          'pred_Switch': ('P(Switch)', (0, 0.4)),
                                          'pred_selHigh': ('P(selHigh)', (0, 1))
-                                         })
+                                         },
+                                      errorbar=None)
     [ax.set(xlim=(-10, 20)) for ax in axs]
     axs[1].get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
     fig_path = get_experiment_file(f"learning_{model_name}_val_preds_bpos_{step_cutoff}.png", run)
@@ -93,6 +108,7 @@ def plot_conditional_switching_learning(predictions, model_name, seq_length, run
     if seq_length > 2:
         ax.set_xticks(ax.get_xticks())
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+    ax.get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
     fig_path = get_experiment_file(f"learning_{model_name}_val_preds_seq{seq_length}_{step_cutoff}.png", run)
     fig.savefig(fig_path)
     print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
@@ -103,7 +119,8 @@ def add_choice_metrics(df, prefix=''):
     source = 'Predicted' if prefix == 'pred_' else 'True'
 
     # Get previous choice from context
-    df['prev_choice'] = df['seq3_RL'].apply(lambda x: x[-1].upper())
+    df['prev_choice'] = df['seq2_RL'].apply(lambda x: x[-1].upper()
+                                            if not pd.isna(x) else None)
 
     # Calculate choice metrics
     df[f'{prefix}choice_str'] = df[source].apply(lambda x: x.upper())
@@ -112,21 +129,6 @@ def add_choice_metrics(df, prefix=''):
     df[f'{prefix}selHigh'] = (df[f'{prefix}choice'] == df['high_port']).astype(int)
 
     return df
-
-
-def load_behavior_data(model_info):
-    try:
-        data_path = model_info['dataloader']['File validated on']
-        high_port_path = data_path.replace('behavior', 'high_port')
-        context_path = data_path.replace('behavior', 'context_transitions')
-        events = parse_files(data_path, high_port_path, context_path)
-    except FileNotFoundError:
-        data_path = convert_to_local_path(data_path)
-        high_port_path = data_path.replace('behavior', 'high_port')
-        context_path = data_path.replace('behavior', 'context_transitions')
-        events = parse_files(data_path, high_port_path, context_path)
-
-    return events
 
 
 def preprocess_predictions(predictions, events):
@@ -148,7 +150,7 @@ def preprocess_predictions(predictions, events):
         events = add_sequence_columns(events, seq_length=N)
         predictions[f'seq{N}_RL'] = predictions['Idx'].map(events[f'seq{N}_RL'])
         predictions[f'seq{N}'] = predictions['Idx'].map(events[f'seq{N}'])
-
+    
     # Add metrics for true and predicted choices
     predictions = add_choice_metrics(predictions)  # True choices
     predictions = add_choice_metrics(predictions, prefix='pred_')  # Predicted choices
