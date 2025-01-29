@@ -25,10 +25,10 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_eval
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py
 
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=100
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
 
 
 # python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=1000
