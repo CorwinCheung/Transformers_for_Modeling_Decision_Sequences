@@ -14,9 +14,30 @@
 module load python/3.12.5-fasrc01
 mamba activate transformers
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py --multiple_contexts=True
-python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py
-python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py
+# Get latest run number from experiments directory
+get_next_run() {
+    local latest=$(ls -d experiments/run_* 2>/dev/null | sort -t_ -k2 -n | tail -n1 | sed 's/.*run_//')
+    if [ -z "$latest" ]; then
+        echo 1
+    else
+        echo $((latest + 1))
+    fi
+}
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
+RUN_NUMBER=$(get_next_run)
+echo "Starting run $RUN_NUMBER"
+
+python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_contexts=True
+
+python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
+
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=1000 --run $RUN_NUMBER 
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100 --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000 --run $RUN_NUMBER
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER
+
+# Automatically remove large learning files
+rm "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
+
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
