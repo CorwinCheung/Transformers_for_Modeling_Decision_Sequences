@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from evaluation.graph_helper import (add_sequence_columns,
                                      plot_conditional_switching,
-                                     plot_probabilities)
+                                     plot_bpos_behavior)
 from utils.file_management import get_experiment_file, read_file
 
 global rflr
@@ -160,7 +160,7 @@ def main(run=None, suffix: str = 'v'):
             print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
             # Calculate probabilities for block positions
-            plot_probabilities(events, run, suffix=suffix)
+            plot_bpos_behavior(events, run, suffix=suffix)
             plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix)
             plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix)
 

@@ -26,6 +26,8 @@ def load_predictions(run=None, model_name=None):
 
     # Get model info from metadata.
     model_info = parse_model_info(run, model_name=model_name)
+    if model_name is not None:
+        assert model_info['model_name'] == model_name, 'did not recover correct model'
     model_name = model_info['model_name']
 
     pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run)
@@ -37,7 +39,7 @@ def load_predictions(run=None, model_name=None):
     return predictions, model_info
 
 
-def plot_bpos_behavior_learning(predictions, model_name, run):
+def plot_bpos_behavior_learning(predictions, model_name, run, step_cutoff=None):
     """Plot behavioral position analysis of model predictions.
 
     Calculates and plots switch probability and high port selection probability
@@ -55,7 +57,7 @@ def plot_bpos_behavior_learning(predictions, model_name, run):
         None. Saves plot to file.
     """
 
-    bpos = pts.calc_bpos_probs(predictions, add_cond_cols=['Step'],
+    bpos = pts.calc_bpos_probs(predictions, add_cond_cols=['Step', 'session'],
                                add_agg_cols=['pred_Switch', 'pred_selHigh'])
     fig, axs = pts.plot_bpos_behavior(bpos, hue='Step', palette='viridis',
                                       alpha=0.3,
@@ -65,9 +67,31 @@ def plot_bpos_behavior_learning(predictions, model_name, run):
                                          })
     [ax.set(xlim=(-10, 20)) for ax in axs]
     axs[1].get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
-    fig_path = get_experiment_file(f"learning_{model_name}_val_preds_bpos.png", run)
+    fig_path = get_experiment_file(f"learning_{model_name}_val_preds_bpos_{step_cutoff}.png", run)
     fig.savefig(fig_path)
     print(f'saved bpos plot to {fig_path}')
+
+
+def plot_conditional_switching_learning(predictions, model_name, seq_length, run, step_cutoff=None):
+
+    # Note, here we can predict on switch because seqN reflects history.
+    policies_true = pts.calc_conditional_probs(
+        predictions.query('Step==Step.max()'),
+        htrials=seq_length, sortby='pevent',
+        pred_col='Switch')
+    fig, ax = pts.plot_sequences(policies_true)
+
+    policies_pred = pts.calc_conditional_probs(predictions, htrials=seq_length,
+                                                sortby='pevent', pred_col='pred_Switch', add_grps='Step')
+    fig, ax = pts.plot_sequence_points(policies_pred, grp='Step',
+                                        palette='viridis', yval='pevent',
+                                        size=3, ax=ax, fig=fig)
+    if seq_length > 2:
+        ax.set_xticks(ax.get_xticks())
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+    fig_path = get_experiment_file(f"learning_{model_name}_val_preds_seq{seq_length}_{step_cutoff}.png", run)
+    fig.savefig(fig_path)
+    print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
 
 
 def add_choice_metrics(df, prefix=''):
@@ -86,17 +110,22 @@ def add_choice_metrics(df, prefix=''):
     return df
 
 
-def main(run=None, model_name=None):
-
-    predictions, model_info = load_predictions()
+def load_behavior_data(model_info):
     try:
         data_path = model_info['dataloader']['File validated on']
         high_port_path = data_path.replace('behavior', 'high_port')
-        events = parse_files(data_path, high_port_path)
+        context_path = data_path.replace('behavior', 'context_transitions')
+        events = parse_files(data_path, high_port_path, context_path)
     except FileNotFoundError:
         data_path = convert_to_local_path(data_path)
         high_port_path = data_path.replace('behavior', 'high_port')
-        events = parse_files(data_path, high_port_path)
+        context_path = data_path.replace('behavior', 'context_transitions')
+        events = parse_files(data_path, high_port_path, context_path)
+
+    return events
+
+
+def preprocess_predictions(predictions, events):
 
     # Map behavioral data from events DataFrame
     behavioral_cols = {
@@ -119,34 +148,30 @@ def main(run=None, model_name=None):
     # Add metrics for true and predicted choices
     predictions = add_choice_metrics(predictions)  # True choices
     predictions = add_choice_metrics(predictions, prefix='pred_')  # Predicted choices
+    return predictions
 
-    plot_bpos_behavior_learning(predictions, model_name=model_info['model_name'], run=run)
+
+def main(run=None, model_name=None, step_cutoff=None):
+
+    predictions, model_info = load_predictions(run=run, model_name=model_name)
+    model_name = model_info['model_name']
+    if step_cutoff is None:
+        step_cutoff = predictions['Step'].max()
+    events = load_behavior_data(model_info)
+    predictions = preprocess_predictions(predictions, events)
+
+    predictions = predictions.query('Step <= @step_cutoff')
+
+    plot_bpos_behavior_learning(predictions, model_name=model_name, run=run, step_cutoff=step_cutoff)
 
     for N in [2, 3]:
-        # Note, here we can predict on switch because seqN reflects history.
-        policies_true = pts.calc_conditional_probs(
-            predictions.query('Step==Step.max()'),
-            htrials=N, sortby='pevent',
-            pred_col='Switch')
-        fig, ax = pts.plot_sequences(policies_true)
-
-        policies_pred = pts.calc_conditional_probs(predictions, htrials=N,
-                                                   sortby='pevent', pred_col='pred_Switch', add_grps='Step')
-        fig, ax = pts.plot_sequence_points(policies_pred, grp='Step',
-                                           palette='viridis', yval='pevent',
-                                           size=3, ax=ax, fig=fig)
-        if N > 2:
-            ax.set_xticks(ax.get_xticks())
-            ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-        fig_path = get_experiment_file(f"learning_{model_info['model_name']}_val_preds_seq{N}.png", run)
-        fig.savefig(fig_path)
-        print(f'saved conditional probabilities for {N} trials to {fig_path}')
-
+        plot_conditional_switching_learning(predictions, model_name, N, run, step_cutoff=step_cutoff)
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)
     parser.add_argument('--model_name', type=str, default=None)
+    parser.add_argument('--step_cutoff', type=int, default=None)
     args = parser.parse_args()
-    main(run=args.run, model_name=args.model_name)
+    main(run=args.run, model_name=args.model_name, step_cutoff=args.step_cutoff)

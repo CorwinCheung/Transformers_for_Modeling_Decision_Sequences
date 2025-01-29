@@ -19,7 +19,7 @@ from bh.visualization import plot_trials as pts
 sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
               'axes.titlesize': 12, 'savefig.transparent': False})
 
-def plot_probabilities(events, run, suffix: str = 'v'):
+def plot_bpos_behavior(events, run, suffix: str = 'v'):
 
     events = events.rename(columns={'block_position': 'iInBlock',
                                     'block_length': 'blockLength',

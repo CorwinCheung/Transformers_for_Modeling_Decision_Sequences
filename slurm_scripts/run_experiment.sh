@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=basic-workflow
 #SBATCH --account=kempner_bsabatini_lab
-#SBATCH --output=/n/home00/cberon/seq_output/%j.out
-#SBATCH --error=/n/home00/cberon/seq_output/%j.err
+#SBATCH --output=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/seq_output/%j.out
+#SBATCH --error=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/seq_output/%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
@@ -25,12 +25,14 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_eval
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py
 
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=100
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
-
-
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=1000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
-
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
+
+
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=1000
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
+
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000
+# python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py
