@@ -2,52 +2,42 @@ import os
 # Add the project root directory to Python path
 import sys
 
+import numpy as np
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.file_management import get_experiment_file, read_file
 
 
 def analyze_data(behavior_filename, high_port_filename):
-    def calculate_percentages(count, total):
-        return (count / total) * 100 if total > 0 else 0
-    
+
     behavior_data = read_file(behavior_filename)
     high_port_data = read_file(high_port_filename)
-    
+
     if len(behavior_data) != len(high_port_data):
         print("Error: Data lengths do not match.")
         return None
+
+    high_port_data = [int(hp) for hp in high_port_data]
+    transitions = np.abs(np.diff(high_port_data))
+
+    choice_data = [1 if choice.upper() == 'R' else 0
+                   for choice in behavior_data]
+    selected_correct = [hp == choice
+                        for hp, choice in zip(high_port_data, choice_data)]
+    switch = np.abs(np.diff(choice_data))
+    analysis = {"transitions": transitions.sum(),
+                "transitions_percentage": transitions.mean() * 100,
+                "total_trials": len(behavior_data),
+                "selected_correct": np.sum(selected_correct),
+                "selected_correct_percentage": np.mean(selected_correct) * 100,
+                "switches": switch.sum(),
+                "switches_percentage": switch.mean() * 100}
     
-    counts = {"transitions": 0, "rewarded_left": 0, "rewarded_right": 0, "unrewarded_left": 0, "unrewarded_right": 0, "total_trials": 0, "selected_correct": 0}
-    prev_high_port = None
-
-    for i, token in enumerate(behavior_data):
-        curr_high_port = int(high_port_data[i])
-        if prev_high_port is not None and curr_high_port != prev_high_port:
-            counts["transitions"] += 1
-        
-        if token in 'LRlr':
-            counts["total_trials"] += 1
-            if token == 'L':
-                counts["rewarded_left"] += 1
-            elif token == 'R':
-                counts["rewarded_right"] += 1
-            elif token == 'l':
-                counts["unrewarded_left"] += 1
-            elif token == 'r':
-                counts["unrewarded_right"] += 1
-            
-            if (token in 'Ll' and curr_high_port == 0) or (token in 'Rr' and curr_high_port == 1):
-                counts["selected_correct"] += 1
-        prev_high_port = curr_high_port
-
-    analysis = {key: calculate_percentages(counts[key], counts["total_trials"]) for key in ["rewarded_left", "rewarded_right", "unrewarded_left", "unrewarded_right"]}
-    analysis.update({
-        "transitions": counts["transitions"],
-        "transitions_percentage": calculate_percentages(counts["transitions"], counts["total_trials"]),
-        "total_trials": counts["total_trials"],
-        "selected_correct": counts["selected_correct"],
-        "selected_correct_percentage": calculate_percentages(counts["selected_correct"], counts["total_trials"])
-    })
+    percent_factor = 100 / analysis["total_trials"]
+    analysis["rewarded_left"] = behavior_data.count('L') * percent_factor
+    analysis["rewarded_right"] = behavior_data.count('R') * percent_factor
+    analysis["unrewarded_left"] = behavior_data.count('l') * percent_factor
+    analysis["unrewarded_right"] = behavior_data.count('r') * percent_factor
 
     return analysis
 
@@ -61,27 +51,11 @@ def print_table(analysis):
     print(f"{'Number of Transitions:':<20} {analysis['transitions']:>10,} ({analysis['transitions_percentage']:.2f}% of total trials)")
     print(f"{'Selected Correct (%):':<20} {analysis['selected_correct_percentage']:>10.2f}%")
 
-def compute_switches(behavior_filename):
-    
-    data = read_file(behavior_filename)
+def print_switches(analysis):
 
-    # Convert to lowercase to standardize 'L'/'l' and 'R'/'r'
-    data = data.lower()
-
-    # Now, data is a string of 'l' and 'r' characters
-    # Initialize switches count
-    switches = 0
-    total_trials = len(data) - 1  # Number of transitions between choices
-
-    for i in range(1, len(data)):
-        if data[i-1] != data[i]:
-            switches += 1
-
-    percent_switches = (switches / total_trials) * 100 if total_trials > 0 else 0
-
-    print(f"Total trials: {len(data):,}")
-    print(f"Total switches: {switches:,}")
-    print(f"Percent of trials with a switch: {percent_switches:.2f}%")
+    print(f"Total trials: {analysis['total_trials']:,}")
+    print(f"Total switches: {analysis['switches']:,}")
+    print(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%")
 
 def main(run=None):
     behavior_filename = get_experiment_file("behavior_run_{}.txt", run, 'tr')
@@ -92,7 +66,7 @@ def main(run=None):
         analysis = analyze_data(behavior_filename, high_port_filename)
         if analysis:
             print_table(analysis)
-            compute_switches(behavior_filename)
+            print_switches(analysis)
     else:
         print(f"Files {behavior_filename} or {high_port_filename} not found!")
 
