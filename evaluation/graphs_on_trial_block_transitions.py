@@ -13,15 +13,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from evaluation.graph_helper import (add_sequence_columns,
                                      plot_conditional_switching,
                                      plot_bpos_behavior)
-from utils.file_management import get_experiment_file, read_file
+from utils.file_management import get_experiment_file, read_sequence
 
 global rflr
 
 
 def parse_files(behavior_filename, high_port_filename, context_filename, clip_short_blocks=False):
 
-    behavior_data = read_file(behavior_filename)
-    high_port_data = read_file(high_port_filename)
+    behavior_data = read_sequence(behavior_filename)
+    high_port_data = read_sequence(high_port_filename)
     assert len(behavior_data) == len(high_port_data), (
         "Error: Behavior data and high port data have different lengths.")
 

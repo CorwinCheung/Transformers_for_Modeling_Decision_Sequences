@@ -14,7 +14,7 @@ from scipy.stats import bootstrap
 from evaluation.graph_helper import (calculate_switch_probabilities,
                                      plot_probabilities,
                                      plot_switch_probabilities)
-from utils.file_management import get_file_path, read_file
+from utils.file_management import get_file_path, read_sequence
 
 global rflr
 
@@ -130,7 +130,7 @@ def read_predictions(filename):
     - predictions (str): The prediction sequence as a string.
     """
 
-    return read_file(filename)
+    return read_sequence(filename)
 
 def align_events_with_predictions(events, predictions):
     """

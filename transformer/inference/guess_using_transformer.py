@@ -10,8 +10,8 @@ import torch.nn.functional as F
 # Add the project root directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from transformer.transformer import GPT, GPTConfig
-from utils.file_management import (get_experiment_file, get_latest_model_name,
-                                   get_latest_run, parse_model_info, read_file)
+from utils.file_management import (get_experiment_file, get_latest_run, parse_model_info,
+                                   read_sequence, write_sequence)
 
 seed = 200
 random.seed(seed)
@@ -97,7 +97,7 @@ def main(run=None, model_name=None):
 
     # Load and preprocess the new data
     behavior_file = get_experiment_file("behavior_run_{}.txt", run, 'v')
-    text = read_file(behavior_file)
+    text = read_sequence(behavior_file)
     tokens = encode_sequence(text)
     print(f"Loaded {len(tokens)} tokens from ground truth data.")
 
@@ -117,12 +117,7 @@ def main(run=None, model_name=None):
 
     # Write predictions to a file
     pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
-    with open(pred_file, 'w') as f:
-        for i, char in enumerate(predicted_chars):
-            if i % 100 == 0 and i > 0:
-                f.write('\n')
-            f.write(char)
-
+    write_sequence(pred_file, predicted_chars)
     write_guess_metadata(model_name, run, behavior_file, pred_file, config)
 
     print(f"Model predictions saved to {pred_file}")

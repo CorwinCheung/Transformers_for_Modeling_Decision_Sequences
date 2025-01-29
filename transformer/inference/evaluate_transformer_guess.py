@@ -8,7 +8,7 @@ import seaborn as sns
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from utils.file_management import (get_experiment_file, get_latest_run,
-                                   parse_model_info, read_file)
+                                   parse_model_info, read_sequence)
 
 
 def calculate_accuracy_ignore_case(ground_truth, predictions):
@@ -52,11 +52,11 @@ def main(run=None, model_name=None):
 
     # Load ground truth data
     ground_truth_file = get_experiment_file("behavior_run_{}.txt", run, 'v')
-    ground_truth = read_file(ground_truth_file)
+    ground_truth = read_sequence(ground_truth_file)
 
     # Load model predictions
     pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
-    predictions = read_file(pred_file)
+    predictions = read_sequence(pred_file)
 
     # Ensure both sequences have the same length
     min_length = min(len(ground_truth), len(predictions))

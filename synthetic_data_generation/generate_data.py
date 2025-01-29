@@ -15,7 +15,7 @@ from environment import Original_2ABT_Spouts
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.file_management import (ensure_run_dir, get_experiment_file,
-                                   get_latest_run)
+                                   get_latest_run, write_sequence)
 
 
 def parse_args():
@@ -175,14 +175,6 @@ def plot_profiling_results(stats):
     plt.savefig("cprofile of training")
 
 
-def write_file(filepath, data):
-    with open(filepath, 'w') as f:
-        for i, token in enumerate(data):
-            if i % 100 == 0:
-                f.write('\n')
-            f.write(token)
-
-
 def write_context_transitions(filepath, context_transitions):
     """Write context transition data to file.
     
@@ -226,8 +218,8 @@ def main(
         else:
             behavior_data, high_port_data, context_transitions = generate_data(num_steps, task_params, multiple_contexts)
 
-        write_file(behavior_filename, behavior_data)
-        write_file(high_port_filename, high_port_data)
+        write_sequence(behavior_filename, behavior_data)
+        write_sequence(high_port_filename, high_port_data)
         write_context_transitions(context_filename, context_transitions)
         # Write metadata
         metadata_filename = get_experiment_file("metadata.txt", next_run)

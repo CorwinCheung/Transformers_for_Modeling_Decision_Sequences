@@ -106,10 +106,17 @@ def get_latest_model_name(run=None):
     return model_info['model_name']
 
 
-def read_file(file_name):
+def read_sequence(file_name):
     with open(file_name, 'r') as f:
         events = f.read().replace("\n", "").replace(" ", "")
     return events
+
+def write_sequence(file_name, data):
+    with open(file_name, 'w') as f:
+        for i, char in enumerate(data):
+            if i % 100 == 0 and i > 0:
+                f.write('\n')
+            f.write(char)
 
 
 def get_relative_path(full_path):

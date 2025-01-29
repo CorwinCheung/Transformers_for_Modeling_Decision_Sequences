@@ -5,13 +5,13 @@ import sys
 import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import get_experiment_file, read_file
+from utils.file_management import get_experiment_file, read_sequence
 
 
 def analyze_data(behavior_filename, high_port_filename):
 
-    behavior_data = read_file(behavior_filename)
-    high_port_data = read_file(high_port_filename)
+    behavior_data = read_sequence(behavior_filename)
+    high_port_data = read_sequence(high_port_filename)
 
     if len(behavior_data) != len(high_port_data):
         print("Error: Data lengths do not match.")
