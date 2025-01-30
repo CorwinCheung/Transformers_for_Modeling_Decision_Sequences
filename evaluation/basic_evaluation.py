@@ -5,39 +5,32 @@ import sys
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
-from utils.file_management import get_experiment_file, read_sequence
+import utils.file_management as fm
+from utils.parse_data import parse_simulated_data
 
+def analyze_data(behavior_filename, high_port_filename, context_filename):
+    """
+    Get basic stats about the simulated data from the behavior, high port
+    and context files.
+    """
 
-def analyze_data(behavior_filename, high_port_filename):
+    events = parse_simulated_data(behavior_filename, high_port_filename, context_filename)
+    analysis = {k: {} for k in events['context'].unique()}
 
-    behavior_data = read_sequence(behavior_filename)
-    high_port_data = read_sequence(high_port_filename)
+    for grp, context_data in events.groupby('context'):
+        analysis[grp]["switches_percentage"] = context_data.switch.mean() * 100
+        analysis[grp]["switches"] = context_data.switch.sum()
 
-    if len(behavior_data) != len(high_port_data):
-        print("Error: Data lengths do not match.")
-        return None
+        analysis[grp]["transitions"] = context_data.transition.sum()
+        analysis[grp]["transitions_percentage"] = context_data.transition.mean() * 100
 
-    high_port_data = [int(hp) for hp in high_port_data]
-    transitions = np.abs(np.diff(high_port_data))  # TO fix
-
-    choice_data = [1 if choice.upper() == 'R' else 0
-                   for choice in behavior_data]
-    selected_correct = [hp == choice
-                        for hp, choice in zip(high_port_data, choice_data)]
-    switch = np.abs(np.diff(choice_data))  # TO fix
-    analysis = {"transitions": transitions.sum(),
-                "transitions_percentage": transitions.mean() * 100,
-                "total_trials": len(behavior_data),
-                "selected_correct": np.sum(selected_correct),
-                "selected_correct_percentage": np.mean(selected_correct) * 100,
-                "switches": switch.sum(),
-                "switches_percentage": switch.mean() * 100}
-    
-    percent_factor = 100 / analysis["total_trials"]
-    analysis["rewarded_left"] = behavior_data.count('L') * percent_factor
-    analysis["rewarded_right"] = behavior_data.count('R') * percent_factor
-    analysis["unrewarded_left"] = behavior_data.count('l') * percent_factor
-    analysis["unrewarded_right"] = behavior_data.count('r') * percent_factor
+        analysis[grp]["rewarded_left"] = np.mean(context_data['k0'] == 'L') * 100
+        analysis[grp]["rewarded_right"] = np.mean(context_data['k0'] == 'R') * 100
+        analysis[grp]["unrewarded_left"] = np.mean(context_data['k0'] == 'l') * 100
+        analysis[grp]["unrewarded_right"] = np.mean(context_data['k0'] == 'r') * 100
+        analysis[grp]["total_trials"] = len(context_data)
+        analysis[grp]["selected_correct"] = np.sum(context_data['selected_high'])
+        analysis[grp]["selected_correct_percentage"] = np.mean(context_data['selected_high']) * 100
 
     return analysis
 
@@ -55,20 +48,22 @@ def print_switches(analysis):
 
     print(f"Total trials: {analysis['total_trials']:,}")
     print(f"Total switches: {analysis['switches']:,}")
-    print(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%")
+    print(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%\n")
 
 def main(run=None):
-    behavior_filename = get_experiment_file("behavior_run_{}.txt", run, 'tr')
-    high_port_filename = get_experiment_file("high_port_run_{}.txt", run, 'tr')
+    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr')
+    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr')
+    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'tr')
 
-    if os.path.exists(behavior_filename) and os.path.exists(high_port_filename):
-        print(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
-        analysis = analyze_data(behavior_filename, high_port_filename)
-        if analysis:
-            print_table(analysis)
-            print_switches(analysis)
-    else:
-        print(f"Files {behavior_filename} or {high_port_filename} not found!")
+    assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename)
+    print(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
+    analysis = analyze_data(behavior_filename, high_port_filename, context_filename)
+    if analysis:
+        for context, stats in analysis.items():
+            print(f'\n\nAnalysis for Context {context}')
+            print_table(stats)
+            print_switches(stats)
+
 
 if __name__ == "__main__":
     import argparse
