@@ -134,3 +134,22 @@ def get_relative_path(full_path):
 def convert_to_local_path(original_path):
     relative_path = get_relative_path(original_path)
     return os.path.join(os.path.expanduser("~"), "GitHub", relative_path)
+
+
+def check_files_exist(*filepaths):
+    """Check if all specified files exist.
+
+    Args:
+        *filepaths: Variable number of file paths to check
+    Returns:
+        bool: True if all files exist, False otherwise
+    """
+    missing_files = [f for f in filepaths if not os.path.exists(f)]
+
+    if missing_files:
+        print("Missing files:")
+        for f in missing_files:
+            print(f"  {f}")
+        return False
+
+    return True

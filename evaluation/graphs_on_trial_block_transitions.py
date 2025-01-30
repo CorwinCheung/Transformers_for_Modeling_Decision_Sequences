@@ -10,10 +10,10 @@ from scipy.stats import bootstrap
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evaluation.graph_helper import (add_sequence_columns,
-                                     plot_conditional_switching,
-                                     plot_bpos_behavior)
-from utils.file_management import get_experiment_file, read_sequence
+from evaluation.graph_helper import (add_sequence_columns, plot_bpos_behavior,
+                                     plot_conditional_switching)
+from utils.file_management import (check_files_exist, get_experiment_file,
+                                   read_sequence)
 
 global rflr
 
@@ -148,21 +148,20 @@ def main(run=None, suffix: str = 'v'):
     high_port_filename = get_experiment_file("high_port_run_{}.txt", run, suffix)
     context_filename = get_experiment_file("context_transitions_run_{}.txt", run, suffix)
     print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
-    # Check if files exist
-    if not os.path.exists(behavior_filename) or not os.path.exists(high_port_filename) or not os.path.exists(context_filename):
-        print("Behavior file or high port file not found!")
-    else:
-        # Parse the files
-        events = parse_files(behavior_filename, high_port_filename, context_filename)
-        if events is not None:
-            # Calculate and print the percent of trials with a switch
-            percent_switches = events['switch'].mean()*100
-            print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
-            # Calculate probabilities for block positions
-            plot_bpos_behavior(events, run, suffix=suffix)
-            plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix)
-            plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix)
+    assert check_files_exist(behavior_filename, high_port_filename, context_filename)
+
+    # Parse the files
+    events = parse_files(behavior_filename, high_port_filename, context_filename)
+    if events is not None:
+        # Calculate and print the percent of trials with a switch
+        percent_switches = events['switch'].mean()*100
+        print(f"Percent of trials with a switch: {percent_switches:.2f}%")
+
+        # Calculate probabilities for block positions
+        plot_bpos_behavior(events, run, suffix=suffix)
+        plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix)
+        plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix)
 
 
 # Main code
