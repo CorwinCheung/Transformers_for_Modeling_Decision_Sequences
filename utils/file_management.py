@@ -10,6 +10,7 @@ def get_latest_run():
         return 0  # if no runs, return 0 so first run is 1
     return max([int(d.split('_')[-1]) for d in run_dirs])
 
+
 def get_run_dir(run=None):
     """Get the directory for a specific run, defaulting to latest."""
     base_path = os.path.dirname(os.path.dirname(__file__))
@@ -17,11 +18,13 @@ def get_run_dir(run=None):
         run = get_latest_run()
     return os.path.join(base_path, "experiments", f"run_{run}")
 
+
 def ensure_run_dir(run, overwrite=False):
     """Create run directory if it doesn't exist."""
     run_dir = get_run_dir(run)
     os.makedirs(run_dir, exist_ok=overwrite)
     return run_dir
+
 
 def get_file_path(filename, run=None, create_dir=False):
     """Get full path for a file in a run directory."""
@@ -31,6 +34,7 @@ def get_file_path(filename, run=None, create_dir=False):
     if create_dir:
         os.makedirs(run_dir, exist_ok=True)
     return os.path.join(run_dir, filename)
+
 
 def get_experiment_file(filename_template, run=None, suffix='tr'):
     """Get path to an experiment-specific file.
@@ -49,6 +53,7 @@ def get_experiment_file(filename_template, run=None, suffix='tr'):
     filename = filename_template.format(f"{run}{suffix}")
     return os.path.join(get_run_dir(run), filename) 
 
+
 def format_tokens(tokens):
     """Format the number of tokens to nearest thousand (K) or million (M)."""
     if tokens >= 1_000_000:
@@ -57,6 +62,7 @@ def format_tokens(tokens):
         return f"{tokens // 1_000}K"      # Nearest thousand
     else:
         return str(tokens)
+
 
 def parse_model_info(run=None, model_name=None):
     """Parse model information from metadata.txt"""
@@ -67,7 +73,8 @@ def parse_model_info(run=None, model_name=None):
         'dataloader': {},
         'config': {}
     }
-    
+    if model_name is not None:
+        model_name = model_name.split('_cp')[0]
     found_model_name = False
     with open(metadata_file, 'r') as f:
         current_section = None
@@ -110,6 +117,7 @@ def read_sequence(file_name):
     with open(file_name, 'r') as f:
         events = f.read().replace("\n", "").replace(" ", "")
     return events
+
 
 def write_sequence(file_name, data):
     with open(file_name, 'w') as f:

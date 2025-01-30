@@ -8,7 +8,7 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=00:20:00  
-#SBATCH --mem=12GB
+#SBATCH --mem=6GB
 #SBATCH --partition=kempner_requeue
 
 module load python/3.12.5-fasrc01
@@ -41,3 +41,17 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference
 rm "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER
+
+# Find checkpoint files and extract base names
+for model_file in "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/model_"*"cp"*".pth"; do
+    if [ -f "$model_file" ]; then
+        # Extract basename and remove .pth extension
+        model_name=$(basename "$model_file" .pth)
+        echo "\nProcessing checkpoint: $model_name"
+        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER --model "$model_name"
+        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER --model "$model_name"
+        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run "$RUN_NUMBER" --model "$model_name"
+    fi
+done
+

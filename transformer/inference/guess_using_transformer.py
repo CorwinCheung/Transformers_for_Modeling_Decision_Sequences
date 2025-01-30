@@ -47,9 +47,9 @@ def generate_predictions(model, tokens, max_context_length):
         predicted_index = torch.argmax(last_logits).item() #draw from it?
         predicted_indices.append(predicted_index)
 
-        if i % 1000 == 0 and i > 0:
-            print(f"Processed tokens up to {i} in {time.time() - t0:.2f} seconds")
-            t0 = time.time()
+        # if i % 1000 == 0 and i > 0:
+        #     print(f"Processed tokens up to {i} in {time.time() - t0:.2f} seconds")
+        #     t0 = time.time()
 
     return predicted_indices
 
@@ -77,7 +77,11 @@ def main(run=None, model_name=None):
 
     # Get model info from metadata
     model_info = parse_model_info(run, model_name=model_name)
-    model_name = model_info['model_name']
+    if model_name is None:
+        model_name = model_info['model_name']
+    else:
+        assert (model_info['model_name'] == model_name) or (model_info['model_name'] == model_name.split('_cp')[0]), (
+            'did not recover correct model')
 
     # Configure model using metadata
     config = GPTConfig(

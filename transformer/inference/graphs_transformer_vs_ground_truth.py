@@ -45,13 +45,14 @@ def plot_bpos_behavior_predictions(events, run, *, model_name=None, suffix='v'):
    
 
 def main(run=None, model_name: str = None, suffix: str = 'v'):
+    
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
-    # Get model info from metadata.
-    model_info = fm.parse_model_info(run, model_name=model_name)
-    if model_name is not None:
-        assert model_info['model_name'] == model_name, 'did not recover correct model'
-    model_name = model_info['model_name']
+    
+    # Get model info from metadata
+    if model_name is None:
+        model_info = fm.parse_model_info(run, model_name=model_name)
+        model_name = model_info['model_name']
 
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix)
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix)
@@ -77,7 +78,6 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
 
     # Plot block position behavior of the model.
     plot_bpos_behavior_predictions(events, run, model_name=model_name, suffix=suffix)
-
 
     # # Calculate switch probabilities
     # sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
