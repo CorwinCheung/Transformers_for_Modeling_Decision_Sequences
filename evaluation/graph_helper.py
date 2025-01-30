@@ -1,19 +1,17 @@
 import os
 import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from scipy.stats import bootstrap
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pathlib import Path
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 
 from utils.file_management import get_experiment_file
 
-code_path = Path(__file__).parent.parent.parent
-behavior_helpers_path = code_path / 'behavior-helpers'
-sys.path.append(f'{str(behavior_helpers_path)}/')
-import seaborn as sns
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../../behavior-helpers/')))
 from bh.visualization import plot_trials as pts
 
 sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
@@ -34,116 +32,7 @@ def plot_bpos_behavior(events, run, suffix: str = 'v'):
     print(f'saved block position behavior to {bpos_filename}')
 
 
-def map_sequence_to_pattern(seq):
-    """Maps a sequence of actions to a pattern string (encoding).
-
-    Takes a sequence of actions (dictionaries containing choice and reward
-    info) and converts it into a pattern string using the following rules:
-    - First action: 'A' if rewarded, 'a' if unrewarded
-    - Subsequent actions relative to first choice:
-        - Same side as first: 'A' if rewarded, 'a' if unrewarded
-        - Different side: 'B' if rewarded, 'b' if unrewarded
-
-    Args:
-        seq: Dictionary or dataframe, containing:
-            - choice_str: String indicating choice ('L' or 'R')
-            - rewarded: Boolean indicating if choice was rewarded
-
-    Returns:
-        str: Pattern string encoding the sequence (e.g. 'aAb')
-    """
-    action1, *actionN = seq
-
-    # First action: 'A' if rewarded, 'a' if unrewarded
-    first_letter = 'A' if action1['rewarded'] else 'a'
-    first_choice = action1['choice_str']
-    pattern = first_letter
-    # Subsequent actions
-
-    for i_action in actionN:
-        same_side = i_action['choice_str'] == first_choice
-        if same_side:
-            next_letter = 'A' if i_action['rewarded'] else 'a'
-        else:
-            next_letter = 'B' if i_action['rewarded'] else 'b'
-        pattern += next_letter
-
-    return pattern
-
-
-def map_rl_to_pattern(seq):
-    """Maps a sequence of actions to a pattern string (encoding).
-
-    Takes a sequence of actions already encoded as ['R', 'r', 'L', 'L'] and
-    converts it into a pattern string using the following rules:
-    - First action: 'A' if rewarded, 'a' if unrewarded
-    - Subsequent actions relative to first choice:
-        - Same side as first: 'A' if rewarded, 'a' if unrewarded
-        - Different side: 'B' if rewarded, 'b' if unrewarded
-
-    Args:
-        seq: List, tuple, or string, containing at least two characters.
-        Expects encoded actions/outcomes as ['R', 'r', 'L', 'L'].
-
-    Returns:
-        str: Pattern string encoding the sequence (e.g. 'aAb')
-    """
-    action1, *actionN = seq
-    first_letter = 'A' if action1.isupper() else 'a'
-    first_choice = action1.upper()
-    pattern = first_letter
-    for i_action in actionN:
-        same_side = i_action.upper() == first_choice
-        if same_side:
-            next_letter = 'A' if i_action.isupper() else 'a'
-        else:
-            next_letter = 'B' if i_action.isupper() else 'b'
-        pattern += next_letter
-    return pattern
-
-
-def add_sequence_columns(events, seq_length):
-    """Add sequence columns (history up to current trial) to events DataFrame.
-
-    For a given sequence length N, adds two columns to track trial histories:
-    - seqN_RL: right/left encoded sequence of choices/rewards for previous N
-               trials (e.g. 'RrL')
-    - seqN: Pattern-encoded sequence using A/a/B/b notation (e.g. 'aAb')
-
-    Args:
-        events (pd.DataFrame): DataFrame containing trial data with column 'k0' 
-            encoding choices/rewards
-        seq_length (int): Number of previous trials to include in sequence
-
-    Returns:
-        pd.DataFrame: Original DataFrame with added sequence columns. seqN
-        is pattern of N previous trials UP TO but NOT INCLUDING the current
-        trial.
-    """
-
-    events[[f'seq{seq_length}_RL', f'seq{seq_length}']] = None
-
-    # Group by session and calculate sequences
-    def get_session_sequences(session_events):
-        if len(session_events) >= seq_length:
-            start_idx = session_events.index[0] + seq_length
-            session_events.loc[start_idx:, f'seq{seq_length}_RL'] = [
-                ''.join(session_events['k0'].values[i-seq_length:i])
-                for i in range(seq_length, len(session_events))
-            ]
-            session_events.loc[start_idx:, f'seq{seq_length}'] = (
-                session_events.loc[start_idx:, f'seq{seq_length}_RL']
-                .apply(map_rl_to_pattern)
-            )
-        return session_events
-
-    events = events.groupby('session', group_keys=False).apply(get_session_sequences)
-
-    return events
-
-
 def plot_conditional_switching(events, seq_length, run, suffix: str = 'v'):
-
 
     for context in events.context.unique():
         policies = pts.calc_conditional_probs(
