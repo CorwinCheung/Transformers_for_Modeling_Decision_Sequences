@@ -42,10 +42,10 @@ def plot_conditional_switching(events, seq_length, run, suffix: str = 'v'):
         if seq_length > 2:
             ax.set_xticks(ax.get_xticks())
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-
-        fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}{context}.png", run)
-        fig.savefig(fig_path)
-        print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
+        if events.context.nunique() == 1:
+            fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}{context}.png", run)
+            fig.savefig(fig_path)
+            print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
 
     if events.context.nunique() > 1:
         fig, ax, _ = pts.plot_seq_bar_and_points(events, seq_length,

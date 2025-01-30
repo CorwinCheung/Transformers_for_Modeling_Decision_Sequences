@@ -13,6 +13,8 @@ from utils.file_management import get_experiment_file, read_sequence
 
 seed = 200
 torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(seed)
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):

@@ -18,15 +18,15 @@ def print_accuracy(aligned_data):
     correct = np.sum(aligned_data['k0'] == aligned_data['pred_k0'])
     total = len(aligned_data)
     accuracy = correct / total if total > 0 else 0
-    print(f"Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
+    print(f"\n{' ':>37}Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
 
     # Compute and print the adjusted accuracy (choice only scoring)
     choice_accuracy = np.mean(aligned_data['pred_choice'] == aligned_data['choice'])
-    print(f"\nChoice only Accuracy ('R'-'r','L'-'l' same): {choice_accuracy:.2%}")
+    print(f"{':':>10}Choice only Accuracy (R-r,L-l same): {choice_accuracy:.2%}")
 
     # Compute and print the accuracy on reward predictions
     reward_accuracy = np.mean(aligned_data['pred_reward'] == aligned_data['reward'])
-    print(f"\nReward Accuracy ('R'-'r','L'-'l' same): {reward_accuracy:.2%}")
+    print(f"{':':>15}Reward Accuracy (R-r,L-l same): {reward_accuracy:.2%}")
 
 
 def plot_confusion_matrix(aligned_data, run, model_name):
@@ -123,9 +123,10 @@ def main(run=None, model_name=None):
     if run is None:
         run = fm.get_latest_run()
 
-    # Get model info from metadata
-    model_info = fm.parse_model_info(run, model_name=model_name)
-    model_name = model_info['model_name']
+    if model_name is None:
+        # Get model info from metadata
+        model_info = fm.parse_model_info(run, model_name=model_name)
+        model_name = model_info['model_name']
     aligned_data = load_data(run, model_name)
 
     for context, data in aligned_data.groupby('context'):
@@ -135,4 +136,9 @@ def main(run=None, model_name=None):
         plot_confusion_matrix(data, run, model_name)
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=int, default=None)
+    parser.add_argument('--model_name', type=str, default=None)
+    args = parser.parse_args()
+    main(run=args.run, model_name=args.model_name)
