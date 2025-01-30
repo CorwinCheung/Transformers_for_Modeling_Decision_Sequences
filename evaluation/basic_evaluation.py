@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 from utils.file_management import get_experiment_file, read_sequence
 
 
