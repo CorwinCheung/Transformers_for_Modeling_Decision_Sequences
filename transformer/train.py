@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
     parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
-
+    parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of steps between checkpoints')
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -58,8 +58,7 @@ if __name__ == "__main__":
 ENABLE_PROFILING = False
 
 # Loss calculation parameters
-max_eval_iters = 10  # Use 10 batches for validation
-checkpoint_interval = 1000
+# max_eval_iters = 10  # Use 10 batches for validation
 
 # Learning rate schedule
 max_lr = args.max_lr
@@ -273,10 +272,11 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_lo
     print(f"Metadata saved to {metdata_file}")
 
 
-def save_model(model, model_name, run_number, is_checkpoint=False, step=None, compile=False):
+def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False):
 
     suffix = f"_cp{step}" if is_checkpoint else ""
-    model_path = get_experiment_file(f'{model_name}.pth', run_number, suffix)
+    model_path = get_experiment_file(f'{model_name}{suffix}.pth', run_number)
+    print(model_path)
     if args.compile:
         torch.save(model._orig_mod.state_dict(), model_path)
     else:
@@ -285,8 +285,22 @@ def save_model(model, model_name, run_number, is_checkpoint=False, step=None, co
     # wandb.save(model_path)
 
 
+def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    xs = np.insert(np.arange(0, max_steps, eval_interval), -1, max_steps)
+    ax.plot(xs, loss_steps, label='Training Loss')
+    ax.plot(xs, val_loss_steps, label='Validation Loss')
+    ax.set(xlabel='Steps', ylabel='Loss', title='Training and Validation Losses')
+    ax.legend()
+    fig_path = get_experiment_file(f'losses_{model_name}.png', run_number)
+    fig.savefig(fig_path)
+
+
 best_val_loss = float('inf')
 val_loss = None
+loss_steps = []
+val_loss_steps = []
 # Training loop
 for step in range(max_steps):
 
@@ -348,13 +362,17 @@ for step in range(max_steps):
                 "tokens_per_sec": tokens_per_sec,
             })
             print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
-    if step % checkpoint_interval == 0 and step > 0:
+            
+            loss_steps.append(loss_accum.item())
+            val_loss_steps.append(val_loss.item())
+    if step % args.checkpoint_interval == 0 and step > 0:
         if loss_improved := (val_loss < best_val_loss):
             best_val_loss = val_loss
         if ddp.master_process:
             # Save the model checkpoint
             save_model(model, model_name, run_number, is_checkpoint=True,
                        step=step, compile=compile)
+            args.checkpoint_interval *= 10
             print(f"New best validation loss: {best_val_loss.item():.4f}. Model checkpoint saved at step {step}. Validation loss improved:{loss_improved}")
         # else:
         #     if ddp.master_process:
@@ -368,6 +386,8 @@ if ddp.master_process:
 
 if ddp.ddp:
     destroy_process_group()
+
+plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval)
 
 
 def profile_execution(function_to_profile, *args, **kwargs):
