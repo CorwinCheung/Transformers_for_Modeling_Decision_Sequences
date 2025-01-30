@@ -244,7 +244,7 @@ def write_predictions(model_name, predictions, last_step=False):
             f.write(f"{s}\t{true}\t{pred}\t{idx}\n")
     if last_step:
         print(f"Sampled validation predictions saved to {pred_file}")
-    
+
 
 def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, config):
     metdata_file = get_experiment_file("metadata.txt", run_number)
@@ -271,6 +271,18 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_lo
         meta_file.write(f"  Embedding size: {config.n_embd}\n")
         meta_file.write(f"\n")
     print(f"Metadata saved to {metdata_file}")
+
+
+def save_model(model, model_name, run_number, is_checkpoint=False, step=None, compile=False):
+
+    suffix = f"_cp{step}" if is_checkpoint else ""
+    model_path = get_experiment_file(f'{model_name}.pth', run_number, suffix)
+    if args.compile:
+        torch.save(model._orig_mod.state_dict(), model_path)
+    else:
+        # switch to saving in scratch?
+        torch.save(model.state_dict(), model_path)
+    # wandb.save(model_path)
 
 
 best_val_loss = float('inf')
@@ -336,37 +348,22 @@ for step in range(max_steps):
                 "tokens_per_sec": tokens_per_sec,
             })
             print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
-    # if step % checkpoint_interval == 0 and step > 0:
-    #     if val_loss < best_val_loss:
-    #         best_val_loss = val_loss
-    #         if master_process:
-    #             # Save the model checkpoint
-    #             checkpoint_path = f"/n/holyscratch01/bsabatini_lab/Users/ccheung/{model_name}_step{step}.pth"
-    #             if compile:
-    #                 torch.save(model._orig_mod.state_dict(), checkpoint_path)
-    #             else:
-    #                 torch.save(model.state_dict(), checkpoint_path)
-    #             wandb.save(checkpoint_path)
-    #             print(f"New best validation loss: {best_val_loss.item():.4f}. Model checkpoint saved at step {step}.")
-    #     else:
-    #         if master_process:
-    #             print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
-
-
-
+    if step % checkpoint_interval == 0 and step > 0:
+        if loss_improved := (val_loss < best_val_loss):
+            best_val_loss = val_loss
+        if ddp.master_process:
+            # Save the model checkpoint
+            save_model(model, model_name, run_number, is_checkpoint=True,
+                       step=step, compile=compile)
+            print(f"New best validation loss: {best_val_loss.item():.4f}. Model checkpoint saved at step {step}. Validation loss improved:{loss_improved}")
+        # else:
+        #     if ddp.master_process:
+        #         print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
 
 # Call this function after the model training code
 if ddp.master_process:
-
-    model_path = get_experiment_file(f'{model_name}.pth', run_number)
-    if args.compile:
-        torch.save(model._orig_mod.state_dict(), model_path)
-    else:
-        # switch to saving in scratch?
-        torch.save(model.state_dict(), model_path)
-    
+    save_model(model, model_name, run_number, compile=compile)
     write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
-    wandb.save(model_path)  # Save the model checkpoint to wandb
     wandb.finish()
 
 if ddp.ddp:

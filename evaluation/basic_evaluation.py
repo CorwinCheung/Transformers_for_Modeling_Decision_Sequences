@@ -18,13 +18,13 @@ def analyze_data(behavior_filename, high_port_filename):
         return None
 
     high_port_data = [int(hp) for hp in high_port_data]
-    transitions = np.abs(np.diff(high_port_data))
+    transitions = np.abs(np.diff(high_port_data))  # TO fix
 
     choice_data = [1 if choice.upper() == 'R' else 0
                    for choice in behavior_data]
     selected_correct = [hp == choice
                         for hp, choice in zip(high_port_data, choice_data)]
-    switch = np.abs(np.diff(choice_data))
+    switch = np.abs(np.diff(choice_data))  # TO fix
     analysis = {"transitions": transitions.sum(),
                 "transitions_percentage": transitions.mean() * 100,
                 "total_trials": len(behavior_data),
