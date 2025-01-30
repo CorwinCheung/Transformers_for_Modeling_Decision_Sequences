@@ -1,22 +1,17 @@
 import os
 import sys
-from pathlib import Path
 
 import pandas as pd
 
-repo_path = Path(__file__).parent.parent.parent
-code_path = repo_path.parent
-sys.path.append(f'{str(repo_path)}/')
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
+
 from utils.file_management import (convert_to_local_path, get_experiment_file,
                                    get_latest_run, parse_model_info)
 
-behavior_helpers_path = code_path / 'behavior-helpers'
-
-sys.path.append(f'{str(behavior_helpers_path)}/')
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../../../behavior-helpers/')))
 from bh.visualization import plot_trials as pts
 
-from evaluation.graph_helper import add_sequence_columns
-from evaluation.graphs_on_trial_block_transitions import parse_files
+from utils.parse_data import add_sequence_columns, parse_simulated_data
 
 
 def load_predictions(run=None, model_name=None):
@@ -39,17 +34,12 @@ def load_predictions(run=None, model_name=None):
 
 
 def load_behavior_data(model_info):
-    try:
-        data_path = model_info['dataloader']['File validated on']
-        high_port_path = data_path.replace('behavior', 'high_port')
-        context_path = data_path.replace('behavior', 'context_transitions')
-        events = parse_files(data_path, high_port_path, context_path)
-    except FileNotFoundError:
+    data_path = model_info['dataloader']['File validated on']
+    if not os.path.isfile(data_path):
         data_path = convert_to_local_path(data_path)
-        high_port_path = data_path.replace('behavior', 'high_port')
-        context_path = data_path.replace('behavior', 'context_transitions')
-        events = parse_files(data_path, high_port_path, context_path)
-
+    high_port_path = data_path.replace('behavior', 'high_port')
+    context_path = data_path.replace('behavior', 'context_transitions')
+    events = parse_simulated_data(data_path, high_port_path, context_path)
     return events
 
 
@@ -80,9 +70,9 @@ def plot_bpos_behavior_learning(predictions,
     fig, axs = pts.plot_bpos_behavior(bpos, hue='Step', palette='viridis',
                                       alpha=0.8,
                                       plot_features={
-                                         'pred_Switch': ('P(Switch)', (0, 0.4)),
-                                         'pred_selHigh': ('P(selHigh)', (0, 1))
-                                         },
+                                        'pred_selHigh': ('P(selHigh)', (0, 1)),
+                                        'pred_Switch': ('P(Switch)', (0, 0.4))
+                                        },
                                       errorbar=None)
     [ax.set(xlim=(-10, 20)) for ax in axs]
     axs[1].get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
@@ -150,7 +140,7 @@ def preprocess_predictions(predictions, events):
         events = add_sequence_columns(events, seq_length=N)
         predictions[f'seq{N}_RL'] = predictions['Idx'].map(events[f'seq{N}_RL'])
         predictions[f'seq{N}'] = predictions['Idx'].map(events[f'seq{N}'])
-    
+
     # Add metrics for true and predicted choices
     predictions = add_choice_metrics(predictions)  # True choices
     predictions = add_choice_metrics(predictions, prefix='pred_')  # Predicted choices
