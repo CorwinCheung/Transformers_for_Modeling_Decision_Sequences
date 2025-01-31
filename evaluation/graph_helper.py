@@ -17,19 +17,26 @@ from bh.visualization import plot_trials as pts
 sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
               'axes.titlesize': 12, 'savefig.transparent': False})
 
-def plot_bpos_behavior(events, run, suffix: str = 'v'):
 
+def calc_bpos_behavior(events, add_cond_cols=['context', 'session'], **kwargs):
     events = events.rename(columns={'block_position': 'iInBlock',
                                     'block_length': 'blockLength',
                                     'selected_high': 'selHigh',
                                     'switch': 'Switch'})
-    bpos = pts.calc_bpos_probs(events, add_cond_cols=['context', 'session'])
-    fig, axs = pts.plot_bpos_behavior(bpos, hue='context', errorbar='se')
+    bpos = pts.calc_bpos_probs(events, add_cond_cols=add_cond_cols, **kwargs)
+    return bpos
+
+
+def plot_bpos_behavior(bpos, run, suffix: str = 'v',  **kwargs):
+    source = kwargs.pop('source', '') + '_'
+    fig, axs = pts.plot_bpos_behavior(bpos.query('iInBlock.between(-15, 25)'), errorbar='se', **kwargs)
     [ax.set(xlim=(-10, 20)) for ax in axs]
-    axs[1].set(ylim=(0, 0.2))
-    bpos_filename = get_experiment_file('bpos_behavior_{}.png', run, suffix)
+    axs[0].set(ylim=(0, 1.1))
+    axs[1].set(ylim=(0, 0.4))
+    bpos_filename = get_experiment_file(f'bpos_{source}.png', run, suffix)
     fig.savefig(bpos_filename, bbox_inches='tight')
     print(f'saved block position behavior to {bpos_filename}')
+    return fig, axs
 
 
 def plot_conditional_switching(events, seq_length, run, suffix: str = 'v'):

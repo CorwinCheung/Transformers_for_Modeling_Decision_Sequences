@@ -5,6 +5,7 @@ import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
+from evaluation.graph_helper import calc_bpos_behavior, plot_bpos_behavior
 from utils.file_management import (convert_to_local_path, get_experiment_file,
                                    get_latest_run, parse_model_info)
 
@@ -47,7 +48,8 @@ def plot_bpos_behavior_learning(predictions,
                                 *,
                                 model_name=None,
                                 run=None,
-                                step_cutoff=None):
+                                step_cutoff=None,
+                                suffix='v'):
     """Plot behavioral position analysis of model predictions.
 
     Calculates and plots switch probability and high port selection probability
@@ -64,19 +66,20 @@ def plot_bpos_behavior_learning(predictions,
     Returns:
         None. Saves plot to file.
     """
-
-    bpos = pts.calc_bpos_probs(predictions, add_cond_cols=['Step', 'session'],
-                               add_agg_cols=['pred_Switch', 'pred_selHigh'])
-    fig, axs = pts.plot_bpos_behavior(bpos, hue='Step', palette='viridis',
-                                      alpha=0.8,
-                                      plot_features={
-                                        'pred_selHigh': ('P(selHigh)', (0, 1)),
-                                        'pred_Switch': ('P(Switch)', (0, 0.4))
-                                        },
-                                      errorbar=None)
-    [ax.set(xlim=(-10, 20)) for ax in axs]
+    source = f'learning_{model_name}_{step_cutoff}'
+    bpos = calc_bpos_behavior(predictions, add_cond_cols=['Step', 'session'],
+                              add_agg_cols=['pred_Switch', 'pred_selHigh'])
+    fig, axs = plot_bpos_behavior(bpos, hue='Step', palette='viridis',
+                                  alpha=0.8,
+                                  plot_features={
+                                    'pred_selHigh': ('P(selHigh)', (0, 1)),
+                                    'pred_Switch': ('P(Switch)', (0, 0.4))
+                                  },
+                                  errorbar=None,
+                                  source=source)
     axs[1].get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
-    fig_path = get_experiment_file(f"learning_{model_name}_val_preds_bpos_{step_cutoff}.png", run)
+    fig_path = get_experiment_file(f'bpos_{source}.png', run, suffix)
+    # get_experiment_file(f"learning_{model_name}_val_preds_bpos_{step_cutoff}.png", run)
     fig.savefig(fig_path)
     print(f'saved bpos plot to {fig_path}')
 
