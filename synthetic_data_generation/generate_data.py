@@ -38,6 +38,8 @@ def parse_args():
     parser.add_argument('--transition_prob', type=float, default=0.02)
     parser.add_argument('--multiple_contexts', type=bool, default=False,
                         help='Whether to vary parameters across sessions')
+    parser.add_argument('--context_id', type=str, default=None,
+                        help='shortcut to task parameters, overrides individual param args')
     return parser.parse_args()
 
 
@@ -112,7 +114,7 @@ def configure_task_params(task_params, multiple_contexts=False):
                      'beta': 2.1,
                      'tau': 1.4,
                      'policy': 'probability_matching'}
-    if not multiple_contexts:
+    if (not multiple_contexts) or (not any([task_params.get(k, False) for k in ['A', 'B', 'C']])):
         task_params['environment'] = task_params.get('environment', default_environment)
         task_params['agent'] = task_params.get('agent', default_agent)
         task_params = {'B': task_params}
@@ -250,9 +252,10 @@ if __name__ == "__main__":
 
     args = parse_args()
 
-    if args.multiple_contexts:
+    if args.multiple_contexts or args.context_id:
         task_params = load_param_sets()
-
+        if args.context_id:
+            task_params = {args.context_id: task_params[args.context_id]}
     else:
         task_params = {}
         if all(v is None for v in [args.alpha, args.beta, args.tau, args.policy]):
