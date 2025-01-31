@@ -34,6 +34,8 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100 --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000 --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=10000 --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100000 --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER
 
 # Automatically remove large learning files

@@ -114,7 +114,7 @@ def configure_task_params(task_params, multiple_contexts=False):
                      'beta': 2.1,
                      'tau': 1.4,
                      'policy': 'probability_matching'}
-    if (not multiple_contexts) or (not any([task_params.get(k, False) for k in ['A', 'B', 'C']])):
+    if (not multiple_contexts) and (not any([task_params.get(k, False) for k in ['A', 'B', 'C']])):
         task_params['environment'] = task_params.get('environment', default_environment)
         task_params['agent'] = task_params.get('agent', default_agent)
         task_params = {'B': task_params}
@@ -251,11 +251,12 @@ def main(
 if __name__ == "__main__":
 
     args = parse_args()
-
+    print(args.context_id)
     if args.multiple_contexts or args.context_id:
         task_params = load_param_sets()
         if args.context_id:
             task_params = {args.context_id: task_params[args.context_id]}
+            print(task_params)
     else:
         task_params = {}
         if all(v is None for v in [args.alpha, args.beta, args.tau, args.policy]):
