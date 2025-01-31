@@ -75,23 +75,24 @@ def plot_checkpoint_comparison(run=None, suffix='v'):
     
     # Plot each checkpoint's predictions for each context
     colors = plt.cm.viridis(np.linspace(0, 1, len(model_names)))
-    
+    # Mimic ground truth data as final model (will be plotted black) for each context
     for model_name, color in zip(model_names, colors):
         # Load predictions for this checkpoint
         pred_file = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
         predictions = fm.read_sequence(pred_file)
         events = align_predictions_with_gt(gt_events, predictions)
-        
+        bpos = pts.calc_bpos_probs(events,
+                                   add_cond_cols=['context', 'session'],
+                                   add_agg_cols=['pred_switch', 'pred_selected_high'])
+
         # Plot for each context
         for ax, context in zip(axes, contexts):
-            context_data = events[events['context'] == context]
-            bpos = pts.calc_bpos_probs(context_data, 
-                                     add_agg_cols=['pred_switch', 'pred_selected_high'])
-            
+            context_data = bpos.query('context == @context')
+
             # Plot P(switch)
-            ax.errorbar(bpos['iInBlock'], 
-                       bpos['pred_switch']['mean'],
-                       yerr=bpos['pred_switch']['sem'],
+            ax.errorbar(context_data['iInBlock'], 
+                       context_data['pred_switch']['mean'],
+                       yerr=context_data['pred_switch']['sem'],
                        color=color,
                        label=f'CP {model_name.split("_cp")[-1]}')
             

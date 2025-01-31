@@ -27,7 +27,7 @@ get_next_run() {
 RUN_NUMBER=$(get_next_run)
 echo "Starting run $RUN_NUMBER"
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --context_id "A"
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
@@ -38,3 +38,7 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference
 
 # Automatically remove large learning files
 rm "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
+
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER

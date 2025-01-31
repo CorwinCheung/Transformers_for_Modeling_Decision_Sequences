@@ -6,8 +6,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=00:50:00  
+#SBATCH --cpus-per-task=2
+#SBATCH --time=02:00:00  
 #SBATCH --mem=6GB
 #SBATCH --partition=kempner_requeue
 
@@ -32,10 +32,12 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_genera
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER 
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=100000 --run $RUN_NUMBER 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100 --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000 --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=10000
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=100000
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=1000000
 
 # Automatically remove large learning files
 rm "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
@@ -51,7 +53,7 @@ for model_file in "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequ
         echo -e "\nProcessing checkpoint: $model_name"
         python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER --model "$model_name"
         python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER --model "$model_name"
-        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run "$RUN_NUMBER" --model "$model_name"
+        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model "$model_name"
     fi
 done
 
