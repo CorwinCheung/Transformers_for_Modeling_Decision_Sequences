@@ -271,6 +271,8 @@ def align_predictions_with_gt(events, predictions):
     events_['pred_selected_high'] = (events_['pred_choice'] == events_['high_port']).astype(int)
     events_['prev_choice'] = events_['seq2_RL'].apply(lambda x: x[-1].upper()
                                                       if not pd.isna(x) else None)
-    events_['pred_switch'] = (events_['pred_choice_str'] != events_['prev_choice']).astype(int)
+    events_['pred_switch'] = ((events_['pred_choice_str'] != events_['prev_choice'])
+                              .where(events_['prev_choice'].notna(), np.nan)
+                              .astype('Int64'))
 
     return events_
