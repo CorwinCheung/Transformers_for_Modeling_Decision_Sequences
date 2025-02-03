@@ -1,6 +1,6 @@
 import os
 import sys
-
+import numpy as np
 import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
@@ -78,8 +78,8 @@ def plot_bpos_behavior_learning(predictions,
                                   },
                                   errorbar=None,
                                   source=source)
-    axs[1].get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
-    fig_path = get_experiment_file(f'bpos_{source}.png', run, suffix)
+    axs[1].get_legend().set(bbox_to_anchor=(1.1, 0), loc='lower left', title='Step')
+    fig_path = get_experiment_file(f'bpos_{source}_{suffix}.png', run)
     # get_experiment_file(f"learning_{model_name}_val_preds_bpos_{step_cutoff}.png", run)
     fig.savefig(fig_path)
     print(f'saved bpos plot to {fig_path}')
@@ -118,7 +118,10 @@ def add_choice_metrics(df, prefix=''):
 
     # Calculate choice metrics
     df[f'{prefix}choice_str'] = df[source].apply(lambda x: x.upper())
-    df[f'{prefix}Switch'] = (df['prev_choice'] != df[f'{prefix}choice_str']).astype(int)
+    df[f'{prefix}Switch'] = ((df['prev_choice'] != df[f'{prefix}choice_str']).astype(int)
+                             .where(df['prev_choice'].notna(), np.nan)
+                             .astype('Int64'))
+
     df[f'{prefix}choice'] = (df[f'{prefix}choice_str'] == 'R').astype(int)
     df[f'{prefix}selHigh'] = (df[f'{prefix}choice'] == df['high_port']).astype(int)
 

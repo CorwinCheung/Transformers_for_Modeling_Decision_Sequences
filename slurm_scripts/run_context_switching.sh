@@ -11,6 +11,8 @@
 #SBATCH --mem=6GB
 #SBATCH --partition=kempner_requeue
 
+BASE_PATH="/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences"
+
 module load python/3.12.5-fasrc01
 mamba activate transformers
 
@@ -27,35 +29,35 @@ get_next_run() {
 RUN_NUMBER=$(get_next_run)
 echo "Starting run $RUN_NUMBER"
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_contexts=True
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_contexts=True
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py --run $RUN_NUMBER
-python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
+python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
+python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=100000 --run $RUN_NUMBER 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100 --run $RUN_NUMBER
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000 --run $RUN_NUMBER
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=10000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=100000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=1000000
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/train.py --predict=True --epochs=100000 --run $RUN_NUMBER 
+python ${BASE_PATH}/transformer/inference/learning.py --step_cutoff=100 --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/inference/learning.py --step_cutoff=1000 --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=10000
+python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=100000
+python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=1000000
+python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER
 # Automatically remove large learning files
-rm "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
+rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/plot_checkpoint_comparison.py --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/inference/plot_checkpoint_comparison.py --run $RUN_NUMBER
 
 # Find checkpoint files and extract base names
-for model_file in "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/model_"*"cp"*".pth"; do
+for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/model_"*"cp"*".pth"; do
     if [ -f "$model_file" ]; then
         # Extract basename and remove .pth extension
         model_name=$(basename "$model_file" .pth)
         echo -e "\nProcessing checkpoint: $model_name"
-        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER --model "$model_name"
-        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER --model "$model_name"
-        python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model "$model_name"
+        python ${BASE_PATH}/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER --model "$model_name"
+        python ${BASE_PATH}/inference/evaluate_transformer_guess.py --run $RUN_NUMBER --model "$model_name"
+        python ${BASE_PATH}/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model "$model_name"
     fi
 done
 
