@@ -31,11 +31,15 @@ def main(run=None, suffix: str = 'v'):
 
         # Calculate probabilities for block positions
         bpos = calc_bpos_behavior(events, add_cond_cols=['context', 'session'])
-        plot_bpos_behavior(bpos, run, suffix=suffix, hue='context')
+        plot_bpos_behavior(bpos, run, suffix=suffix, hue='context', source='behavior')
         plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix)
         plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix)
 
 
 # Main code
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=int, default=None)
+    args = parser.parse_args()
+    main(run=args.run)
