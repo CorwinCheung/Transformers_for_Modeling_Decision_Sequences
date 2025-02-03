@@ -1,5 +1,6 @@
 import os
 import sys
+
 import numpy as np
 import pandas as pd
 
@@ -78,9 +79,8 @@ def plot_bpos_behavior_learning(predictions,
                                   },
                                   errorbar=None,
                                   source=source)
-    axs[1].get_legend().set(bbox_to_anchor=(1.1, 0), loc='lower left', title='Step')
+    axs[1].get_legend().set(title='Step')
     fig_path = get_experiment_file(f'bpos_{source}_{suffix}.png', run)
-    # get_experiment_file(f"learning_{model_name}_val_preds_bpos_{step_cutoff}.png", run)
     fig.savefig(fig_path)
     print(f'saved bpos plot to {fig_path}')
 

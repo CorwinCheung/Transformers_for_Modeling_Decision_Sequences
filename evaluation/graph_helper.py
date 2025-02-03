@@ -33,6 +33,7 @@ def plot_bpos_behavior(bpos, run, suffix: str = 'v', errorbar='se',  **kwargs):
     [ax.set(xlim=(-10, 20)) for ax in axs]
     axs[0].set(ylim=(0, 1.1))
     axs[1].set(ylim=(0, 0.4))
+    axs[1].get_legend().set(bbox_to_anchor=(1.1, 0), loc='lower left')
     bpos_filename = get_experiment_file(f'bpos_{source}{suffix}.png', run)
     fig.savefig(bpos_filename, bbox_inches='tight')
     print(f'saved block position behavior to {bpos_filename}')
