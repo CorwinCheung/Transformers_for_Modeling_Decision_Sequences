@@ -69,7 +69,8 @@ def plot_bpos_behavior_learning(predictions,
     source = f'learning_{model_name}_{step_cutoff}'
     bpos = calc_bpos_behavior(predictions, add_cond_cols=['Step', 'session'],
                               add_agg_cols=['pred_Switch', 'pred_selHigh'])
-    fig, axs = plot_bpos_behavior(bpos, hue='Step', palette='viridis',
+    fig, axs = plot_bpos_behavior(bpos, run=run, suffix=suffix,
+                                  hue='Step', palette='viridis',
                                   alpha=0.8,
                                   plot_features={
                                     'pred_selHigh': ('P(selHigh)', (0, 1)),

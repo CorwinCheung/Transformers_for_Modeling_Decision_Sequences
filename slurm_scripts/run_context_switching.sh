@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=02:00:00  
+#SBATCH --time=12:00:00  
 #SBATCH --mem=6GB
 #SBATCH --partition=kempner_requeue
 
@@ -38,12 +38,14 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=10000
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=100000
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER --step_cutoff=1000000
-
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --run $RUN_NUMBER
 # Automatically remove large learning files
 rm "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/plot_checkpoint_comparison.py --run $RUN_NUMBER
 
 # Find checkpoint files and extract base names
 for model_file in "/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/experiments/run_${RUN_NUMBER}/model_"*"cp"*".pth"; do

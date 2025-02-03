@@ -361,7 +361,9 @@ for step in range(max_steps):
                 "step_time_ms": dt,
                 "tokens_per_sec": tokens_per_sec,
             })
-            print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
+            
+            if step % (args.eval_interval*100) == 0:
+                print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
             
             loss_steps.append(loss_accum.item())
             val_loss_steps.append(val_loss.item())

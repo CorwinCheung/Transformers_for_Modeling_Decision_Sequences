@@ -31,7 +31,7 @@ python ~/code/Transformers_for_Modeling_Decision_Sequences/synthetic_data_genera
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER 
+python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/train.py --predict=True --epochs=1000 --run $RUN_NUMBER 
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=100 --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=1000 --run $RUN_NUMBER
 python ~/code/Transformers_for_Modeling_Decision_Sequences/transformer/inference/learning.py --step_cutoff=10000 --run $RUN_NUMBER
