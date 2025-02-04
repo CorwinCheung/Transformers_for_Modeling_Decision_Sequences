@@ -29,7 +29,7 @@ def print_accuracy(aligned_data):
     print(f"{' ':>15}Reward Accuracy (R-r,L-l same): {reward_accuracy:.2%}")
 
 
-def plot_confusion_matrix(aligned_data, run, model_name):
+def plot_confusion_matrix(aligned_data, run, model_name, context=''):
 
     ground_truth_tokens = list(aligned_data['k0'].values)
     prediction_tokens = list(aligned_data['pred_k0'].values)
@@ -52,7 +52,7 @@ def plot_confusion_matrix(aligned_data, run, model_name):
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
                 xticklabels=labels, yticklabels=labels, ax=ax)
     ax.set(xlabel="Predicted Label", ylabel="Ground Truth Label", title="Confusion Matrix")
-    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}")
+    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{context}")
     print(f'saved confusion matrix to {cm_file}')
     fig.savefig(cm_file)
 
@@ -133,7 +133,7 @@ def main(run=None, model_name=None):
         print(f'\n\nAnalysis for Context {context}')
         print_accuracy(data)
         print_switches(data)
-        plot_confusion_matrix(data, run, model_name)
+        plot_confusion_matrix(data, run, model_name, context)
 
 if __name__ == "__main__":
     import argparse
