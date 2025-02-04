@@ -65,7 +65,6 @@ def plot_bpos_behavior_learning(predictions,
     Returns:
         None. Saves plot to file.
     """
-    source = f'learning_{model_name}_{step_max}'
     bpos = calc_bpos_behavior(predictions, add_cond_cols=['Step', 'session'],
                               add_agg_cols=['pred_Switch', 'pred_selHigh'])
     fig, axs = plot_bpos_behavior(bpos, run=run, suffix=suffix,
@@ -76,10 +75,9 @@ def plot_bpos_behavior_learning(predictions,
                                     'pred_Switch': ('P(Switch)', (0, 0.3))
                                   },
                                   errorbar=None,
-                                  source=source,
                                   save=False)
     axs[1].get_legend().set(title='Step')
-    fig_path = fm.get_experiment_file(f'bpos_{source}_{suffix}.png', run, subdir='learning')
+    fig_path = fm.get_experiment_file(f'bpos_{model_name}_{step_max}_{suffix}.png', run, subdir='learning')
     fig.savefig(fig_path)
     print(f'saved bpos plot to {fig_path}')
 
@@ -164,8 +162,12 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
     predictions = preprocess_predictions(predictions, events)
 
     predictions = predictions.query('Step.between(@step_min, @step_max)')
-
+    
+    if len(predictions) == 0:
+        print(f'No steps between {step_min} and {step_max}')
+        return None
     run_dir = fm.get_run_dir(run)
+    
     os.makedirs(os.path.join(run_dir, 'learning'), exist_ok=True)
 
     plot_bpos_behavior_learning(predictions, model_name=model_name, run=run, step_max=step_max)

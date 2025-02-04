@@ -52,7 +52,7 @@ def plot_confusion_matrix(aligned_data, run, model_name, context=''):
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
                 xticklabels=labels, yticklabels=labels, ax=ax)
     ax.set(xlabel="Predicted Label", ylabel="Ground Truth Label", title="Confusion Matrix")
-    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{context}")
+    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{context}", subdir='predictions')
     print(f'saved confusion matrix to {cm_file}')
     fig.savefig(cm_file)
 

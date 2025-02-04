@@ -12,6 +12,7 @@
 #SBATCH --partition=kempner_requeue
 
 BASE_PATH="/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences"
+INFERENCE_PATH="${BASE_PATH}/transformer/inference"
 
 module load python/3.12.5-fasrc01
 mamba activate transformers
@@ -47,28 +48,28 @@ python ${BASE_PATH}/transformer/train.py --predict=True --epochs=100 --run $RUN_
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_max=100
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_max=1000
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_min=100000 --step_max=1000000
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER --step_min=1000000
-python ${BASE_PATH}/transformer/inference/learning.py --run $RUN_NUMBER # all data
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=100000 --step_max=1000000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER # all data
 
 # Automatically remove large learning files
-rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
+rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/seqs/learning_model"*"val_preds.txt"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "guess_using_transformer.py\n"
-python ${BASE_PATH}/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER
+python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "evaluate_transformer_guess.py\n"
-python ${BASE_PATH}/transformer/inference/evaluate_transformer_guess.py --run $RUN_NUMBER
+python ${INFERENCE_PATH}//evaluate_transformer_guess.py --run $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "graphs_transformer_vs_ground_truth.py\n"
-python ${BASE_PATH}/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
+python ${INFERENCE_PATH}//graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
 
 # Find checkpoint files and extract base names
 for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/models/model_"*"cp"*".pth"; do
@@ -77,13 +78,13 @@ for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/models/model_"*"cp
         model_name=$(basename "$model_file" .pth)
         printf '%*s\n' 80 '' | tr ' ' '-'
         echo -e "\nProcessing checkpoint: $model_name"
-        python ${BASE_PATH}/transformer/inference/guess_using_transformer.py --run $RUN_NUMBER --model_name "$model_name"
-        python ${BASE_PATH}/inference/evaluate_transformer_guess.py --run $RUN_NUMBER --model_name "$model_name"
-        python ${BASE_PATH}/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model_name "$model_name"
+        python ${INFERENCE_PATH}//guess_using_transformer.py --run $RUN_NUMBER --model_name "$model_name"
+        python ${INFERENCE_PATH}//evaluate_transformer_guess.py --run $RUN_NUMBER --model_name "$model_name"
+        python ${INFERENCE_PATH}//graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model_name "$model_name"
     fi
 done
 
 # Must follow checkpoint predictions
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "plot_checkpoint_comparison.py\n"
-python ${BASE_PATH}/transformer/inference/plot_checkpoint_comparison.py --run $RUN_NUMBER
+python ${INFERENCE_PATH}//plot_checkpoint_comparison.py --run $RUN_NUMBER

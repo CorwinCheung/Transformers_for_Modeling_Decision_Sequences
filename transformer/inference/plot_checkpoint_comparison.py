@@ -22,10 +22,9 @@ def main(run=None, suffix: str = 'v'):
 
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
-    print(fm.get_run_dir(run))
     # Find all checkpoint files
-    checkpoint_files = glob.glob(os.path.join(fm.get_run_dir(run), "pred_*cp*.txt"))
-    model_files = glob.glob(os.path.join(fm.get_run_dir(run), "model_*.pth"))
+    checkpoint_files = glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_*cp*.txt"))
+    model_files = glob.glob(os.path.join(fm.get_run_dir(run), 'models', "model_*.pth"))
     if not checkpoint_files:
         print(f"No checkpoint models found in run {run}")
         return

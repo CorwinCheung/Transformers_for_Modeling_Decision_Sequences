@@ -52,8 +52,8 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
     # Plot block position behavior of the model.
     bpos = calc_bpos_behavior(events, add_cond_cols=['context', 'session'],
                               add_agg_cols=['pred_switch', 'pred_selected_high'])
-    plot_bpos_behavior(bpos, run, suffix=suffix,
-                       source=f'pred_{model_name}',
+    plot_bpos_behavior(bpos, run, suffix=f'{model_name}_{suffix}',
+                       subdir='predictions',
                        hue='context',
                        plot_features={
                             'pred_selected_high': ('P(High)', (0, 1)),
