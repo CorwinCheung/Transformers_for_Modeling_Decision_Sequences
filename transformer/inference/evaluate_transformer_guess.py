@@ -98,10 +98,10 @@ session boundaries'''
 
 
 def load_data(run, model_name):
-    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'v')
-    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'v')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'v')
-    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
+    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
+    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'v', subdir='seqs')
+    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'v', subdir='seqs')
+    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
 
     print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
 

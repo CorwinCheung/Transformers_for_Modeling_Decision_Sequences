@@ -19,15 +19,18 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
     
+    run_dir = fm.get_run_dir(run)
+    os.makedirs(os.path.join(run_dir, 'predictions'), exist_ok=True)
+
     # Get model info from metadata
     if model_name is None:
         model_info = fm.parse_model_info(run, model_name=model_name)
         model_name = model_info['model_name']
 
-    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix)
-    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix)
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix)
-    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
+    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
+    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
+    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix, subdir='seqs')
+    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
 
     print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
 

@@ -14,16 +14,15 @@ from utils.parse_data import align_predictions_with_gt, parse_simulated_data
 
 def main(run=None, suffix: str = 'v'):
     
-    # Files will automatically use latest run if run=None
-    run = run or fm.get_latest_run()
-    
     """Plot behavior comparisons across checkpoints and contexts."""
     sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
                   'axes.titlesize': 12, 'savefig.transparent': False})
 
     import glob
-    run = run or fm.get_latest_run()
 
+    # Files will automatically use latest run if run=None
+    run = run or fm.get_latest_run()
+    print(fm.get_run_dir(run))
     # Find all checkpoint files
     checkpoint_files = glob.glob(os.path.join(fm.get_run_dir(run), "pred_*cp*.txt"))
     model_files = glob.glob(os.path.join(fm.get_run_dir(run), "model_*.pth"))
@@ -33,9 +32,9 @@ def main(run=None, suffix: str = 'v'):
     model_name = model_files[0].split('/')[-1].split('_cp')[0]
 
     # Load ground truth data once
-    behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, suffix)
-    high_port_file = fm.get_experiment_file("high_port_run_{}.txt", run, suffix)
-    context_file = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix)
+    behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
+    high_port_file = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
+    context_file = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix, subdir='seqs')
     
     gt_events = parse_simulated_data(behavior_file, high_port_file, context_file)
     contexts = sorted(gt_events['context'].unique())

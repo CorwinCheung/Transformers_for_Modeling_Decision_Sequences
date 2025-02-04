@@ -94,13 +94,13 @@ def main(run=None, model_name=None):
     # Load the trained model
     # config = GPTConfig()
     model = GPT(config)
-    model_path = get_experiment_file(f'{model_name}.pth', run)
+    model_path = get_experiment_file(f'{model_name}.pth', run, subdir='models')
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
 
     # Load and preprocess the new data
-    behavior_file = get_experiment_file("behavior_run_{}.txt", run, 'v')
+    behavior_file = get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
     text = read_sequence(behavior_file)
     tokens = encode_sequence(text)
     print(f"Loaded {len(tokens)} tokens from ground truth data.")
@@ -120,7 +120,7 @@ def main(run=None, model_name=None):
     print(f"Generated {len(predicted_chars)} predicted characters.")
 
     # Write predictions to a file
-    pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}")
+    pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
     write_sequence(pred_file, predicted_chars)
     write_guess_metadata(model_name, run, behavior_file, pred_file, config)
 
@@ -131,8 +131,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)
-    parser.add_argument('--model', type=str, default=None)
+    parser.add_argument('--model_name', type=str, default=None)
     args = parser.parse_args()
     
-    main(run=args.run, model_name=args.model)
+    main(run=args.run, model_name=args.model_name)
 

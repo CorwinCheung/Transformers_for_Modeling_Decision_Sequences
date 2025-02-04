@@ -51,9 +51,9 @@ def print_switches(analysis):
     print(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%\n")
 
 def main(run=None):
-    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr')
-    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'tr')
+    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr', subdir='seqs')
+    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr', subdir='seqs')
+    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'tr', subdir='seqs')
 
     assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename)
     print(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")

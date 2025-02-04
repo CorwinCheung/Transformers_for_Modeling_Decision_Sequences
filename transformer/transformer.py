@@ -194,7 +194,7 @@ class DataLoaderLite:
         self.num_processes = num_processes
         
         # Get the behavior file path using the file management utility
-        behavior_file = get_experiment_file(f"behavior_run_{{}}.txt", run_number, suffix)
+        behavior_file = get_experiment_file(f"behavior_run_{{}}.txt", run_number, suffix, subdir='seqs')
         text = read_sequence(behavior_file)
 
         vocab = ['R', 'r', 'L', 'l']

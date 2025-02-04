@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=12:00:00  
+#SBATCH --time=0:10:00  
 #SBATCH --mem=6GB
 #SBATCH --partition=kempner_requeue
 
@@ -43,7 +43,7 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "train.py\n"
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=1000 --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/train.py --predict=True --epochs=100 --run $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"
@@ -70,12 +70,8 @@ printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "graphs_transformer_vs_ground_truth.py\n"
 python ${BASE_PATH}/transformer/inference/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
 
-printf '%*s\n' 80 '' | tr ' ' '-'
-echo -e "plot_checkpoint_comparison.py\n"
-python ${BASE_PATH}/transformer/inference/plot_checkpoint_comparison.py --run $RUN_NUMBER
-
 # Find checkpoint files and extract base names
-for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/model_"*"cp"*".pth"; do
+for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/models/model_"*"cp"*".pth"; do
     if [ -f "$model_file" ]; then
         # Extract basename and remove .pth extension
         model_name=$(basename "$model_file" .pth)
@@ -87,3 +83,7 @@ for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/model_"*"cp"*".pth
     fi
 done
 
+# Must follow checkpoint predictions
+printf '%*s\n' 80 '' | tr ' ' '-'
+echo -e "plot_checkpoint_comparison.py\n"
+python ${BASE_PATH}/transformer/inference/plot_checkpoint_comparison.py --run $RUN_NUMBER

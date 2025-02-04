@@ -222,7 +222,7 @@ def write_predictions(model_name, predictions, last_step=False):
     vocab = ['R', 'r', 'L', 'l']
     itos = {i: ch for i, ch in enumerate(vocab)}
     
-    pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number)
+    pred_file = get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number, subdir='seqs')
     
     if predictions['step'][0] == 0:
         # Initialize the validation predictions file.
@@ -275,7 +275,7 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_lo
 def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False):
 
     suffix = f"_cp{step}" if is_checkpoint else ""
-    model_path = get_experiment_file(f'{model_name}{suffix}.pth', run_number)
+    model_path = get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
     print(model_path)
     if args.compile:
         torch.save(model._orig_mod.state_dict(), model_path)
@@ -293,7 +293,7 @@ def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
     ax.plot(xs, val_loss_steps, label='Validation Loss')
     ax.set(xlabel='Steps', ylabel='Loss', title='Training and Validation Losses')
     ax.legend()
-    fig_path = get_experiment_file(f'losses_{model_name}.png', run_number)
+    fig_path = get_experiment_file(f'losses_{model_name}.png', run_number, subdir='models')
     fig.savefig(fig_path)
 
 

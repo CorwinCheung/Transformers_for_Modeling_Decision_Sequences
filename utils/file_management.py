@@ -19,10 +19,13 @@ def get_run_dir(run=None):
     return os.path.join(base_path, "experiments", f"run_{run}")
 
 
-def ensure_run_dir(run, overwrite=False):
-    """Create run directory if it doesn't exist."""
+def ensure_run_dir(run, overwrite=False, subdir=None):
+    """Create run directory and subdirectory if they don't exist."""
     run_dir = get_run_dir(run)
-    os.makedirs(run_dir, exist_ok=overwrite)
+    if subdir:
+        run_dir = os.path.join(run_dir, subdir)
+    
+    os.makedirs(run_dir, exist_ok=overwrite)  # Ensure the directory exists
     return run_dir
 
 
@@ -36,13 +39,14 @@ def get_file_path(filename, run=None, create_dir=False):
     return os.path.join(run_dir, filename)
 
 
-def get_experiment_file(filename_template, run=None, suffix='tr'):
+def get_experiment_file(filename_template, run=None, suffix='tr', subdir=None):
     """Get path to an experiment-specific file.
     
     Args:
         filename_template (str): Template like 'behavior_run_{}.txt'
         run (int, optional): Run number. Defaults to latest run.
         suffix (str, optional): Dataset suffix ('tr' or 'v'). Defaults to 'tr'.
+        subdir (str, optional): Subdirectory within the run directory. Defaults to None.
     
     Returns:
         str: Full path to the requested file
@@ -50,8 +54,13 @@ def get_experiment_file(filename_template, run=None, suffix='tr'):
     if run is None:
         run = get_latest_run()
     
+    run_dir = get_run_dir(run)
+    if subdir:
+        run_dir = os.path.join(run_dir, subdir)
+    
+    os.makedirs(run_dir, exist_ok=True)  # Ensure the subdirectory exists
     filename = filename_template.format(f"{run}{suffix}")
-    return os.path.join(get_run_dir(run), filename) 
+    return os.path.join(run_dir, filename)
 
 
 def format_tokens(tokens):

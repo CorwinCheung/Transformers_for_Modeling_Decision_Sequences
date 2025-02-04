@@ -200,7 +200,7 @@ def main(
 
     # Get next run number.
     next_run = run or (get_latest_run() + 1)
-    run_dir = ensure_run_dir(next_run, overwrite=overwrite)
+    run_dir = ensure_run_dir(next_run, overwrite=overwrite, subdir='seqs')
 
     datasets = ['tr', 'v'] if include_val else ['tr']
 
@@ -208,9 +208,9 @@ def main(
     task_params = configure_task_params(task_params, multiple_contexts)
 
     for suffix in datasets:
-        behavior_filename = get_experiment_file("behavior_run_{}.txt", next_run, suffix)
-        high_port_filename = get_experiment_file("high_port_run_{}.txt", next_run, suffix)
-        context_filename = get_experiment_file("context_transitions_run_{}.txt", next_run, suffix)
+        behavior_filename = get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
+        high_port_filename = get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
+        context_filename = get_experiment_file("context_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
         if profile:
             with cProfile.Profile() as pr:
                 behavior_data, high_port_data, context_transitions = generate_data(num_steps, task_params, multiple_contexts)
