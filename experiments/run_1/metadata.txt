@@ -1,0 +1,22 @@
+Run 1
+Dataset tr
+Number of steps: 100,000
+Multiple contexts: 0
+Task parameters:
+  A
+  Environment parameters:
+    {'high_reward_prob': 0.9, 'low_reward_prob': 0.1, 'transition_prob': 0.02}
+  Agent parameters:
+    {'alpha': 0.56, 'beta': 1.84, 'tau': 1.25, 'policy': 'probability_matching'}
+
+Run 1
+Dataset v
+Number of steps: 100,000
+Multiple contexts: 0
+Task parameters:
+  A
+  Environment parameters:
+    {'high_reward_prob': 0.9, 'low_reward_prob': 0.1, 'transition_prob': 0.02}
+  Agent parameters:
+    {'alpha': 0.56, 'beta': 1.84, 'tau': 1.25, 'policy': 'probability_matching'}
+
