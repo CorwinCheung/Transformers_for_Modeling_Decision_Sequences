@@ -7,8 +7,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --time=0:10:00  
-#SBATCH --mem=6GB
+#SBATCH --time=02:00:00  
+#SBATCH --mem=40GB
 #SBATCH --partition=kempner_requeue
 
 BASE_PATH="/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences"
@@ -28,6 +28,7 @@ get_next_run() {
 }
 
 RUN_NUMBER=$(get_next_run)
+RUN_NUMBER=1
 echo "Starting run $RUN_NUMBER"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
@@ -48,13 +49,13 @@ python ${BASE_PATH}/transformer/train.py --predict=True --epochs=10000 --run $RU
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"
-python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
-python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=0 --step_max=100
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=0 --step_max=1000
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=100000 --step_max=1000000
-python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000000
-python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER # all data
+# python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=0 # all data
 
 # Automatically remove large learning files
 rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/seqs/learning_model"*"val_preds.txt"

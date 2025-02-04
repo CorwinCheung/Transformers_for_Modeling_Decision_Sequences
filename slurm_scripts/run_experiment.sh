@@ -42,7 +42,7 @@ python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_m
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER
 
 # Automatically remove large learning files
-rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/learning_model"*"val_preds.txt"
+rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/seqs/learning_model"*"val_preds.txt"
 
 python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER
 python ${INFERENCE_PATH}/evaluate_transformer_guess.py --run $RUN_NUMBER

@@ -67,7 +67,7 @@ def main(run=None, suffix: str = 'v'):
         sns.lineplot(bpos_context.query('iInBlock.between(-11, 21)'),
                      x='iInBlock', y='Switch', ax=ax_[1], color='k', label='ground truth', linewidth=3, errorbar=None)
         ax_[0].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
-        ax_[0].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
+        ax_[1].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
         ax_[0].set(title=context,
                    ylabel='P(pred high)', ylim=(0, 1.1))
         ax_[1].set(xlabel='block position', xlim=(-10, 20),
