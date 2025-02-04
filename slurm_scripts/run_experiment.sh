@@ -8,8 +8,8 @@
 #SBATCH --time=01:00:00  
 #SBATCH --mem=40GB
 #SBATCH --partition=kempner_requeue
-#SBATCH --output=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/seq_output/%j.out
-#SBATCH --error=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/seq_output/%j.err
+#SBATCH --output=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/slurm_scripts/slurm_output/%j.out
+#SBATCH --error=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/slurm_scripts/slurm_output/%j.err
 
 BASE_PATH="/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences"
 INFERENCE_PATH="${BASE_PATH}/transformer/inference"
@@ -33,12 +33,12 @@ echo "Starting run $RUN_NUMBER"
 # Run python scripts with base path
 python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --context_id "A"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=1000 --run $RUN_NUMBER 
+python ${BASE_PATH}/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER 
 
-python ${INFERENCE_PATH}/learning.py --step_cutoff=100 --run $RUN_NUMBER
-python ${INFERENCE_PATH}/learning.py --step_cutoff=1000 --run $RUN_NUMBER
-python ${INFERENCE_PATH}/learning.py --step_cutoff=10000 --run $RUN_NUMBER
-python ${INFERENCE_PATH}/learning.py --step_cutoff=100000 --run $RUN_NUMBER
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER
 
 # Automatically remove large learning files
