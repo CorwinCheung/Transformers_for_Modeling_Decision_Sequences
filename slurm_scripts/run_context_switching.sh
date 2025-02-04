@@ -44,7 +44,7 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "train.py\n"
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=100 --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"

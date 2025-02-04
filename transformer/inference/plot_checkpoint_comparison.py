@@ -23,7 +23,7 @@ def main(run=None, suffix: str = 'v'):
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
     # Find all checkpoint files
-    checkpoint_files = glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_*cp*.txt"))
+    checkpoint_files = sorted(glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_*cp*.txt")))
     model_files = glob.glob(os.path.join(fm.get_run_dir(run), 'models', "model_*.pth"))
     if not checkpoint_files:
         print(f"No checkpoint models found in run {run}")
@@ -77,7 +77,7 @@ def main(run=None, suffix: str = 'v'):
     ax_[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Checkpoint')
 
     sns.despine()
-    fig_path = fm.get_experiment_file(f'bpos_checkpoints_{model_name}.png', run)
+    fig_path = fm.get_experiment_file(f'bpos_checkpoints_{model_name}.png', run, subdir='predictions')
     fig.savefig(fig_path, bbox_inches='tight')
     print(f'Saved checkpoint comparison plot to {fig_path}')
 
