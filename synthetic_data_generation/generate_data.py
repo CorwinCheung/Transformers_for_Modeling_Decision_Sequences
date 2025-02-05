@@ -251,7 +251,7 @@ def main(
 if __name__ == "__main__":
 
     args = parse_args()
-    print(args.context_id)
+    print("Context ID:", args.context_id)
     if args.multiple_contexts or args.context_id:
         task_params = load_param_sets()
         if args.context_id:
