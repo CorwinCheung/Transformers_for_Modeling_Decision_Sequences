@@ -1,6 +1,4 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from collections import Counter
 
 # Load files
 with open("../data/2ABT_behavior_run_2.txt", "r") as f:

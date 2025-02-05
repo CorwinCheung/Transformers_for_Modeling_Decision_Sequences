@@ -44,7 +44,7 @@ def parse_args():
 
 
 def load_param_sets():
-    config_path = os.path.join(os.path.dirname(__file__), 'contexts.ini')
+    config_path = os.path.join(os.path.dirname(__file__), 'domains.ini')
     config = configparser.ConfigParser()
     config.read(config_path)
 
