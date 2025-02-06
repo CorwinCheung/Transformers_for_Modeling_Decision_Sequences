@@ -129,3 +129,198 @@ GPTConfig parameters:
   Number of layers: 1
   Number of heads: 1
   Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/celia/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp1000.txt'
+Model used for guessing: model_seen999M_cp1000
+
+Data guessed on: /n/home10/ccheung/celia/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/celia/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp100.txt'
+Model used for guessing: model_seen999M_cp100
+
+Data guessed on: /n/home10/ccheung/celia/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/celia/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp10.txt'
+Model used for guessing: model_seen999M_cp10
+
+Data guessed on: /n/home10/ccheung/celia/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M.txt'
+Model used for guessing: model_seen999M
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp100000.txt'
+Model used for guessing: model_seen999M_cp100000
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp10000.txt'
+Model used for guessing: model_seen999M_cp10000
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp1000.txt'
+Model used for guessing: model_seen999M_cp1000
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp100.txt'
+Model used for guessing: model_seen999M_cp100
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp10.txt'
+Model used for guessing: model_seen999M_cp10
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M.txt'
+Model used for guessing: model_seen999M
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp100000.txt'
+Model used for guessing: model_seen999M_cp100000
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp10000.txt'
+Model used for guessing: model_seen999M_cp10000
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp1000.txt'
+Model used for guessing: model_seen999M_cp1000
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp100.txt'
+Model used for guessing: model_seen999M_cp100
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64
+Run: 1
+
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_run_1_model_seen999M_cp10.txt'
+Model used for guessing: model_seen999M_cp10
+
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+
+GPTConfig parameters:
+  Block size: 12
+  Vocab size: 4
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 64

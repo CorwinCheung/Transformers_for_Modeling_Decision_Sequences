@@ -176,7 +176,7 @@ class GPT(nn.Module):
         return optimizer
 
 
-class DataLoaderLite:
+class DataLoader:
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         """Initialize data loader for training or validation.
         
@@ -204,32 +204,9 @@ class DataLoaderLite:
         
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
-        self.current_position = self.B * self.T * self.process_rank
-        self.batches_per_epoch = len(self.tokens) // (self.B * self.T)
+        self.current_position = 0
+        self.batches_per_epoch = (len(self.tokens) - self.T) // (self.B)
         self.behavior_file = behavior_file
-
-    def next_batch(self, return_indices=False):
-        """Get next batch of data."""
-        B, T = self.B, self.T
-        buf = self.tokens[self.current_position:self.current_position + B * T + 1]
-        index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
-
-        x = buf[:-1].view(B, T)
-        y = buf[1:].view(B, T)
-        # Track original indices for each target token
-        y_indices = index_buf[1:].view(B, T)
-
-        self.current_position += B * T * self.num_processes
-        if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
-        
-        if return_indices:
-            return x, y, y_indices
-        return x, y
-    
-class DataLoaderHeavy(DataLoaderLite):
-    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
-        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
 
     def next_batch(self, return_indices=False):
         """Get next batch of data."""

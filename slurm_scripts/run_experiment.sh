@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=4
-#SBATCH --time=01:00:00  
+#SBATCH --time=02:00:00  
 #SBATCH --mem=40GB
 #SBATCH --partition=kempner_requeue
 #SBATCH --output=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/slurm_scripts/slurm_output/%j.out
