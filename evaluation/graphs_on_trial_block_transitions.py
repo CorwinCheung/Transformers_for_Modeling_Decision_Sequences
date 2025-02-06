@@ -1,5 +1,4 @@
 import os
-# Add the project root directory to Python path
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
@@ -8,9 +7,6 @@ import utils.file_management as fm
 from evaluation.graph_helper import (calc_bpos_behavior, plot_bpos_behavior,
                                      plot_conditional_switching)
 from utils import parse_data
-
-global rflr
-
 
 def main(run=None, suffix: str = 'v'):
 
