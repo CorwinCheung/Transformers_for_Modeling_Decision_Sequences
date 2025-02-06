@@ -118,7 +118,8 @@ model = GPT(GPTConfig(
     block_size=T,
     n_layer=args.n_layer,
     n_head=args.n_head,
-    n_embd=args.n_embd
+    n_embd=args.n_embd,
+    device=ddp.device
 ))
 model.to(ddp.device)
 
@@ -145,35 +146,35 @@ optimizer = raw_model.configure_optimizers(
     master_process=ddp.master_process
 )
 
-if ddp.master_process:
-    wandb.init(
-        project="gpt-training",
-        config={
-            "run_number": run_number,
-            "total_batch_size": total_batch_size,
-            "max_lr": max_lr,
-            "min_lr": min_lr,
-            "warmup_steps": warmup_steps,
-            "max_steps": max_steps,
-            "B": B,
-            "T": T,
-            "grad_accum_steps": grad_accum_steps,
-            "vocab_size": 4,
-            "n_layer": args.n_layer,
-            "n_head": args.n_head,
-            "n_embd": args.n_embd,
-            "learning_rate": args.max_lr,
-            "task_id": args.task_id
-        },
-        name=f"run_task_{args.task_id}",  # Name the run based on the task ID
-        dir="/tmp",
-    )
-    wandb.watch(model)
+# if ddp.master_process:
+#     wandb.init(
+#         project="gpt-training",
+#         config={
+#             "run_number": run_number,
+#             "total_batch_size": total_batch_size,
+#             "max_lr": max_lr,
+#             "min_lr": min_lr,
+#             "warmup_steps": warmup_steps,
+#             "max_steps": max_steps,
+#             "B": B,
+#             "T": T,
+#             "grad_accum_steps": grad_accum_steps,
+#             "vocab_size": 4,
+#             "n_layer": args.n_layer,
+#             "n_head": args.n_head,
+#             "n_embd": args.n_embd,
+#             "learning_rate": args.max_lr,
+#             "task_id": args.task_id
+#         },
+#         name=f"run_task_{args.task_id}",  # Name the run based on the task ID
+#         dir="/tmp",
+#     )
+#     wandb.watch(model)
 
 
 def estimate_loss(predict=False):
     model.eval()
-    losses = []
+    losses = {}
     if predict:
         predictions = {
             'step': [],
@@ -189,8 +190,15 @@ def estimate_loss(predict=False):
             x, y = val_loader.next_batch()
         x, y = x.to(ddp.device), y.to(ddp.device)
         with torch.no_grad():
-            logits, loss = model(x, y)
-            losses.append(loss)
+            logits, loss = model(x, y, by_feature=True)
+            
+            if isinstance(loss, dict):
+                for key, value in loss.items():
+                    if key not in losses:
+                        losses[key] = []  # Initialize a list for each key if not already present
+                    losses[key].append(value)  # Append the loss value for this key
+            else:
+                losses.append(loss)  # Handle the single value case
 
             if predict:
                 # Get predicted next tokens
@@ -204,11 +212,22 @@ def estimate_loss(predict=False):
                 predictions['y_indices'] = torch.cat([predictions['y_indices'], y_indices[:, -1].cpu()])
                 predictions['step'].extend([step] * x.shape[0])
 
-    avg_loss = torch.stack(losses).mean()
+    avg_loss = {}
+    # Calculate average loss for each key if losses is a dictionary
+    if isinstance(losses, dict):
+        for key in losses.keys():
+            avg_loss[key] = torch.stack(losses[key]).mean()
+    else:
+        avg_loss = torch.stack(losses).mean()
+
     # Reduce the loss across all processes if using DDP
     if ddp.ddp:
         dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
-        avg_loss = avg_loss / ddp.world_size
+        if isinstance(avg_loss, dict):
+            for key in avg_loss.keys():
+                avg_loss[key] = avg_loss[key] / ddp.world_size
+        else:
+            avg_loss = avg_loss / ddp.world_size
     model.train()  # Switch back to training mode
     if predict:
         return avg_loss, predictions
@@ -252,7 +271,7 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_lo
     with open(metdata_file, 'a') as meta_file:
         meta_file.write(f"\nModel name: {model_name}\n")
         meta_file.write(f"  Num Parameters: {sum(p.numel() for p in model.parameters())}\n")
-        meta_file.write(f"\nTokens seen: {tokens_trained_on}\n")
+        meta_file.write(f"\nTokens seen: {tokens_trained_on:,}\n")
         meta_file.write(f"\nTotal batch size: {total_batch_size:,}\n")
         meta_file.write(f"\nMax steps: {max_steps:,}\n")
         meta_file.write(f"\nDataloader parameters:\n")
@@ -289,7 +308,11 @@ def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
     fig, ax = plt.subplots(figsize=(10, 6))
     xs = np.insert(np.arange(0, max_steps, eval_interval), -1, max_steps)
     ax.plot(xs, loss_steps, label='Training Loss')
-    ax.plot(xs, val_loss_steps, label='Validation Loss')
+    if isinstance(val_loss_steps, dict):
+        for key, data in val_loss_steps.items():
+            ax.plot(xs, data, label=f'Validation {key}')
+    else:
+        ax.plot(xs, val_loss_steps, label='Validation Loss')
     ax.set(xlabel='Steps', ylabel='Loss', title='Training and Validation Losses')
     ax.legend()
     fig_path = get_experiment_file(f'losses_{model_name}.png', run_number, subdir='models')
@@ -299,7 +322,7 @@ def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
 best_val_loss = float('inf')
 val_loss = None
 loss_steps = []
-val_loss_steps = []
+val_loss_steps = {}
 # Training loop
 for step in range(max_steps):
 
@@ -351,21 +374,37 @@ for step in range(max_steps):
                 write_predictions(model_name, predictions, step==(max_steps-1))
             else:
                 val_loss = estimate_loss(predict=False)
-            wandb.log({
-                "step": step,
-                "loss": loss_accum.item(),
-                "val_loss": val_loss.item(),
-                "lr": lr,
-                "grad_norm": norm,
-                "step_time_ms": dt,
-                "tokens_per_sec": tokens_per_sec,
-            })
+            
+            if isinstance(val_loss, dict):
+                for key in val_loss.keys():
+                    if key not in val_loss_steps:
+                        val_loss_steps[key] = []
+                    val_loss_steps[key].append(val_loss[key].item())
+            else:
+                if isinstance(val_loss_steps, dict):
+                    val_loss_steps = []
+                val_loss_steps.append(val_loss)
+    
+            val_loss_choice = val_loss.get('choice_loss').item() if isinstance(val_loss, dict) else None
+            val_loss_reward = val_loss.get('reward_loss').item() if isinstance(val_loss, dict) else None
+            val_loss = val_loss.get('full_loss').item() if isinstance(val_loss, dict) else val_loss.item()
+            # wandb.log({
+            #     "step": step,
+            #     "loss": loss_accum.item(),
+            #     "val_loss": val_loss,
+            #     "choice_loss": val_loss_choice,
+            #     "reward_loss": val_loss_reward,
+            #     "lr": lr,
+            #     "grad_norm": norm,
+            #     "step_time_ms": dt,
+            #     "tokens_per_sec": tokens_per_sec,
+            # })
             
             if step % (args.eval_interval*10) == 0:
-                print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss.item():.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
+                print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
             
             loss_steps.append(loss_accum.item())
-            val_loss_steps.append(val_loss.item())
+
     if step % args.checkpoint_interval == 0 and step > 0:
         if loss_improved := (val_loss < best_val_loss):
             best_val_loss = val_loss
@@ -374,7 +413,7 @@ for step in range(max_steps):
             save_model(model, model_name, run_number, is_checkpoint=True,
                        step=step, compile=compile)
             args.checkpoint_interval *= 10
-            print(f"New best validation loss: {best_val_loss.item():.4f}. Model checkpoint saved at step {step}. Validation loss improved:{loss_improved}")
+            print(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved:{loss_improved}")
         # else:
         #     if ddp.master_process:
         #         print(f"Validation loss did not improve at step {step}. No checkpoint saved.")
@@ -383,7 +422,7 @@ for step in range(max_steps):
 if ddp.master_process:
     save_model(model, model_name, run_number, compile=compile)
     write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
-    wandb.finish()
+    # wandb.finish()
 
 if ddp.ddp:
     destroy_process_group()
