@@ -312,7 +312,7 @@ def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
     ax.plot(xs, loss_steps, label='Training Loss')
     if isinstance(val_loss_steps, dict):
         for key, data in val_loss_steps.items():
-            ax.plot(xs, data.cpu(), label=f'Validation {key}')
+            ax.plot(xs, data, label=f'Validation {key}')
     else:
         ax.plot(xs, val_loss_steps, label='Validation Loss')
     ax.set(xlabel='Steps', ylabel='Loss', title='Training and Validation Losses')
