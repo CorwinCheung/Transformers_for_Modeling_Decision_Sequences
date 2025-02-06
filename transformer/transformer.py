@@ -204,7 +204,7 @@ class DataLoaderLite:
         
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
-        self.current_position = self.B * self.T * self.process_rank
+        self.current_position = 0
         self.batches_per_epoch = len(self.tokens) // (self.B * self.T)
         self.behavior_file = behavior_file
 
@@ -221,7 +221,7 @@ class DataLoaderLite:
 
         self.current_position += B * T * self.num_processes
         if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
+            self.current_position = 0
         
         if return_indices:
             return x, y, y_indices
@@ -230,6 +230,9 @@ class DataLoaderLite:
 class DataLoaderHeavy(DataLoaderLite):
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+        
+        self.current_position = 0
+        self.batches_per_epoch = (len(self.tokens) - self.T) // self.B 
 
     def next_batch(self, return_indices=False):
         """Get next batch of data."""
@@ -249,7 +252,7 @@ class DataLoaderHeavy(DataLoaderLite):
         # Update position for next batch
         self.current_position += B * self.num_processes
         if self.current_position + B + T > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
+            self.current_position = 0  # restart -- could shuffle batches a bit?
         
         if return_indices:
             return x, y, y_indices

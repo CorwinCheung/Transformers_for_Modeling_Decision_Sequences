@@ -29,15 +29,15 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
 
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix, subdir='seqs')
+    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
     predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
 
-    print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
+    print(behavior_filename, '\n', high_port_filename, '\n', session_filename)
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename, predictions_filename)
+    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename, predictions_filename)
 
     # Parse the ground truth events
-    gt_events = parse_simulated_data(behavior_filename, high_port_filename, context_filename)
+    gt_events = parse_simulated_data(behavior_filename, high_port_filename, session_filename)
 
     predictions = fm.read_sequence(predictions_filename)
     print(f"Number of events: {len(gt_events)}")
@@ -50,11 +50,11 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
     print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
     # Plot block position behavior of the model.
-    bpos = calc_bpos_behavior(events, add_cond_cols=['context', 'session'],
+    bpos = calc_bpos_behavior(events, add_cond_cols=['domain', 'session'],
                               add_agg_cols=['pred_switch', 'pred_selected_high'])
     plot_bpos_behavior(bpos, run, suffix=f'{model_name}_{suffix}',
                        subdir='predictions',
-                       hue='context',
+                       hue='domain',
                        plot_features={
                             'pred_selected_high': ('P(High)', (0, 1)),
                             'pred_switch': ('P(Switch)', (0, 0.4)),

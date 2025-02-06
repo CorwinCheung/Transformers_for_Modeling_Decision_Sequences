@@ -86,7 +86,7 @@ assert total_batch_size % (B * T * ddp.world_size) == 0, (
 grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
 # Configure train and validation dataloaders.
-train_loader = DataLoaderLite(
+train_loader = DataLoaderHeavy(
     B=B,
     T=T,
     process_rank=ddp.rank,
@@ -104,7 +104,8 @@ val_loader = DataLoaderHeavy(
 )
 
 # Number steps required to pass over full dataset x n_epochs.
-max_steps = int((len(train_loader.tokens) / total_batch_size) * args.epochs)
+max_steps = int(train_loader.batches_per_epoch * args.epochs)
+# max_steps = int((len(train_loader.tokens) / total_batch_size) * args.epochs)
 tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
 model_name = f"model_seen{format_tokens(tokens_trained_on)}"
 

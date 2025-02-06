@@ -8,14 +8,20 @@
 #SBATCH --time=01:00:00  
 #SBATCH --mem=40GB
 #SBATCH --partition=kempner_requeue
-#SBATCH --output=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/slurm_scripts/slurm_output/%j.out
-#SBATCH --error=/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences/slurm_scripts/slurm_output/%j.err
+#SBATCH --output=slurm_output/%j.out
+#SBATCH --error=slurm_output/%j.err
 
-BASE_PATH="/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences"
+BASE_PATH="."  # Changed BASE_PATH to point to the current directory
 INFERENCE_PATH="${BASE_PATH}/transformer/inference"
 
 module load python/3.12.5-fasrc01
 mamba activate transformers
+
+# Initialize Conda/Mamba properly
+eval "$(conda shell.bash hook)"  # Initialize shell hook
+
+# Activate the environment using the full path
+mamba activate ~/.conda/envs/transformers || source ~/.conda/envs/transformers/bin/activate
 
 # Get latest run number
 get_next_run() {
@@ -32,7 +38,7 @@ echo "Starting run $RUN_NUMBER"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "generate_data.py\n"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --context_id "A"
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"
@@ -44,7 +50,7 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "train.py\n"
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER 
+python ${BASE_PATH}/transformer/train.py --predict=True --epochs=100 --run $RUN_NUMBER 
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"
@@ -68,3 +74,17 @@ python ${INFERENCE_PATH}/evaluate_transformer_guess.py --run $RUN_NUMBER
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "graphs_transformer_vs_ground_truth.py\n"
 python ${INFERENCE_PATH}/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
+
+# Find checkpoint files and extract base names
+for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/models/model_"*"cp"*".pth"; do
+    if [ -f "$model_file" ]; then
+        # Extract basename and remove .pth extension
+        model_name=$(basename "$model_file" .pth)
+        printf '%*s\n' 80 '' | tr ' ' '-'
+        echo -e "\nProcessing checkpoint: $model_name"
+        python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER --model_name "$model_name"
+        python ${INFERENCE_PATH}/evaluate_transformer_guess.py --run $RUN_NUMBER --model_name "$model_name"
+        python ${INFERENCE_PATH}/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model_name "$model_name"
+    fi
+done
+

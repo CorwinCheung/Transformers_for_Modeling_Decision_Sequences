@@ -13,13 +13,13 @@ def main(run=None, suffix: str = 'v'):
     # Get file paths
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix, subdir='seqs')
-    print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
+    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
+    print(behavior_filename, '\n', high_port_filename, '\n', session_filename)
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename)
+    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
 
     # Parse the files
-    events = parse_data.parse_simulated_data(behavior_filename, high_port_filename, context_filename)
+    events = parse_data.parse_simulated_data(behavior_filename, high_port_filename, session_filename)
 
     if events is not None:
         # Calculate and print the percent of trials with a switch
@@ -27,8 +27,8 @@ def main(run=None, suffix: str = 'v'):
         print(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
         # Calculate probabilities for block positions
-        bpos = calc_bpos_behavior(events, add_cond_cols=['context', 'session'])
-        plot_bpos_behavior(bpos, run, suffix=suffix, hue='context', subdir='agent_behavior')
+        bpos = calc_bpos_behavior(events, add_cond_cols=['domain', 'session'])
+        plot_bpos_behavior(bpos, run, suffix=suffix, hue='domain', subdir='agent_behavior')
         plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix, subdir='agent_behavior')
         plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix, subdir='agent_behavior')
 

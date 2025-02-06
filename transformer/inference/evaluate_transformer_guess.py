@@ -29,7 +29,7 @@ def print_accuracy(aligned_data):
     print(f"{' ':>15}Reward Accuracy (R-r,L-l same): {reward_accuracy:.2%}")
 
 
-def plot_confusion_matrix(aligned_data, run, model_name, context=''):
+def plot_confusion_matrix(aligned_data, run, model_name, domain=''):
 
     ground_truth_tokens = list(aligned_data['k0'].values)
     prediction_tokens = list(aligned_data['pred_k0'].values)
@@ -52,7 +52,7 @@ def plot_confusion_matrix(aligned_data, run, model_name, context=''):
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
                 xticklabels=labels, yticklabels=labels, ax=ax)
     ax.set(xlabel="Predicted Label", ylabel="Ground Truth Label", title="Confusion Matrix")
-    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{context}", subdir='predictions')
+    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{domain}", subdir='predictions')
     print(f'saved confusion matrix to {cm_file}')
     fig.savefig(cm_file)
 
@@ -100,15 +100,15 @@ session boundaries'''
 def load_data(run, model_name):
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'v', subdir='seqs')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'v', subdir='seqs')
+    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, 'v', subdir='seqs')
     predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
 
-    print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
+    print(behavior_filename, '\n', high_port_filename, '\n', session_filename)
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename, predictions_filename)
+    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename, predictions_filename)
 
     # Parse the ground truth events and map in predictions
-    ground_truth = parse_simulated_data(behavior_filename, high_port_filename, context_filename)    
+    ground_truth = parse_simulated_data(behavior_filename, high_port_filename, session_filename)    
     predictions = list(fm.read_sequence(predictions_filename))
 
     assert len(ground_truth) == len(predictions), (
@@ -129,11 +129,11 @@ def main(run=None, model_name=None):
         model_name = model_info['model_name']
     aligned_data = load_data(run, model_name)
 
-    for context, data in aligned_data.groupby('context'):
-        print(f'\n\nAnalysis for Context {context}')
+    for domain, data in aligned_data.groupby('domain'):
+        print(f'\n\nAnalysis for Domain {domain}')
         print_accuracy(data)
         print_switches(data)
-        plot_confusion_matrix(data, run, model_name, context)
+        plot_confusion_matrix(data, run, model_name, domain)
 
 if __name__ == "__main__":
     import argparse
