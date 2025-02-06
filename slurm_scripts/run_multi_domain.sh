@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=multi-context-test
+#SBATCH --job-name=multi-domain-test
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=2
-#SBATCH --time=02:00:00  # Reduced to 30 minutes
-#SBATCH --mem=40GB
+#SBATCH --cpus-per-task=8
+#SBATCH --time=08:00:00  
+#SBATCH --mem=60GB
 #SBATCH --partition=kempner_requeue
 
 BASE_PATH="."  # Get parent directory of script location
@@ -21,7 +21,6 @@ eval "$(conda shell.bash hook)"  # Initialize shell hook
 
 # Activate the environment using the full path
 mamba activate ~/.conda/envs/transformers || source ~/.conda/envs/transformers/bin/activate
-
 
 # Get latest run number from experiments directory
 get_next_run() {

@@ -18,7 +18,7 @@ sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
               'axes.titlesize': 12, 'savefig.transparent': False})
 
 
-def calc_bpos_behavior(events, add_cond_cols=['context', 'session'], **kwargs):
+def calc_bpos_behavior(events, add_cond_cols=['domain', 'session'], **kwargs):
     events = events.rename(columns={'block_position': 'iInBlock',
                                     'block_length': 'blockLength',
                                     'selected_high': 'selHigh',
@@ -43,25 +43,25 @@ def plot_bpos_behavior(bpos, run, suffix: str = 'v', errorbar='se', save=True, s
 
 def plot_conditional_switching(events, seq_length, run, suffix: str = 'v', save=True, subdir=None):
 
-    for context in events.context.unique():
+    for domain in events.domain.unique():
         policies = pts.calc_conditional_probs(
-            events.query('context == @context'), htrials=seq_length, sortby='pevent', pred_col='switch')
+            events.query('domain == @domain'), htrials=seq_length, sortby='pevent', pred_col='switch')
         fig, ax = pts.plot_sequences(policies)
 
         if seq_length > 2:
             ax.set_xticks(ax.get_xticks())
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-        if (events.context.nunique() == 1) & save:
-            fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}{context}.png", run, subdir=subdir)
+        if (events.domain.nunique() == 1) & save:
+            fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}{domain}.png", run, subdir=subdir)
             fig.savefig(fig_path)
             print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
 
-    if events.context.nunique() > 1:
+    if events.domain.nunique() > 1:
         fig, ax, _ = pts.plot_seq_bar_and_points(events, seq_length,
-                                        grp='context',
+                                        grp='domain',
                                         palette='deep',
                                         pred_col='switch')
         if save:
-            fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}_context_comparison.png", run, subdir=subdir)
+            fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}_domain_comparison.png", run, subdir=subdir)
             fig.savefig(fig_path)
-            print(f'saved context comparison for {seq_length} trials to {fig_path}')
+            print(f'saved `domain` comparison for {seq_length} trials to {fig_path}')

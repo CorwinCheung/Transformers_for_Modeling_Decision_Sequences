@@ -8,29 +8,29 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 import utils.file_management as fm
 from utils.parse_data import parse_simulated_data
 
-def analyze_data(behavior_filename, high_port_filename, context_filename):
+def analyze_data(behavior_filename, high_port_filename, session_filename):
     """
     Get basic stats about the simulated data from the behavior, high port
-    and context files.
+    and session files.
     """
 
-    events = parse_simulated_data(behavior_filename, high_port_filename, context_filename)
-    analysis = {k: {} for k in events['context'].unique()}
+    events = parse_simulated_data(behavior_filename, high_port_filename, session_filename)
+    analysis = {k: {} for k in events['domain'].unique()}
 
-    for grp, context_data in events.groupby('context'):
-        analysis[grp]["switches_percentage"] = context_data.switch.mean() * 100
-        analysis[grp]["switches"] = context_data.switch.sum()
+    for grp, domain_data in events.groupby('domain'):
+        analysis[grp]["switches_percentage"] = domain_data.switch.mean() * 100
+        analysis[grp]["switches"] = domain_data.switch.sum()
 
-        analysis[grp]["transitions"] = context_data.transition.sum()
-        analysis[grp]["transitions_percentage"] = context_data.transition.mean() * 100
+        analysis[grp]["transitions"] = domain_data.transition.sum()
+        analysis[grp]["transitions_percentage"] = domain_data.transition.mean() * 100
 
-        analysis[grp]["rewarded_left"] = np.mean(context_data['k0'] == 'L') * 100
-        analysis[grp]["rewarded_right"] = np.mean(context_data['k0'] == 'R') * 100
-        analysis[grp]["unrewarded_left"] = np.mean(context_data['k0'] == 'l') * 100
-        analysis[grp]["unrewarded_right"] = np.mean(context_data['k0'] == 'r') * 100
-        analysis[grp]["total_trials"] = len(context_data)
-        analysis[grp]["selected_correct"] = np.sum(context_data['selected_high'])
-        analysis[grp]["selected_correct_percentage"] = np.mean(context_data['selected_high']) * 100
+        analysis[grp]["rewarded_left"] = np.mean(domain_data['k0'] == 'L') * 100
+        analysis[grp]["rewarded_right"] = np.mean(domain_data['k0'] == 'R') * 100
+        analysis[grp]["unrewarded_left"] = np.mean(domain_data['k0'] == 'l') * 100
+        analysis[grp]["unrewarded_right"] = np.mean(domain_data['k0'] == 'r') * 100
+        analysis[grp]["total_trials"] = len(domain_data)
+        analysis[grp]["selected_correct"] = np.sum(domain_data['selected_high'])
+        analysis[grp]["selected_correct_percentage"] = np.mean(domain_data['selected_high']) * 100
 
     return analysis
 
@@ -53,14 +53,14 @@ def print_switches(analysis):
 def main(run=None):
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr', subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr', subdir='seqs')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'tr', subdir='seqs')
+    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, 'tr', subdir='seqs')
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename)
+    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
     print(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
-    analysis = analyze_data(behavior_filename, high_port_filename, context_filename)
+    analysis = analyze_data(behavior_filename, high_port_filename, session_filename)
     if analysis:
-        for context, stats in analysis.items():
-            print(f'\n\nAnalysis for Context {context}')
+        for domain, stats in analysis.items():
+            print(f'\n\nAnalysis for Domain {domain}')
             print_table(stats)
             print_switches(stats)
 

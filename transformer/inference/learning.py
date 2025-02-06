@@ -38,8 +38,8 @@ def load_behavior_data(model_info):
     if not os.path.isfile(data_path):
         data_path = fm.convert_to_local_path(data_path)
     high_port_path = data_path.replace('behavior', 'high_port')
-    context_path = data_path.replace('behavior', 'context_transitions')
-    events = parse_simulated_data(data_path, high_port_path, context_path)
+    sessions_path = data_path.replace('behavior', 'session_transitions')
+    events = parse_simulated_data(data_path, high_port_path, sessions_path)
     return events
 
 
@@ -109,7 +109,7 @@ def add_choice_metrics(df, prefix=''):
     """Add choice-related metrics with optional prefix for predicted values."""
     source = 'Predicted' if prefix == 'pred_' else 'True'
 
-    # Get previous choice from context
+    # Get previous choice from encoded sequence
     df['prev_choice'] = df['seq2_RL'].apply(lambda x: x[-1].upper()
                                             if not pd.isna(x) else None)
 
@@ -133,7 +133,7 @@ def preprocess_predictions(predictions, events):
         'block_position': 'iInBlock',
         'block_length': 'blockLength',
         'high_port': 'high_port',
-        'context': 'context',
+        'domain': 'domain',
         'session': 'session'
     }
     for event_col, pred_col in behavioral_cols.items():

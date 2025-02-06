@@ -226,7 +226,7 @@ class DataLoader:
         # Update position for next batch
         self.current_position += B * self.num_processes
         if self.current_position + B + T > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
+            self.current_position = 0  # restart -- could shuffle batches a bit?
         
         if return_indices:
             return x, y, y_indices
