@@ -64,13 +64,18 @@ def get_experiment_file(filename_template, run=None, suffix='tr', subdir=None):
 
 
 def format_tokens(tokens):
-    """Format the number of tokens to nearest thousand (K) or million (M)."""
-    if tokens >= 1_000_000:
-        return f"{tokens // 1_000_000}M"  # Nearest million
-    elif tokens >= 1_000:
-        return f"{tokens // 1_000}K"      # Nearest thousand
-    else:
-        return str(tokens)
+    """Format the number of tokens to a concise string label (K, M, B, etc.)."""
+    if tokens < 0:
+        raise ValueError("Token count cannot be negative.")
+    
+    suffixes = ['', 'K', 'M', 'B', 'T']  # Add more suffixes as needed
+    index = 0
+    
+    while tokens >= 1000 and index < len(suffixes) - 1:
+        tokens /= 1000.0
+        index += 1
+    
+    return f"{int(tokens)}{suffixes[index]}"
 
 
 def parse_model_info(run=None, model_name=None):
