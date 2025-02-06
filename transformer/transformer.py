@@ -86,6 +86,7 @@ class GPTConfig:
     n_layer: int = 1
     n_head: int = 1
     n_embd: int = 64
+    device: str = 'cpu'
 
 
 class GPT(nn.Module):
@@ -101,6 +102,7 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.lm_head.weight = self.transformer.wte.weight
         self.apply(self._init_weights)
+        self.device = config.device
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -111,7 +113,43 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None, return_attn_weights=False):
+    def combine_logits_by_group(self, logits, targets, group_label=''):
+
+        group_idcs = {
+            'choice': [[0, 1], [2, 3]],  # Right and left
+            'reward': [[0, 2], [1, 3]]   # Reward and unreward
+        }
+
+        grouped_logits = []
+        combined_targets = torch.empty_like(targets)
+
+        for i, idcs in enumerate(group_idcs.get(group_label)):
+            grouped_logits.append(logits[:, :, idcs].sum(dim=2))
+            # Create a boolean mask for targets
+            mask = torch.isin(targets, torch.tensor(idcs).to(self.device))  # Porting across devices may be costly
+            combined_targets[mask] = i  # Assign the group index to combined_targets
+    
+        # Create a new logits tensor with shape [batch_size, sequence_length, 2]
+        combined_logits = torch.stack(grouped_logits, dim=2)  # Shape: [batch_size, sequence_length,            
+
+        return combined_logits, combined_targets
+
+    def calculate_loss(self, logits, targets=None, by_feature=False):
+
+        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
+
+        if by_feature:
+            logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
+            logits_reward, targets_reward = self.combine_logits_by_group(logits, targets, 'reward')
+            loss = {'full_loss': loss,
+                    'choice_loss': F.cross_entropy(logits_choice.view(-1, logits_choice.size(-1)),
+                                                   targets_choice.view(-1)),
+                    'reward_loss': F.cross_entropy(logits_reward.view(-1, logits_reward.size(-1)),
+                                                    targets_reward.view(-1))
+                }
+        return loss
+
+    def forward(self, idx, targets=None, return_attn_weights=False, **kwargs):
         B, T = idx.size()
         assert T <= self.config.block_size, f"Sequence length {T} exceeds block size {self.config.block_size}"
 
@@ -127,8 +165,7 @@ class GPT(nn.Module):
                 x = block(x)
 
         logits = self.lm_head(self.transformer.ln_f(x))
-        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
-
+        loss = self.calculate_loss(logits, targets, **kwargs)
         if return_attn_weights:
             # Each attn_weights is of shape (batch_size, num_heads, seq_len, seq_len)
             return logits, loss, attn_weights_all_layers
