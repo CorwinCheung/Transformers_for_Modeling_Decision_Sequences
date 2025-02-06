@@ -6,9 +6,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=2
-#SBATCH --time=02:00:00  
-#SBATCH --mem=40GB
+#SBATCH --cpus-per-task=8
+#SBATCH --time=08:00:00  
+#SBATCH --mem=60GB
 #SBATCH --partition=kempner_requeue
 
 BASE_PATH="/n/home00/cberon/code/Transformers_for_Modeling_Decision_Sequences"
@@ -28,12 +28,11 @@ get_next_run() {
 }
 
 RUN_NUMBER=$(get_next_run)
-RUN_NUMBER=1
 echo "Starting run $RUN_NUMBER"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "\ngenerate_data.py"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_contexts=True
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_contexts True --num_steps 1000000
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"
@@ -45,7 +44,7 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "train.py\n"
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER
+python ${BASE_PATH}/transformer/train.py --predict=True --epochs=10000 --run $RUN_NUMBER --sequence_length 24
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"
