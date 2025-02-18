@@ -1,11 +1,10 @@
 import argparse
-import cProfile
 import getpass
 import math
 import os
-import pstats
 import sys
 import time
+import glob
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,7 +37,7 @@ def parse_args():
     parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
     parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
-    parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of steps between checkpoints')
+    parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of epochs between checkpoints')
     return parser.parse_args()
 
 def write_predictions(model_name, predictions, last_step=False):
@@ -69,7 +68,7 @@ def write_predictions(model_name, predictions, last_step=False):
     if last_step:
         print(f"Sampled validation predictions saved to {pred_file}")
 
-def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, config):
+def write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, config):
     metdata_file = fm.get_experiment_file("metadata.txt", run_number)
     tokens_trained_on = total_batch_size * max_steps
 
@@ -94,18 +93,28 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_lo
         meta_file.write(f"\n")
     print(f"Metadata saved to {metdata_file}")
 
-def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False):
+def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False, **kwargs):
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
     print("Saving model at: ", model_path)
-    if args.compile:
+    if compile:
         torch.save(model._orig_mod.state_dict(), model_path)
+    elif is_checkpoint:
+        checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': kwargs.get('optimizer').state_dict(),
+            'step': step,  # Save the current step or epoch
+            'best_val_loss': kwargs.get('best_val_loss'),
+            'loss_steps': kwargs.get('loss_steps'),
+            'val_loss_steps': kwargs.get('val_loss_steps'),
+        }
+        torch.save(checkpoint, model_path)
     else:
         # switch to saving in scratch?
         torch.save(model.state_dict(), model_path)
-    wandb.save(model_path)
+    # wandb.save(model_path)
 
-def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
+def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval, model_name):
 
     fig, ax = plt.subplots(figsize=(10, 6))
     xs = np.insert(np.arange(0, max_steps, eval_interval), -1, max_steps)
@@ -122,12 +131,14 @@ def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
 
 def profile_execution(function_to_profile, *args, **kwargs):
     """Profiles the execution of a function and generates a performance plot."""
+    import cProfile
+    import pstats
     with cProfile.Profile() as pr:
         function_to_profile(*args, **kwargs)
     stats = pstats.Stats(pr)
     stats.sort_stats('cumtime')
 
-    # Extract function statistics for plotting
+    # Extract function statistics for plotting based on cumulative time
     function_names = []
     cumulative_times = []
     for func, stat in stats.stats.items():
@@ -146,6 +157,123 @@ def profile_execution(function_to_profile, *args, **kwargs):
     plt.gca().invert_yaxis()
     plt.show()
 
+def get_lr(step, lr_schedule, max_steps):
+    warmup_steps = lr_schedule['warmup_steps']
+    max_lr = lr_schedule['max_lr']
+    min_lr = lr_schedule['min_lr']
+    if step < warmup_steps:
+        return max_lr * (step + 1) / warmup_steps
+    if step > max_steps:
+        return min_lr
+    decay_ratio = (step - warmup_steps) / (max_steps - warmup_steps)
+    return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
+
+def estimate_loss(model, val_loader, ddp, step, predict=False):
+    model.eval()
+    losses = {}
+    if predict:
+        predictions = {
+            'step': [],
+            'context': torch.empty((0, val_loader.T), dtype=torch.long),  # [total_samples, T]
+            'true_next': torch.empty(0, dtype=torch.long),                # [total_samples]
+            'pred_next': torch.empty(0, dtype=torch.long),                # [total_samples]
+            'y_indices': torch.empty(0, dtype=torch.long),                # [total_samples]
+        }
+    for _ in range(val_loader.batches_per_epoch):
+        if predict:
+            x, y, y_indices = val_loader.next_batch(return_indices=True)
+        else:
+            x, y = val_loader.next_batch()
+        x, y = x.to(ddp.device), y.to(ddp.device)
+        with torch.no_grad():
+            logits, loss = model(x, y, by_feature=True)
+            
+            if isinstance(loss, dict):
+                for key, value in loss.items():
+                    if key not in losses:
+                        losses[key] = []  # Initialize a list for each key if not already present
+                    losses[key].append(value)  # Append the loss value for this key
+            else:
+                losses.append(loss)  # Handle the single value case
+
+            if predict:
+                # Get predicted next tokens
+                last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size]
+                pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+
+                # Store entire batch at once
+                predictions['context'] = torch.cat([predictions['context'], x.cpu()], dim=0)
+                predictions['true_next'] = torch.cat([predictions['true_next'], y[:, -1].cpu()])
+                predictions['pred_next'] = torch.cat([predictions['pred_next'], pred_tokens.cpu()])
+                predictions['y_indices'] = torch.cat([predictions['y_indices'], y_indices[:, -1].cpu()])
+                predictions['step'].extend([step] * x.shape[0])
+
+    avg_loss = {}
+    # Calculate average loss for each key if losses is a dictionary
+    if isinstance(losses, dict):
+        for key in losses.keys():
+            avg_loss[key] = torch.stack(losses[key]).mean()
+    else:
+        avg_loss = torch.stack(losses).mean()
+
+    # Reduce the loss across all processes if using DDP
+    if ddp.ddp:
+        dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
+        if isinstance(avg_loss, dict):
+            for key in avg_loss.keys():
+                avg_loss[key] = avg_loss[key] / ddp.world_size
+        else:
+            avg_loss = avg_loss / ddp.world_size
+    model.train()  # Switch back to training mode
+    if predict:
+        return avg_loss, predictions
+    return avg_loss
+
+def update_predictions_file(model_name, starting_step):
+    pred_file = fm.get_experiment_file(f"learning_{model_name}_val_preds.txt", run_number, subdir='seqs')
+
+    # Check if the predictions file exists
+    if not os.path.exists(pred_file):
+        print(f"Predictions file {pred_file} does not exist. No updates needed.")
+        return None  # Exit the function if the file does not exist
+
+    # Read existing predictions
+    with open(pred_file, 'r') as f:
+        lines = f.readlines()
+    excess_steps = []
+
+    # Write back only the lines that are within the cutoff step
+    with open(pred_file, 'w') as f:
+        for line in lines:
+            if line.startswith("Step"):  # Keep the header
+                f.write(line)
+            else:
+                step = int(line.split('\t')[0])  # Extract the step from the line
+                if step <= starting_step:  # Check against the cutoff step
+                    f.write(line)
+                else:
+                    excess_steps.append(step)
+    if excess_steps:
+        print(f"Excess steps: {excess_steps[0]} to {excess_steps[-1]}")
+
+def trim_loss_steps(losses, starting_step, eval_interval):
+    
+    # Get the indices of the losses to keep.
+    idcs = np.insert(np.arange(0, starting_step, eval_interval), -1, starting_step)
+    num_idcs = len(idcs)
+
+    if isinstance(losses, dict):
+        for key in losses.keys():
+            losses[key] = losses[key][:num_idcs]
+    else:
+        losses = losses[:num_idcs]
+
+    return losses
+
+def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps):
+    steps_per_epoch = batches_per_epoch * grad_accum_steps
+    checkpoint_steps = checkpoint_interval * steps_per_epoch
+    return checkpoint_steps
 
 def main():
     # Set random seeds
@@ -159,20 +287,17 @@ def main():
     # Parse arguments
     args = parse_args()
 
-    # Training parameters
-    ENABLE_PROFILING = False
-
     # Learning rate schedule
-    max_lr = args.max_lr
-    min_lr = max_lr * 0.1
-    warmup_steps = 1000
+    lr_schedule ={
+        'max_lr': args.max_lr,
+        'min_lr': args.max_lr * 0.1,
+        'warmup_steps': 1000,
+    }
 
     # Data parameters
     global run_number
     run_number = args.run or fm.get_latest_run()
-
-    #launch ddp with
-    #torchrun --standalone --nproc_per_node=2 train.py
+    #torchrun --standalone --nproc_per_node=2 train.py  # to launch ddp
 
     # Set up DDP if using, mimic it if not.
     ddp = DDPConfig()
@@ -215,25 +340,48 @@ def main():
         print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
         print(f"=> calculated steps: {max_steps}")
 
-    # Check whether checkpoint or model already exists.
-    if fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models'):
-        return None
+    # Create model.
+    model = GPT(GPTConfig(
+        vocab_size=4,
+        block_size=T,
+        n_layer=args.n_layer,
+        n_head=args.n_head,
+        n_embd=args.n_embd,
+        device=ddp.device
+    ))
 
-    elif fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models'):
-        model = GPT(config)
-        model_path = fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models')
-        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    # Check whether checkpoint or model already exists.
+    if os.path.exists(fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models')):
+        print("Model already exists. Skipping training.")
+        return None
+    elif any(checkpoints := glob.glob(os.path.join(fm.get_run_dir(run_number), 'models', "*cp*.pth"))):
+        print("Checkpoint already exists. Loading checkpoint.")
+        model_path = sorted(checkpoints)[-1]
+        checkpoint = torch.load(model_path, map_location=ddp.device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        starting_step = checkpoint['step']
+        best_val_loss = checkpoint['best_val_loss']  # There is a chance this came after the checkpoint was saved.
+        loss_steps = trim_loss_steps(checkpoint['loss_steps'], starting_step, args.eval_interval)
+        val_loss_steps = trim_loss_steps(checkpoint['val_loss_steps'], starting_step, args.eval_interval)
+        val_loss = val_loss_steps.get('full_loss')[-1] if isinstance(val_loss_steps, dict) else val_loss_steps[-1]
+        print(f"Starting from step {starting_step}")
+        print('Num loss steps:', len(loss_steps))
+        print('Adjusted from:', len(checkpoint['loss_steps']))
+
+        # Remove any predictions made after the checkpoint was saved.
+        update_predictions_file(model_name, starting_step)
+
     else:
-        # Create model.
-        model = GPT(GPTConfig(
-            vocab_size=4,
-            block_size=T,
-            n_layer=args.n_layer,
-            n_head=args.n_head,
-            n_embd=args.n_embd,
-            device=ddp.device
-        ))
+        best_val_loss = float('inf')
+        val_loss = None
+        loss_steps = []
+        val_loss_steps = {}
+        starting_step = 0
+    
     model.to(ddp.device)
+    checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
 
     if args.compile:
         model = torch.compile(model)
@@ -241,115 +389,40 @@ def main():
         model = DDP(model, device_ids=[ddp.local_rank])
     raw_model = model.module if ddp.ddp else model
 
-    def get_lr(it):
-        if it < warmup_steps:
-            return max_lr * (it + 1) / warmup_steps
-        if it > max_steps:
-            return min_lr
-        decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
-        return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
-
-
     optimizer = raw_model.configure_optimizers(
         weight_decay=0.1,
-        learning_rate=max_lr,
+        learning_rate=lr_schedule['max_lr'],
         device=ddp.device,
         master_process=ddp.master_process
     )
 
-    # if ddp.master_process:
-    #     wandb.init(
-    #         project="gpt-training",
-    #         config={
-    #             "run_number": run_number,
-    #             "total_batch_size": total_batch_size,
-    #             "max_lr": max_lr,
-    #             "min_lr": min_lr,
-    #             "warmup_steps": warmup_steps,
-    #             "max_steps": max_steps,
-    #             "B": B,
-    #             "T": T,
-    #             "grad_accum_steps": grad_accum_steps,
-    #             "vocab_size": 4,
-    #             "n_layer": args.n_layer,
-    #             "n_head": args.n_head,
-    #             "n_embd": args.n_embd,
-    #             "learning_rate": args.max_lr,
-    #             "task_id": args.task_id
-    #         },
-    #         name=f"run_task_{args.task_id}",  # Name the run based on the task ID
-    #         dir="/tmp",
-    #     )
-    #     wandb.watch(model)
+    if ddp.master_process:
+        wandb.init(
+            project="gpt-training",
+            config={
+                "run_number": run_number,
+                "total_batch_size": total_batch_size,
+                "max_lr": lr_schedule['max_lr'],
+                "min_lr": lr_schedule['min_lr'],
+                "warmup_steps": lr_schedule['warmup_steps'],
+                "max_steps": max_steps,
+                "B": B,
+                "T": T,
+                "grad_accum_steps": grad_accum_steps,
+                "vocab_size": 4,
+                "n_layer": args.n_layer,
+                "n_head": args.n_head,
+                "n_embd": args.n_embd,
+                # "learning_rate": args.max_lr,
+                "task_id": args.task_id
+            },
+            name=f"run_task_{args.task_id}",  # Name the run based on the task ID
+            dir="/tmp",
+        )
+        wandb.watch(model)
 
-
-    def estimate_loss(predict=False):
-        model.eval()
-        losses = {}
-        if predict:
-            predictions = {
-                'step': [],
-                'context': torch.empty((0, val_loader.T), dtype=torch.long),  # [total_samples, T]
-                'true_next': torch.empty(0, dtype=torch.long),                # [total_samples]
-                'pred_next': torch.empty(0, dtype=torch.long),                # [total_samples]
-                'y_indices': torch.empty(0, dtype=torch.long),                # [total_samples]
-            }
-        for _ in range(val_loader.batches_per_epoch):
-            if predict:
-                x, y, y_indices = val_loader.next_batch(return_indices=True)
-            else:
-                x, y = val_loader.next_batch()
-            x, y = x.to(ddp.device), y.to(ddp.device)
-            with torch.no_grad():
-                logits, loss = model(x, y, by_feature=True)
-                
-                if isinstance(loss, dict):
-                    for key, value in loss.items():
-                        if key not in losses:
-                            losses[key] = []  # Initialize a list for each key if not already present
-                        losses[key].append(value)  # Append the loss value for this key
-                else:
-                    losses.append(loss)  # Handle the single value case
-
-                if predict:
-                    # Get predicted next tokens
-                    last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size]
-                    pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
-
-                    # Store entire batch at once
-                    predictions['context'] = torch.cat([predictions['context'], x.cpu()], dim=0)
-                    predictions['true_next'] = torch.cat([predictions['true_next'], y[:, -1].cpu()])
-                    predictions['pred_next'] = torch.cat([predictions['pred_next'], pred_tokens.cpu()])
-                    predictions['y_indices'] = torch.cat([predictions['y_indices'], y_indices[:, -1].cpu()])
-                    predictions['step'].extend([step] * x.shape[0])
-
-        avg_loss = {}
-        # Calculate average loss for each key if losses is a dictionary
-        if isinstance(losses, dict):
-            for key in losses.keys():
-                avg_loss[key] = torch.stack(losses[key]).mean()
-        else:
-            avg_loss = torch.stack(losses).mean()
-
-        # Reduce the loss across all processes if using DDP
-        if ddp.ddp:
-            dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
-            if isinstance(avg_loss, dict):
-                for key in avg_loss.keys():
-                    avg_loss[key] = avg_loss[key] / ddp.world_size
-            else:
-                avg_loss = avg_loss / ddp.world_size
-        model.train()  # Switch back to training mode
-        if predict:
-            return avg_loss, predictions
-        return avg_loss
-
-    best_val_loss = float('inf')
-    val_loss = None
-    loss_steps = []
-    val_loss_steps = {}
     # Training loop
-    for step in range(max_steps):
+    for step in range(starting_step, max_steps):
 
         if ddp.device_type == 'cuda':
             # Synchronize for CUDA
@@ -362,6 +435,9 @@ def main():
         for micro_step in range(grad_accum_steps):
             x, y = train_loader.next_batch()
             x, y = x.to(ddp.device), y.to(ddp.device)
+
+            if (step % checkpoint_interval == 1):
+                print(f"Step {step} with dataloader position {train_loader.current_position}")
 
             # Forward pass and loss computation
             with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
@@ -377,7 +453,7 @@ def main():
         # Clip gradients to prevent exploding gradients
         norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
-        lr = get_lr(step)
+        lr = get_lr(step, lr_schedule, max_steps)
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
@@ -395,10 +471,10 @@ def main():
         if step % args.eval_interval == 0 or step == max_steps - 1:
             if ddp.master_process:
                 if args.predict:
-                    val_loss, predictions = estimate_loss(predict=True)
+                    val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
                     write_predictions(model_name, predictions, step==(max_steps-1))
                 else:
-                    val_loss = estimate_loss(predict=False)
+                    val_loss = estimate_loss(model, val_loader, ddp, step, predict=False)
                 
                 if isinstance(val_loss, dict):
                     for key in val_loss.keys():
@@ -413,73 +489,49 @@ def main():
                 val_loss_choice = val_loss.get('choice_loss').item() if isinstance(val_loss, dict) else None
                 val_loss_reward = val_loss.get('reward_loss').item() if isinstance(val_loss, dict) else None
                 val_loss = val_loss.get('full_loss').item() if isinstance(val_loss, dict) else val_loss.item()
-                # wandb.log({
-                #     "step": step,
-                #     "loss": loss_accum.item(),
-                #     "val_loss": val_loss,
-                #     "choice_loss": val_loss_choice,
-                #     "reward_loss": val_loss_reward,
-                #     "lr": lr,
-                #     "grad_norm": norm,
-                #     "step_time_ms": dt,
-                #     "tokens_per_sec": tokens_per_sec,
-                # })
+                wandb.log({
+                    "step": step,
+                    "loss": loss_accum.item(),
+                    "val_loss": val_loss,
+                    "choice_loss": val_loss_choice,
+                    "reward_loss": val_loss_reward,
+                    "lr": lr,
+                    "grad_norm": norm,
+                    "step_time_ms": dt,
+                    "tokens_per_sec": tokens_per_sec,
+                })
                 
                 if step % (args.eval_interval*10) == 0:
                     print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
                 
                 loss_steps.append(loss_accum.item())
 
-        if step % args.checkpoint_interval == 0 and step > 0:
+        if (step % checkpoint_interval == 0) and (step > 0):
+            print(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
             if ddp.master_process:
                 # Save the model checkpoint
-                save_model(model, model_name, run_number, is_checkpoint=True,
-                        step=step, compile=compile)
+                save_model(model, model_name, run_number, is_checkpoint=True, compile=args.compile,
+                           step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
+                           val_loss_steps=val_loss_steps)
                 args.checkpoint_interval *= 10
                 print(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved:{loss_improved}")
 
     # Call this function after the model training code
     if ddp.master_process:
-        save_model(model, model_name, run_number, compile=compile)
-        write_metadata(model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
+        save_model(model, model_name, run_number, compile=args.compile)
+        write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         # wandb.finish()
 
     if ddp.ddp:
         destroy_process_group()
 
-    plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval)
+    plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
-
-# for profiling if needed
-# if __name__ == "__main__":
-#     with cProfile.Profile() as pr:
-#         main()
-
-#     stats = pstats.Stats(pr)
-#     stats.sort_stats('cumtime')  # Sort by cumulative time
-#     function_names = []
-#     cumulative_times = []
-
-#     # Extract top functions based on cumulative time
-#     for func, stat in stats.stats.items():
-#         filename, lineno, func_name = func
-#         cumulative_time = stat[3]  # cumulative time is the 4th element in stat tuple
-#         # Filter out irrelevant low-level functions by setting a threshold
-#         if cumulative_time > 0.01:  # Adjust threshold as needed
-#             function_names.append(f"{lineno}({func_name})")
-#             cumulative_times.append(cumulative_time)
-
-#     # Plot the profiling results
-#     plt.figure(figsize=(10, 6))
-#     plt.barh(function_names, cumulative_times, color="skyblue")
-#     plt.xlabel("Cumulative Time (s)")
-#     plt.ylabel("Function")
-#     plt.title("Cumulative Time of Key Functions in Profiled Code")
-#     plt.gca().invert_yaxis()
-#     plt.show()
 if __name__ == "__main__":
+
+    ENABLE_PROFILING = False
     if ENABLE_PROFILING:
         profile_execution(main)
     else:
