@@ -1,5 +1,6 @@
 import glob
 import os
+import logging
 
 
 def get_latest_run():
@@ -175,3 +176,43 @@ def check_files_exist(*filepaths):
         return False
 
     return True
+
+
+def setup_logging(run_number, component_name, module_name=None):
+    """Set up logging for experiment scripts.
+    
+    Args:
+        run_number (int): The experiment run number
+        component_name (str): Name of the component for log file (e.g., 'data_generation', 'training')
+        module_name (str, optional): Name of the module for logger. If None, uses component_name
+    """
+    run_dir = get_run_dir(run_number)
+    log_dir = os.path.join(run_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Get SLURM job ID from environment variable, default to 'local' if not running in SLURM
+    job_id = os.environ.get('SLURM_JOB_ID', 'local')
+    
+    # Configure logging to write to both component-specific file and console
+    log_file = os.path.join(log_dir, f'{component_name}.log')
+    
+    # Clear any existing handlers
+    logging.getLogger().handlers = []
+
+    handlers = [logging.FileHandler(log_file)]
+    if job_id == 'local':  # Only add StreamHandler when not running in SLURM
+        handlers.append(logging.StreamHandler(sys.stdout))  # Explicitly use stdout
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - job_%(job_id)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',  # Format time to seconds only
+        handlers=handlers
+    )
+    
+    # Create a logger specific to the module
+    logger = logging.getLogger(module_name or component_name)
+    
+    # Add SLURM job ID to logger's context
+    logger = logging.LoggerAdapter(logger, {'job_id': job_id})
+    return logger

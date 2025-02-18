@@ -14,6 +14,9 @@ from bh.visualization import plot_trials as pts
 
 from utils.parse_data import add_sequence_columns, parse_simulated_data
 
+def initialize_logger(run):
+    global logger
+    logger = fm.setup_logging(run, 'inference', 'learning')
 
 def load_predictions(run=None, model_name=None):
 
@@ -79,7 +82,7 @@ def plot_bpos_behavior_learning(predictions,
     axs[1].get_legend().set(title='Step')
     fig_path = fm.get_experiment_file(f'bpos_{model_name}_{step_max}_{suffix}.png', run, subdir='learning')
     fig.savefig(fig_path)
-    print(f'saved bpos plot to {fig_path}')
+    logger.info(f'saved bpos plot to {fig_path}')
 
 
 def plot_conditional_switching_learning(predictions, model_name, seq_length, run, step_max=None):
@@ -102,7 +105,7 @@ def plot_conditional_switching_learning(predictions, model_name, seq_length, run
     ax.get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
     fig_path = fm.get_experiment_file(f"learning_{model_name}_val_preds_seq{seq_length}_{step_max}.png", run, subdir='learning')
     fig.savefig(fig_path)
-    print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
+    logger.info(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
 
 
 def add_choice_metrics(df, prefix=''):
@@ -153,6 +156,7 @@ def preprocess_predictions(predictions, events):
 
 def main(run=None, model_name=None, step_min=0, step_max=None):
 
+    logger = initialize_logger(run)
     predictions, model_info = load_predictions(run=run, model_name=model_name)
     model_name = model_info['model_name']
     if step_max is None:
@@ -164,7 +168,7 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
     predictions = predictions.query('Step.between(@step_min, @step_max)')
     
     if len(predictions) == 0:
-        print(f'No steps between {step_min} and {step_max}')
+        logger.info(f'No steps between {step_min} and {step_max}')
         return None
     run_dir = fm.get_run_dir(run)
     
@@ -176,6 +180,8 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
         plot_conditional_switching_learning(predictions, model_name, N, run, step_max=step_max)
 
 if __name__ == "__main__":
+    print('-' * 80)
+    print('learning.py\n')
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)

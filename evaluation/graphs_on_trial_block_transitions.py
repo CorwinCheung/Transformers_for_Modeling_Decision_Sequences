@@ -8,13 +8,19 @@ from evaluation.graph_helper import (calc_bpos_behavior, plot_bpos_behavior,
                                      plot_conditional_switching)
 from utils import parse_data
 
-def main(run=None, suffix: str = 'v'):
+logger = None
 
+def initialize_logger(run_number):
+    global logger
+    logger = fm.setup_logging(run_number, 'data_generation', 'graphs_on_trial_block_transitions')
+
+def main(run=None, suffix: str = 'v'):
+    initialize_logger(run)
     # Get file paths
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
     session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
-    print(behavior_filename, '\n', high_port_filename, '\n', session_filename)
+    logger.info(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
 
     assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
 
@@ -24,7 +30,7 @@ def main(run=None, suffix: str = 'v'):
     if events is not None:
         # Calculate and print the percent of trials with a switch
         percent_switches = events['switch'].mean()*100
-        print(f"Percent of trials with a switch: {percent_switches:.2f}%")
+        logger.info(f"Percent of trials with a switch: {percent_switches:.2f}%")
 
         # Calculate probabilities for block positions
         bpos = calc_bpos_behavior(events, add_cond_cols=['domain', 'session'])
@@ -35,6 +41,9 @@ def main(run=None, suffix: str = 'v'):
 
 # Main code
 if __name__ == "__main__":
+
+    print('-' * 80)
+    print('graphs_on_trial_block_transitions.py\n')
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)

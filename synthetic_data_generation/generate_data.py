@@ -15,7 +15,13 @@ from environment import Original_2ABT_Spouts
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
+from pprint import pformat
 
+logger = None
+
+def initialize_logger(run_number):
+    global logger
+    logger = fm.setup_logging(run_number, 'data_generation', 'generate_data')
 
 def parse_args():
     import argparse
@@ -198,6 +204,11 @@ def main(
         task_params=None,
         multiple_domains=False):
 
+    initialize_logger(run)
+    # Format the dictionary nicely
+    args_str = pformat(locals(), indent=2)
+    logger.info("Starting data generation with args:\n%s", args_str)
+
     # Get next run number.
     next_run = run or (fm.get_latest_run() + 1)
     run_dir = fm.ensure_run_dir(next_run, subdir='seqs')
@@ -211,10 +222,8 @@ def main(
         behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
         high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
         sessions_filename = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
-        print(behavior_filename, high_port_filename, sessions_filename)
-        print(f'{overwrite=}')
         if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename) and (not overwrite):
-            print(f"Files already exist for run_{next_run}, skipping data generation")
+            logger.info(f"Files already exist for run_{next_run}, skipping data generation")
             return None
 
         if profile:
@@ -242,13 +251,15 @@ def main(
                 meta_file.write(f"{' '*2}Environment parameters:\n{' '*4}{params['environment']}\n")
                 meta_file.write(f"{' '*2}Agent parameters:\n{' '*4}{params['agent']}\n")
             meta_file.write(f"\n")
-
-        print(f"Generated data for run_{next_run}")
-        print(f"Files saved to {run_dir}")
-    print(f"Metadata saved to {metadata_filename}")
+        logger.info(f"Generated data for run_{next_run}")
+        logger.info(f"Files saved to {run_dir}")
+    logger.info(f"Metadata saved to {metadata_filename}")
 
 
 if __name__ == "__main__":
+
+    print('-' * 80)
+    print('generate_data.py\n')
 
     args = parse_args()
     print("Domain ID:", args.domain_id)
@@ -256,7 +267,7 @@ if __name__ == "__main__":
         task_params = load_param_sets()
         if args.domain_id:
             task_params = {args.domain_id: task_params[args.domain_id]}
-            print(task_params)
+            print(pformat(task_params, indent=2))
     else:
         task_params = {}
         if all(v is None for v in [args.alpha, args.beta, args.tau, args.policy]):

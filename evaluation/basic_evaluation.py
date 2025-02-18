@@ -8,6 +8,12 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 import utils.file_management as fm
 from utils.parse_data import parse_simulated_data
 
+logger = None
+
+def initialize_logger(run_number):
+    global logger
+    logger = fm.setup_logging(run_number, 'data_generation', 'basic_evaluation')
+
 def analyze_data(behavior_filename, high_port_filename, session_filename):
     """
     Get basic stats about the simulated data from the behavior, high port
@@ -51,12 +57,13 @@ def print_switches(analysis):
     print(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%\n")
 
 def main(run=None):
+    initialize_logger(run)
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr', subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr', subdir='seqs')
     session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, 'tr', subdir='seqs')
 
     assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
-    print(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
+    logger.info(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
     analysis = analyze_data(behavior_filename, high_port_filename, session_filename)
     if analysis:
         for domain, stats in analysis.items():
@@ -66,6 +73,10 @@ def main(run=None):
 
 
 if __name__ == "__main__":
+
+    print('-' * 80)
+    print('basic_evaluation.py\n')
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)

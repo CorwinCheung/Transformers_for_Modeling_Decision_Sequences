@@ -10,8 +10,7 @@ import torch.nn.functional as F
 # Add the project root directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from transformer.transformer import GPT, GPTConfig
-from utils.file_management import (get_experiment_file, get_latest_run, parse_model_info,
-                                   read_sequence, write_sequence)
+import utils.file_management as fm
 
 seed = 200
 random.seed(seed)
@@ -54,7 +53,7 @@ def generate_predictions(model, tokens, max_context_length):
     return predicted_indices
 
 def write_guess_metadata(model_name, run, behavior_file, pred_file, config):
-    metadata_file = get_experiment_file("metadata.txt", run)
+    metadata_file = fm.get_experiment_file("metadata.txt", run)
 
     with open(metadata_file, 'a') as meta_file:
         meta_file.write(f"Run: {run}\n")
@@ -68,15 +67,23 @@ def write_guess_metadata(model_name, run, behavior_file, pred_file, config):
         meta_file.write(f"  Number of heads: {config.n_head}\n")
         meta_file.write(f"  Embedding size: {config.n_embd}\n")
 
-    print(f"Guess metadata saved to {metadata_file}")
+    logger.info(f"Guess metadata saved to {metadata_file}")
+
+logger = None
+
+def initialize_logger(run_number):
+    global logger
+    logger = fm.setup_logging(run_number, 'inference')
 
 def main(run=None, model_name=None):
+    initialize_logger(run)
+    logger.info("Starting inference with model: %s", model_name)
 
     if run is None:
-        run = get_latest_run()
+        run = fm.get_latest_run()
 
     # Get model info from metadata
-    model_info = parse_model_info(run, model_name=model_name)
+    model_info = fm.parse_model_info(run, model_name=model_name)
     if model_name is None:
         model_name = model_info['model_name']
     else:
@@ -94,16 +101,16 @@ def main(run=None, model_name=None):
     # Load the trained model
     # config = GPTConfig()
     model = GPT(config)
-    model_path = get_experiment_file(f'{model_name}.pth', run, subdir='models')
+    model_path = fm.get_experiment_file(f'{model_name}.pth', run, subdir='models')
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
 
     # Load and preprocess the new data
-    behavior_file = get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
-    text = read_sequence(behavior_file)
+    behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
+    text = fm.read_sequence(behavior_file)
     tokens = encode_sequence(text)
-    print(f"Loaded {len(tokens)} tokens from ground truth data.")
+    logger.info(f"Loaded {len(tokens)} tokens from ground truth data.")
 
     # Set start_token_idx to 'R' or 'L' randomly half the time
     start_tokens = ['R', 'L']
@@ -117,17 +124,19 @@ def main(run=None, model_name=None):
     context_length = model_info['dataloader'].get('Sequence length (T)', 12)
     predicted_indices = generate_predictions(model, tokens, max_context_length=context_length)
     predicted_chars = [itos[idx] for idx in predicted_indices]
-    print(f"Generated {len(predicted_chars)} predicted characters.")
+    logger.info(f"Generated {len(predicted_chars)} predicted characters.")
 
     # Write predictions to a file
-    pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
-    write_sequence(pred_file, predicted_chars)
+    pred_file = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
+    fm.write_sequence(pred_file, predicted_chars)
     write_guess_metadata(model_name, run, behavior_file, pred_file, config)
 
-    print(f"Model predictions saved to {pred_file}")
+    logger.info(f"Model predictions saved to {pred_file}")
 
 # Main code
 if __name__ == "__main__":
+    print('-' * 80)
+    print('guess_using_transformer.py\n')
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)

@@ -7,5 +7,6 @@ transformer/wandb/*
 **/*.err
 **/*.out
 **/*.txt
+**/*.log
 experiments/*
 slurm_scripts/slurm_output/*

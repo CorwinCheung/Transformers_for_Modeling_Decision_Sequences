@@ -19,10 +19,15 @@ from transformer import GPT, DataLoader, DDPConfig, GPTConfig
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
 
-# from inference.guess_using_transformer import generate_predictions
-# from inference.graphs_transformer_vs_ground_truth import parse_files, calculate_probabilities
+# Module-level logger (initialized as None)
+logger = None
 
 username = getpass.getuser()
+
+def initialize_logger(run_number):
+    """Initialize the logger with the correct run number."""
+    global logger
+    logger = fm.setup_logging(run_number, 'training', 'train')
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train GPT model with hyperparameter tuning.')
@@ -38,7 +43,8 @@ def parse_args():
     parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
     parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of epochs between checkpoints')
-    return parser.parse_args()
+    args = parser.parse_args()
+    return args
 
 def write_predictions(model_name, predictions, last_step=False):
     
@@ -66,7 +72,7 @@ def write_predictions(model_name, predictions, last_step=False):
         ):
             f.write(f"{s}\t{true}\t{pred}\t{idx}\n")
     if last_step:
-        print(f"Sampled validation predictions saved to {pred_file}")
+        logger.info(f"Sampled validation predictions saved to {pred_file}")
 
 def write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, config):
     metdata_file = fm.get_experiment_file("metadata.txt", run_number)
@@ -91,12 +97,12 @@ def write_metadata(model, model_name, total_batch_size, max_steps, train_loader,
         meta_file.write(f"  Number of heads: {config.n_head}\n")
         meta_file.write(f"  Embedding size: {config.n_embd}\n")
         meta_file.write(f"\n")
-    print(f"Metadata saved to {metdata_file}")
+    logger.info(f"Metadata saved to {metdata_file}")
 
 def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False, **kwargs):
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
-    print("Saving model at: ", model_path)
+    logger.info("Saving model at: %s", model_path)
     if compile:
         torch.save(model._orig_mod.state_dict(), model_path)
     elif is_checkpoint:
@@ -234,7 +240,7 @@ def update_predictions_file(model_name, starting_step):
 
     # Check if the predictions file exists
     if not os.path.exists(pred_file):
-        print(f"Predictions file {pred_file} does not exist. No updates needed.")
+        logger.info(f"Predictions file {pred_file} does not exist. No updates needed.")
         return None  # Exit the function if the file does not exist
 
     # Read existing predictions
@@ -254,7 +260,7 @@ def update_predictions_file(model_name, starting_step):
                 else:
                     excess_steps.append(step)
     if excess_steps:
-        print(f"Excess steps: {excess_steps[0]} to {excess_steps[-1]}")
+        logger.info(f"Excess steps: {excess_steps[0]} to {excess_steps[-1]}")
 
 def trim_loss_steps(losses, starting_step, eval_interval):
     
@@ -272,7 +278,7 @@ def trim_loss_steps(losses, starting_step, eval_interval):
 
 def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps):
     steps_per_epoch = batches_per_epoch * grad_accum_steps
-    checkpoint_steps = checkpoint_interval * steps_per_epoch
+    checkpoint_steps = (checkpoint_interval * steps_per_epoch) - grad_accum_steps
     return checkpoint_steps
 
 def main():
@@ -286,6 +292,8 @@ def main():
 
     # Parse arguments
     args = parse_args()
+    initialize_logger(args.run)  # Initialize logger with the correct run number
+    logger.info("Starting training script with args: %s", args)
 
     # Learning rate schedule
     lr_schedule ={
@@ -336,9 +344,9 @@ def main():
     model_name = f"model_seen{fm.format_tokens(tokens_trained_on)}"
 
     if ddp.master_process:
-        print(f"total desired batch size: {total_batch_size}")
-        print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
-        print(f"=> calculated steps: {max_steps}")
+        logger.info(f"total desired batch size: {total_batch_size}")
+        logger.info(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
+        logger.info(f"=> calculated steps: {max_steps}")
 
     # Create model.
     model = GPT(GPTConfig(
@@ -352,10 +360,10 @@ def main():
 
     # Check whether checkpoint or model already exists.
     if os.path.exists(fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models')):
-        print("Model already exists. Skipping training.")
+        logger.info("Model already exists. Skipping training.")
         return None
     elif any(checkpoints := glob.glob(os.path.join(fm.get_run_dir(run_number), 'models', "*cp*.pth"))):
-        print("Checkpoint already exists. Loading checkpoint.")
+        logger.info("Checkpoint already exists. Loading checkpoint.")
         model_path = sorted(checkpoints)[-1]
         checkpoint = torch.load(model_path, map_location=ddp.device)
         model.load_state_dict(checkpoint['model_state_dict'])
@@ -366,9 +374,9 @@ def main():
         loss_steps = trim_loss_steps(checkpoint['loss_steps'], starting_step, args.eval_interval)
         val_loss_steps = trim_loss_steps(checkpoint['val_loss_steps'], starting_step, args.eval_interval)
         val_loss = val_loss_steps.get('full_loss')[-1] if isinstance(val_loss_steps, dict) else val_loss_steps[-1]
-        print(f"Starting from step {starting_step}")
-        print('Num loss steps:', len(loss_steps))
-        print('Adjusted from:', len(checkpoint['loss_steps']))
+        logger.info(f"Starting from step {starting_step}")
+        logger.info('Num loss steps:', len(loss_steps))
+        logger.info('Adjusted from:', len(checkpoint['loss_steps']))
 
         # Remove any predictions made after the checkpoint was saved.
         update_predictions_file(model_name, starting_step)
@@ -382,6 +390,7 @@ def main():
     
     model.to(ddp.device)
     checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
+    logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
 
     if args.compile:
         model = torch.compile(model)
@@ -437,7 +446,7 @@ def main():
             x, y = x.to(ddp.device), y.to(ddp.device)
 
             if (step % checkpoint_interval == 1):
-                print(f"Step {step} with dataloader position {train_loader.current_position}")
+                logger.info(f"Step {step} with dataloader position {train_loader.current_position}")
 
             # Forward pass and loss computation
             with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
@@ -502,12 +511,12 @@ def main():
                 })
                 
                 if step % (args.eval_interval*10) == 0:
-                    print(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
+                    logger.info(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
                 
                 loss_steps.append(loss_accum.item())
 
         if (step % checkpoint_interval == 0) and (step > 0):
-            print(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
+            logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
             if ddp.master_process:
@@ -516,7 +525,7 @@ def main():
                            step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
                            val_loss_steps=val_loss_steps)
                 args.checkpoint_interval *= 10
-                print(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved:{loss_improved}")
+                logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
 
     # Call this function after the model training code
     if ddp.master_process:
@@ -530,7 +539,8 @@ def main():
     plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
 if __name__ == "__main__":
-
+    print('-' * 80)
+    print('train.py\n')
     ENABLE_PROFILING = False
     if ENABLE_PROFILING:
         profile_execution(main)
