@@ -155,8 +155,9 @@ def preprocess_predictions(predictions, events):
 
 
 def main(run=None, model_name=None, step_min=0, step_max=None):
-
-    logger = initialize_logger(run)
+    
+    initialize_logger(run)
+    
     predictions, model_info = load_predictions(run=run, model_name=model_name)
     model_name = model_info['model_name']
     if step_max is None:
@@ -170,9 +171,9 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
     if len(predictions) == 0:
         logger.info(f'No steps between {step_min} and {step_max}')
         return None
-    run_dir = fm.get_run_dir(run)
+    # run_dir = fm.get_run_dir(run)
     
-    os.makedirs(os.path.join(run_dir, 'learning'), exist_ok=True)
+    # os.makedirs(os.path.join(run_dir, 'learning'), exist_ok=True)
 
     plot_bpos_behavior_learning(predictions, model_name=model_name, run=run, step_max=step_max)
 

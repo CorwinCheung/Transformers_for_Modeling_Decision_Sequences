@@ -1,6 +1,7 @@
 import glob
 import os
 import logging
+import sys
 
 
 def get_latest_run():
@@ -159,7 +160,7 @@ def convert_to_local_path(original_path):
     return os.path.join(os.path.expanduser("~"), "GitHub", relative_path)
 
 
-def check_files_exist(*filepaths):
+def check_files_exist(*filepaths, verbose=True):
     """Check if all specified files exist.
 
     Args:
@@ -170,12 +171,34 @@ def check_files_exist(*filepaths):
     missing_files = [f for f in filepaths if not os.path.exists(f)]
 
     if missing_files:
-        print("Missing files:")
-        for f in missing_files:
-            print(f"  {f}")
+        if verbose:
+            print("Missing files:")
+            for f in missing_files:
+                print(f"  {f}")
         return False
 
     return True
+
+
+class ConditionalFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None):
+        super().__init__(fmt, datefmt)
+    
+    def format(self, record):
+        if getattr(record, 'no_format', False):
+            return record.getMessage()
+        return super().format(record)
+
+
+class FormattedLogger(logging.LoggerAdapter):
+    def __init__(self, logger, extra):
+        super().__init__(logger, extra)
+    
+    def raw(self, msg, *args):
+        """Log a message without the standard formatting"""
+        if args:
+            msg = msg % args
+        self.logger.info(msg, extra={'no_format': True})
 
 
 def setup_logging(run_number, component_name, module_name=None):
@@ -199,20 +222,23 @@ def setup_logging(run_number, component_name, module_name=None):
     # Clear any existing handlers
     logging.getLogger().handlers = []
 
+    formatter = ConditionalFormatter(
+        fmt='%(asctime)s - job_%(job_id)s - %(name)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
     handlers = [logging.FileHandler(log_file)]
     if job_id == 'local':  # Only add StreamHandler when not running in SLURM
         handlers.append(logging.StreamHandler(sys.stdout))  # Explicitly use stdout
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - job_%(job_id)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',  # Format time to seconds only
-        handlers=handlers
-    )
+    for handler in handlers:
+        handler.setFormatter(formatter)
+    
+    logging.basicConfig(level=logging.INFO, handlers=handlers)
     
     # Create a logger specific to the module
     logger = logging.getLogger(module_name or component_name)
     
     # Add SLURM job ID to logger's context
-    logger = logging.LoggerAdapter(logger, {'job_id': job_id})
+    logger = FormattedLogger(logger, {'job_id': job_id})
     return logger

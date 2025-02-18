@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=00:20:00  
+#SBATCH --time=00:10:00  
 #SBATCH --mem=80GB
 #SBATCH --partition=kempner_requeue
 #SBATCH --output=slurm_output/%j.out
@@ -34,17 +34,14 @@ get_next_run() {
 }
 
 RUN_NUMBER=$(get_next_run)
-RUN_NUMBER=13
 
 echo "Starting run $RUN_NUMBER"
 
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 1000 --no_overwrite
-
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 100000 --no_overwrite
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
-
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=100 --run $RUN_NUMBER 
+python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run $RUN_NUMBER --enforce_data_epochs
 
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000

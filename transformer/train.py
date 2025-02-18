@@ -39,10 +39,11 @@ def parse_args():
     parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
     parser.add_argument('--run', type=int, default=None, help='ID of dataset to train/validate on')
-    parser.add_argument('--compile', type=bool, default=False, help='Whether or not to compile the code for faster training')
-    parser.add_argument('--predict', type=bool, default=False, help='Whether or not to predict on the validation set')
+    parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
+    parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
     parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of epochs between checkpoints')
+    parser.add_argument('--enforce_data_epochs', action='store_true', default=False, help='Flag to force data loader to reset')
     args = parser.parse_args()
     return args
 
@@ -277,8 +278,8 @@ def trim_loss_steps(losses, starting_step, eval_interval):
     return losses
 
 def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps):
-    steps_per_epoch = batches_per_epoch * grad_accum_steps
-    checkpoint_steps = (checkpoint_interval * steps_per_epoch) - grad_accum_steps
+    steps_per_epoch = batches_per_epoch / grad_accum_steps
+    checkpoint_steps = (checkpoint_interval * steps_per_epoch)
     return checkpoint_steps
 
 def main():
@@ -292,7 +293,11 @@ def main():
 
     # Parse arguments
     args = parse_args()
-    initialize_logger(args.run)  # Initialize logger with the correct run number
+
+    # Data parameters
+    global run_number
+    run_number = args.run or fm.get_latest_run()
+    initialize_logger(run_number)  # Initialize logger with the correct run number
     logger.info("Starting training script with args: %s", args)
 
     # Learning rate schedule
@@ -302,9 +307,6 @@ def main():
         'warmup_steps': 1000,
     }
 
-    # Data parameters
-    global run_number
-    run_number = args.run or fm.get_latest_run()
     #torchrun --standalone --nproc_per_node=2 train.py  # to launch ddp
 
     # Set up DDP if using, mimic it if not.
@@ -339,7 +341,7 @@ def main():
     )
 
     # Number steps required to pass over full dataset x n_epochs.
-    max_steps = int(train_loader.batches_per_epoch * args.epochs)
+    max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
     tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
     model_name = f"model_seen{fm.format_tokens(tokens_trained_on)}"
 
@@ -357,6 +359,14 @@ def main():
         n_embd=args.n_embd,
         device=ddp.device
     ))
+
+    # I think optimizer can be configured here?
+    optimizer = model.configure_optimizers(
+        weight_decay=0.1,
+        learning_rate=lr_schedule['max_lr'],
+        device=ddp.device,
+        master_process=ddp.master_process
+    )
 
     # Check whether checkpoint or model already exists.
     if os.path.exists(fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models')):
@@ -391,19 +401,13 @@ def main():
     model.to(ddp.device)
     checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
     logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
+    logger.info(f"Number of batches per epoch: {train_loader.batches_per_epoch}")
 
     if args.compile:
         model = torch.compile(model)
     if ddp.ddp:
         model = DDP(model, device_ids=[ddp.local_rank])
-    raw_model = model.module if ddp.ddp else model
-
-    optimizer = raw_model.configure_optimizers(
-        weight_decay=0.1,
-        learning_rate=lr_schedule['max_lr'],
-        device=ddp.device,
-        master_process=ddp.master_process
-    )
+    # raw_model = model.module if ddp.ddp else model
 
     if ddp.master_process:
         wandb.init(
@@ -442,11 +446,9 @@ def main():
 
         # Accumulate gradients over multiple mini-batches (micro_steps)
         for micro_step in range(grad_accum_steps):
+            logger.info(f'micro step {step}: {train_loader.current_position}')
             x, y = train_loader.next_batch()
             x, y = x.to(ddp.device), y.to(ddp.device)
-
-            if (step % checkpoint_interval == 1):
-                logger.info(f"Step {step} with dataloader position {train_loader.current_position}")
 
             # Forward pass and loss computation
             with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
@@ -515,7 +517,7 @@ def main():
                 
                 loss_steps.append(loss_accum.item())
 
-        if (step % checkpoint_interval == 0) and (step > 0):
+        if (step % checkpoint_interval == 0):# and (step > 0):
             logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
@@ -524,14 +526,18 @@ def main():
                 save_model(model, model_name, run_number, is_checkpoint=True, compile=args.compile,
                            step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
                            val_loss_steps=val_loss_steps)
-                args.checkpoint_interval *= 10
+                # args.checkpoint_interval *= 10
                 logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
+
+            if args.enforce_data_epochs:
+                logger.info(f'prior to data reset (training): {train_loader.current_position}')
+                train_loader.current_position = 0
 
     # Call this function after the model training code
     if ddp.master_process:
         save_model(model, model_name, run_number, compile=args.compile)
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
-        # wandb.finish()
+        wandb.finish()
 
     if ddp.ddp:
         destroy_process_group()

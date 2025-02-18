@@ -21,15 +21,15 @@ def print_accuracy(aligned_data):
     correct = np.sum(aligned_data['k0'] == aligned_data['pred_k0'])
     total = len(aligned_data)
     accuracy = correct / total if total > 0 else 0
-    logger.info(f"\n{' ':>37}Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
+    logger.raw(f"\n{' ':>37}Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
 
     # Compute and print the adjusted accuracy (choice only scoring)
     choice_accuracy = np.mean(aligned_data['pred_choice'] == aligned_data['choice'])
-    logger.info(f"{' ':>10}Choice only Accuracy (Right/Left same): {choice_accuracy:.2%}")
+    logger.raw(f"{' ':>10}Choice only Accuracy (Right/Left same): {choice_accuracy:.2%}")
 
     # Compute and print the accuracy on reward predictions
     reward_accuracy = np.mean(aligned_data['pred_reward'] == aligned_data['reward'])
-    logger.info(f"{' ':>15}Reward Accuracy (Upper/Lower same): {reward_accuracy:.2%}")
+    logger.raw(f"{' ':>15}Reward Accuracy (Upper/Lower same): {reward_accuracy:.2%}")
 
 
 def plot_confusion_matrix(aligned_data, run, model_name, domain=''):
@@ -37,10 +37,10 @@ def plot_confusion_matrix(aligned_data, run, model_name, domain=''):
     ground_truth_tokens = list(aligned_data['k0'].values)
     prediction_tokens = list(aligned_data['pred_k0'].values)
     confusion = Counter((gt, pred) for gt, pred in zip(ground_truth_tokens, prediction_tokens))
-    logger.info("\nConfusion Matrix:")
-    logger.info("Ground Truth -> Prediction: Count")
+    logger.raw("\nConfusion Matrix:")
+    logger.raw("Ground Truth -> Prediction: Count")
     for (gt_char, pred_char), count in sorted(confusion.items(), key=lambda x: x[1], reverse=True):
-        logger.info(f"{gt_char} -> {pred_char}: {count}")
+        logger.raw(f"{gt_char} -> {pred_char}: {count}")
 
     labels = sorted(set(ground_truth_tokens + prediction_tokens))
     label_map = {label: i for i, label in enumerate(labels)}
@@ -64,8 +64,8 @@ def print_switches(aligned_data):
     # # Compute and print switch percentages
     gt_switch_percentage = round(aligned_data.switch.mean() * 100, 2)
     pred_switch_percentage = round(aligned_data.pred_switch.mean() * 100, 2)
-    logger.info(f"\nSwitch Percentage (model): {pred_switch_percentage:.2f}%")
-    logger.info(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
+    logger.raw(f"\nSwitch Percentage (model): {pred_switch_percentage:.2f}%")
+    logger.raw(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
 
 
 def calculate_accuracy_ignore_case(ground_truth, predictions):
@@ -137,7 +137,7 @@ def main(run=None, model_name=None):
     aligned_data = load_data(run, model_name)
 
     for domain, data in aligned_data.groupby('domain'):
-        print(f'\n\nAnalysis for Domain {domain}')
+        logger.raw(f'\nAnalysis for Domain {domain}')
         print_accuracy(data)
         print_switches(data)
         plot_confusion_matrix(data, run, model_name, domain)

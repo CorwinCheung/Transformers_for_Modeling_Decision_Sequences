@@ -222,7 +222,7 @@ def main(
         behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
         high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
         sessions_filename = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
-        if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename) and (not overwrite):
+        if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename, verbose=False) and (not overwrite):
             logger.info(f"Files already exist for run_{next_run}, skipping data generation")
             return None
 

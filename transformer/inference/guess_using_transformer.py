@@ -102,7 +102,12 @@ def main(run=None, model_name=None):
     # config = GPTConfig()
     model = GPT(config)
     model_path = fm.get_experiment_file(f'{model_name}.pth', run, subdir='models')
-    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    print(model_path)
+    if model_name.find('cp') == -1:
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    else:
+        checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+        model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
 

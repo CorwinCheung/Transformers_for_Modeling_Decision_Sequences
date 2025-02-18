@@ -41,22 +41,23 @@ def analyze_data(behavior_filename, high_port_filename, session_filename):
     return analysis
 
 def print_table(analysis):
-    print(f"{'':<20} {'Left':>10} {'Right':>10}")
-    print("="*40)
-    print(f"{'Rewarded (%)':<20} {analysis['rewarded_left']:>10.2f}% {analysis['rewarded_right']:>10.2f}%")
-    print(f"{'Unrewarded (%)':<20} {analysis['unrewarded_left']:>10.2f}% {analysis['unrewarded_right']:>10.2f}%")
-    print("="*40)
-    print(f"{'Total Trials:':<20} {analysis['total_trials']:>10,}")
-    print(f"{'Number of Transitions:':<20} {analysis['transitions']:>10,} ({analysis['transitions_percentage']:.2f}% of total trials)")
-    print(f"{'Selected Correct (%):':<20} {analysis['selected_correct_percentage']:>10.2f}%")
+    logger.raw(f"{'':<20} {'Left':>10} {'Right':>10}")
+    logger.raw("="*40)
+    logger.raw(f"{'Rewarded (%)':<20} {analysis['rewarded_left']:>10.2f}% {analysis['rewarded_right']:>10.2f}%")
+    logger.raw(f"{'Unrewarded (%)':<20} {analysis['unrewarded_left']:>10.2f}% {analysis['unrewarded_right']:>10.2f}%")
+    logger.raw("="*40)
+    logger.raw(f"{'Total Trials:':<20} {analysis['total_trials']:>10,}")
+    logger.raw(f"{'Number of Transitions:':<20} {analysis['transitions']:>10,} ({analysis['transitions_percentage']:.2f}% of total trials)")
+    logger.raw(f"{'Selected Correct (%):':<20} {analysis['selected_correct_percentage']:>10.2f}%")
 
 def print_switches(analysis):
 
-    print(f"Total trials: {analysis['total_trials']:,}")
-    print(f"Total switches: {analysis['switches']:,}")
-    print(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%\n")
+    logger.raw(f"Total trials: {analysis['total_trials']:,}")
+    logger.raw(f"Total switches: {analysis['switches']:,}")
+    logger.raw(f"Percent of trials with a switch: {analysis['switches_percentage']:.2f}%\n")
 
 def main(run=None):
+
     initialize_logger(run)
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr', subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr', subdir='seqs')
@@ -67,7 +68,7 @@ def main(run=None):
     analysis = analyze_data(behavior_filename, high_port_filename, session_filename)
     if analysis:
         for domain, stats in analysis.items():
-            print(f'\n\nAnalysis for Domain {domain}')
+            logger.raw(f'\n\nAnalysis for Domain {domain}')
             print_table(stats)
             print_switches(stats)
 

@@ -15,8 +15,8 @@ def initialize_logger(run_number):
     logger = fm.setup_logging(run_number, 'data_generation', 'graphs_on_trial_block_transitions')
 
 def main(run=None, suffix: str = 'v'):
+
     initialize_logger(run)
-    # Get file paths
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
     session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')

@@ -242,7 +242,7 @@ class DataLoader:
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
         self.current_position = 0
-        self.batches_per_epoch = (len(self.tokens) - self.T) // (self.B)
+        self.batches_per_epoch = (len(self.tokens) - self.T) // (self.B * self.num_processes)  # double check this
         self.behavior_file = behavior_file
 
     def next_batch(self, return_indices=False):
