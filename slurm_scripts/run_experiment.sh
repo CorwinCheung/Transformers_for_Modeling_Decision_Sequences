@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=00:10:00  
+#SBATCH --time=00:05:00  
 #SBATCH --mem=80GB
 #SBATCH --partition=kempner_requeue
 #SBATCH --output=slurm_output/%j.out
@@ -34,6 +34,7 @@ get_next_run() {
 }
 
 RUN_NUMBER=$(get_next_run)
+RUN_NUMBER=48
 
 echo "Starting run $RUN_NUMBER"
 

@@ -359,6 +359,7 @@ def main():
         n_embd=args.n_embd,
         device=ddp.device
     ))
+    model.to(ddp.device)
 
     # I think optimizer can be configured here?
     optimizer = model.configure_optimizers(
@@ -373,8 +374,8 @@ def main():
         logger.info("Model already exists. Skipping training.")
         return None
     elif any(checkpoints := glob.glob(os.path.join(fm.get_run_dir(run_number), 'models', "*cp*.pth"))):
-        logger.info("Checkpoint already exists. Loading checkpoint.")
         model_path = sorted(checkpoints)[-1]
+        logger.info(f"Checkpoint already exists. Loading checkpoint from {model_path}.")
         checkpoint = torch.load(model_path, map_location=ddp.device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -385,8 +386,8 @@ def main():
         val_loss_steps = trim_loss_steps(checkpoint['val_loss_steps'], starting_step, args.eval_interval)
         val_loss = val_loss_steps.get('full_loss')[-1] if isinstance(val_loss_steps, dict) else val_loss_steps[-1]
         logger.info(f"Starting from step {starting_step}")
-        logger.info('Num loss steps:', len(loss_steps))
-        logger.info('Adjusted from:', len(checkpoint['loss_steps']))
+        logger.info('Num loss steps: %d', len(loss_steps))
+        logger.info('Adjusted from: %d', len(checkpoint['loss_steps']))
 
         # Remove any predictions made after the checkpoint was saved.
         update_predictions_file(model_name, starting_step)
@@ -446,7 +447,7 @@ def main():
 
         # Accumulate gradients over multiple mini-batches (micro_steps)
         for micro_step in range(grad_accum_steps):
-            logger.info(f'micro step {step}: {train_loader.current_position}')
+            # logger.info(f'micro step {step}: {train_loader.current_position}')
             x, y = train_loader.next_batch()
             x, y = x.to(ddp.device), y.to(ddp.device)
 
