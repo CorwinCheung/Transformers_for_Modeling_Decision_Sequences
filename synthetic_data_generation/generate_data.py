@@ -22,7 +22,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)
     parser.add_argument('--profile', type=bool, default=False)
-    parser.add_argument('--overwrite', type=bool, default=False)
+    parser.add_argument('--no_overwrite', action='store_false', default=True,
+                        help='Pass flag to prevent overwriting existing data')
     parser.add_argument('--num_steps', type=int, default=100000)
 
     # Agent parameters
@@ -35,7 +36,7 @@ def parse_args():
     parser.add_argument('--high_reward_prob', type=float, default=0.8)
     parser.add_argument('--low_reward_prob', type=float, default=0.2)
     parser.add_argument('--transition_prob', type=float, default=0.02)
-    parser.add_argument('--multiple_domains', type=bool, default=False,
+    parser.add_argument('--multiple_domains', action='store_true', default=False,
                         help='Whether to vary parameters across sessions')
     parser.add_argument('--domain_id', type=str, default=None,
                         help='shortcut to task parameters, overrides individual param args')
@@ -210,8 +211,9 @@ def main(
         behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
         high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
         sessions_filename = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
-
-        if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename) and not overwrite:
+        print(behavior_filename, high_port_filename, sessions_filename)
+        print(f'{overwrite=}')
+        if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename) and (not overwrite):
             print(f"Files already exist for run_{next_run}, skipping data generation")
             return None
 
@@ -226,7 +228,7 @@ def main(
 
         fm.write_sequence(behavior_filename, behavior_data)
         fm.write_sequence(high_port_filename, high_port_data)
-        fm.write_session_transitions(sessions_filename, session_transitions)
+        write_session_transitions(sessions_filename, session_transitions)
         # Write metadata
         metadata_filename = fm.get_experiment_file("metadata.txt", next_run)
         with open(metadata_filename, 'a') as meta_file:
@@ -283,7 +285,7 @@ if __name__ == "__main__":
     # Set profile to True to enable profiling, False to skip
     main(run=args.run,
          profile=args.profile,
-         overwrite=args.overwrite,
+         overwrite=args.no_overwrite,
          num_steps=args.num_steps,
          task_params=task_params,
          multiple_domains=args.multiple_domains)
