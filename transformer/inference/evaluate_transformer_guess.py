@@ -22,11 +22,11 @@ def print_accuracy(aligned_data):
 
     # Compute and print the adjusted accuracy (choice only scoring)
     choice_accuracy = np.mean(aligned_data['pred_choice'] == aligned_data['choice'])
-    print(f"{' ':>10}Choice only Accuracy (R-r, L-l same): {choice_accuracy:.2%}")
+    print(f"{' ':>10}Choice only Accuracy (Right/Left same): {choice_accuracy:.2%}")
 
     # Compute and print the accuracy on reward predictions
     reward_accuracy = np.mean(aligned_data['pred_reward'] == aligned_data['reward'])
-    print(f"{' ':>15}Reward Accuracy (R-L, r-l same): {reward_accuracy:.2%}")
+    print(f"{' ':>15}Reward Accuracy (Upper/Lower same): {reward_accuracy:.2%}")
 
 
 def plot_confusion_matrix(aligned_data, run, model_name, domain=''):

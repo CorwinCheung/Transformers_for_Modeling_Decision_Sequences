@@ -15,8 +15,7 @@ import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from transformer import (GPT, DataLoaderHeavy, DataLoaderLite, DDPConfig,
-                         GPTConfig)
+from transformer import GPT, DataLoader, DDPConfig, GPTConfig
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
@@ -96,16 +95,15 @@ def write_metadata(model_name, total_batch_size, max_steps, train_loader, val_lo
     print(f"Metadata saved to {metdata_file}")
 
 def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False):
-
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
-    print(model_path)
+    print("Saving model at: ", model_path)
     if args.compile:
         torch.save(model._orig_mod.state_dict(), model_path)
     else:
         # switch to saving in scratch?
         torch.save(model.state_dict(), model_path)
-    # wandb.save(model_path)
+    wandb.save(model_path)
 
 def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval):
 
@@ -190,7 +188,7 @@ def main():
     grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
     # Configure train and validation dataloaders.
-    train_loader = DataLoaderHeavy(
+    train_loader = DataLoader(
         B=B,
         T=T,
         process_rank=ddp.rank,
@@ -198,7 +196,7 @@ def main():
         run_number=run_number,
         suffix='tr'
     )
-    val_loader = DataLoaderHeavy(
+    val_loader = DataLoader(
         B=B,
         T=T,
         process_rank=ddp.rank,
@@ -209,7 +207,6 @@ def main():
 
     # Number steps required to pass over full dataset x n_epochs.
     max_steps = int(train_loader.batches_per_epoch * args.epochs)
-    # max_steps = int((len(train_loader.tokens) / total_batch_size) * args.epochs)
     tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
     model_name = f"model_seen{fm.format_tokens(tokens_trained_on)}"
 
@@ -346,7 +343,6 @@ def main():
         if predict:
             return avg_loss, predictions
         return avg_loss
-
 
     best_val_loss = float('inf')
     val_loss = None

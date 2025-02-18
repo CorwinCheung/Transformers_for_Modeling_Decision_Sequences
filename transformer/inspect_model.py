@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import seaborn as sns
 from dataclasses import dataclass
-from transformer import GPT, GPTConfig, DataLoaderLite
+from transformer import GPT, GPTConfig, DataLoader
 from bertviz import head_view
 from ..utils.file_management import get_experiment_file, get_latest_run
 

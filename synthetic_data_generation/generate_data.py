@@ -43,7 +43,7 @@ def parse_args():
 
 
 def load_param_sets():
-    config_path = os.path.join(os.path.dirname(__file__), 'domains.ini')
+    config_path = os.path.join(os.path.dirname(__file__), 'sticky_unsticky_domains.ini')
     config = configparser.ConfigParser()
     config.read(config_path)
 
