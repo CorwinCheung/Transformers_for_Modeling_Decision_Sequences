@@ -19,7 +19,7 @@ def get_run_dir(run=None):
     return os.path.join(base_path, "experiments", f"run_{run}")
 
 
-def ensure_run_dir(run, overwrite=False, subdir=None):
+def ensure_run_dir(run, overwrite=True, subdir=None):
     """Create run directory and subdirectory if they don't exist."""
     run_dir = get_run_dir(run)
     if subdir:

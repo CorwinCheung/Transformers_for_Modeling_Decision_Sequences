@@ -14,8 +14,7 @@ from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import (ensure_run_dir, get_experiment_file,
-                                   get_latest_run, write_sequence)
+import utils.file_management as fm
 
 
 def parse_args():
@@ -194,13 +193,13 @@ def main(
         num_steps=100000,
         profile=False,
         include_val=True,
-        overwrite=False,
+        overwrite=True,
         task_params=None,
         multiple_domains=False):
 
     # Get next run number.
-    next_run = run or (get_latest_run() + 1)
-    run_dir = ensure_run_dir(next_run, overwrite=overwrite, subdir='seqs')
+    next_run = run or (fm.get_latest_run() + 1)
+    run_dir = fm.ensure_run_dir(next_run, subdir='seqs')
 
     datasets = ['tr', 'v'] if include_val else ['tr']
 
@@ -208,9 +207,14 @@ def main(
     task_params = configure_task_params(task_params, multiple_domains)
 
     for suffix in datasets:
-        behavior_filename = get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
-        high_port_filename = get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
-        sessions_filename = get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
+        behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
+        high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
+        sessions_filename = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
+
+        if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename) and not overwrite:
+            print(f"Files already exist for run_{next_run}, skipping data generation")
+            return None
+
         if profile:
             with cProfile.Profile() as pr:
                 behavior_data, high_port_data, session_transitions = generate_data(num_steps, task_params, multiple_domains)
@@ -220,11 +224,11 @@ def main(
         else:
             behavior_data, high_port_data, session_transitions = generate_data(num_steps, task_params, multiple_domains)
 
-        write_sequence(behavior_filename, behavior_data)
-        write_sequence(high_port_filename, high_port_data)
-        write_session_transitions(sessions_filename, session_transitions)
+        fm.write_sequence(behavior_filename, behavior_data)
+        fm.write_sequence(high_port_filename, high_port_data)
+        fm.write_session_transitions(sessions_filename, session_transitions)
         # Write metadata
-        metadata_filename = get_experiment_file("metadata.txt", next_run)
+        metadata_filename = fm.get_experiment_file("metadata.txt", next_run)
         with open(metadata_filename, 'a') as meta_file:
             meta_file.write(f"Run {next_run}\n")
             meta_file.write(f"Dataset {suffix}\n")
@@ -235,12 +239,6 @@ def main(
                 meta_file.write(f"{' '*2}{domain}\n")
                 meta_file.write(f"{' '*2}Environment parameters:\n{' '*4}{params['environment']}\n")
                 meta_file.write(f"{' '*2}Agent parameters:\n{' '*4}{params['agent']}\n")
-    
-            # meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, "
-            #                 f"low_reward_prob={environment.low_reward_prob}, "
-            #                 f"transition_prob={environment.transition_prob}\n")
-            # meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
-            # meta_file.write(f"Agent policy: {agent.policy}\n")
             meta_file.write(f"\n")
 
         print(f"Generated data for run_{next_run}")
@@ -269,7 +267,6 @@ if __name__ == "__main__":
                 'policy': args.policy
         }
             task_params['agent'] = agent_params
-
 
         if all(v is None for v in [args.high_reward_prob,
                                    args.low_reward_prob,

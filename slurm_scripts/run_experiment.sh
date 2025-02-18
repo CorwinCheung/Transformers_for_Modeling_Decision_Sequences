@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=01:00:00  
-#SBATCH --mem=40GB
+#SBATCH --cpus-per-task=16
+#SBATCH --time=08:00:00  
+#SBATCH --mem=80GB
 #SBATCH --partition=kempner_requeue
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
@@ -38,7 +38,7 @@ echo "Starting run $RUN_NUMBER"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "generate_data.py\n"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A"
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 1000000 --overwrite False
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"
