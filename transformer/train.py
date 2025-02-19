@@ -282,6 +282,18 @@ def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_step
     checkpoint_steps = (checkpoint_interval * steps_per_epoch)
     return checkpoint_steps
 
+def check_cuda_setup():
+    """Verify CUDA setup for torch.compile()"""
+    logger.info("PyTorch version: %s", torch.__version__)
+    logger.info("CUDA available: %s", torch.cuda.is_available())
+    logger.info("CUDA version: %s", torch.version.cuda)
+    if torch.cuda.is_available():
+        logger.info("GPU device: %s", torch.cuda.get_device_name(0))
+    
+    can_compile = torch.cuda.is_available() and torch.version.cuda is not None
+    logger.info("Can use torch.compile(): %s", can_compile)
+    return can_compile
+
 def main():
     # Set random seeds
     seed = 200
@@ -300,6 +312,12 @@ def main():
     initialize_logger(run_number)  # Initialize logger with the correct run number
     logger.info("Starting training script with args: %s", args)
 
+    # Add CUDA setup check
+    can_compile = check_cuda_setup()
+    if args.compile and not can_compile:
+        logger.warning("Compilation requested but CUDA setup incomplete. Will skip compilation.")
+        args.compile = False
+    
     # Learning rate schedule
     lr_schedule ={
         'max_lr': args.max_lr,

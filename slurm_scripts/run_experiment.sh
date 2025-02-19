@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=00:05:00  
+#SBATCH --time=12:00:00  
 #SBATCH --mem=80GB
 #SBATCH --partition=kempner_requeue
 #SBATCH --output=slurm_output/%j.out
@@ -15,7 +15,9 @@ BASE_PATH="."  # Changed BASE_PATH to point to the current directory
 INFERENCE_PATH="${BASE_PATH}/transformer/inference"
 
 module load python/3.12.5-fasrc01
-mamba activate transformers
+module load cuda/12.2.0-fasrc01
+
+# mamba activate transformers
 
 # Initialize Conda/Mamba properly
 eval "$(conda shell.bash hook)"  # Initialize shell hook
@@ -34,7 +36,7 @@ get_next_run() {
 }
 
 RUN_NUMBER=$(get_next_run)
-RUN_NUMBER=48
+RUN_NUMBER=4
 
 echo "Starting run $RUN_NUMBER"
 
@@ -42,7 +44,7 @@ python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run $RUN_NUMBER --enforce_data_epochs
+python ${BASE_PATH}/transformer/train.py --predict --epochs=10000 --run $RUN_NUMBER --enforce_data_epochs --checkpoint_interval=1000 --compile
 
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000
@@ -51,12 +53,10 @@ python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_m
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER
 
 # Automatically remove large learning files
-rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/seqs/learning_model"*"val_preds.txt"
+# rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/seqs/learning_model"*"val_preds.txt"
 
 python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER
-
 python ${INFERENCE_PATH}/evaluate_transformer_guess.py --run $RUN_NUMBER
-
 python ${INFERENCE_PATH}/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
 
 # Find checkpoint files and extract base names
@@ -72,3 +72,7 @@ for model_file in "${BASE_PATH}/experiments/run_${RUN_NUMBER}/models/model_"*"cp
     fi
 done
 
+# Must follow checkpoint predictions
+printf '%*s\n' 80 '' | tr ' ' '-'
+echo -e "plot_checkpoint_comparison.py\n"
+python ${INFERENCE_PATH}/plot_checkpoint_comparison.py --run $RUN_NUMBER
