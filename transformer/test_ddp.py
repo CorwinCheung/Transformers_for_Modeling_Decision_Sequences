@@ -85,6 +85,9 @@ def train(ddp_mode=False):
     losses = []
     steps = 100  # Small number of steps for testing
     
+    if ddp_mode:
+        verify_data_consistency(train_loader, device)
+    
     for step in range(steps):
         optimizer.zero_grad()
         loss_accum = 0.0
@@ -131,6 +134,29 @@ def compare_results():
     
     print("Single GPU training completed. Run DDP training with:")
     print("torchrun --nproc_per_node=2 test_ddp.py")
+
+def verify_data_consistency(train_loader, device, num_batches=5):
+    """Verify that data loading is consistent across processes."""
+    for i in range(num_batches):
+        x, y = train_loader.next_batch()
+        # Move tensors to GPU before all_gather
+        x = x.to(device)
+        
+        # Create list of tensors on the same device
+        x_list = [torch.zeros_like(x, device=device) for _ in range(torch.distributed.get_world_size())]
+        torch.distributed.all_gather(x_list, x)
+        
+        if torch.distributed.get_rank() == 0:
+            # Check that processes see different data
+            for j in range(len(x_list)-1):
+                if torch.equal(x_list[j], x_list[j+1]):
+                    print(f"Warning: Processes {j} and {j+1} see the same data at batch {i}")
+            
+            # Check sequence continuity
+            for proc_x in x_list:
+                for seq in proc_x:
+                    if not torch.equal(seq[1:], seq[:-1]+1):
+                        print(f"Warning: Non-continuous sequence detected: {seq.tolist()}")
 
 if __name__ == "__main__":
     if int(os.environ.get("RANK", -1)) != -1:
