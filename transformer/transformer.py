@@ -249,11 +249,15 @@ class DataLoader:
         """Get next batch of data."""
         B, T = self.B, self.T
         
+        # Calculate actual position including process offset
+        actual_position = self.current_position + (self.process_rank * B)
+        
         # Get window of tokens for contexts (x) and targets (y)
-        x_indices = torch.arange(self.current_position, self.current_position + B) # Starting indices for each sequence
+        x_indices = torch.arange(actual_position, actual_position + B) # Starting indices for each sequence
         x_offsets = torch.arange(T).unsqueeze(0).expand(B, -1) # Offsets for each position in sequence
         x_indices = x_indices.unsqueeze(1).expand(-1, T) # Expand indices to match offsets
         x_positions = x_indices + x_offsets # [B, T] tensor of positions
+        
         
         # Get the tokens at these positions
         x = self.tokens[x_positions]  # [B, T]
@@ -262,8 +266,8 @@ class DataLoader:
         
         # Update position for next batch
         self.current_position += B * self.num_processes
-        if self.current_position + B + T > len(self.tokens):
-            self.current_position = 0  # restart -- could shuffle batches a bit?
+        if self.current_position + (B * self.num_processes + 1) > len(self.tokens):
+            self.current_position = self.B * self.process_rank
         
         if return_indices:
             return x, y, y_indices

@@ -33,7 +33,6 @@ print(f"Total number of parameters: {total_params}")
     # if param.requires_grad:
         # print(f"Layer: {name} | Size: {param.size()} | Number of Parameters: {param.numel()}")
 
-# Initialize DataLoaderLite (using batch size B=1, sequence length T=16, process_rank=0 for simplicity)
 vocab = ['R', 'r', 'L', 'l']
 stoi = {ch: i for i, ch in enumerate(vocab)}
 itos = {i: ch for i, ch in enumerate(vocab)}

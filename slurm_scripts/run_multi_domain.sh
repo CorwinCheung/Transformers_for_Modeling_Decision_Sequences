@@ -39,7 +39,7 @@ echo "Starting run $RUN_NUMBER"
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "\ngenerate_data.py"
 # Reduced num_steps to 1000 for testing
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_contexts=True
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"
@@ -51,8 +51,8 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "train.py\n"
-# Reduced epochs to 10 for testing
-python ${BASE_PATH}/transformer/train.py --predict=True --epochs=1 --run $RUN_NUMBER
+
+python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"

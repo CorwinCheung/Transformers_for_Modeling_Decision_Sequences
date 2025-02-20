@@ -43,7 +43,10 @@ def generate_predictions(model, tokens, max_context_length):
             logits, _ = model(input_ids)
 
         last_logits = logits[0, -1, :]
-        predicted_index = torch.argmax(last_logits).item() #draw from it?
+        # predicted_index = torch.argmax(last_logits).item() #not drawing from it, just taking the most likely
+        probs = F.softmax(lastclecl_logits, dim=0) #drawing from the distribution
+        
+        predicted_index = torch.multinomial(probs, 1).item()  # Sample from the full distribution
         predicted_indices.append(predicted_index)
 
         # if i % 1000 == 0 and i > 0:
