@@ -3,6 +3,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
@@ -28,6 +29,9 @@ def main(run=None, suffix: str = 'v'):
     if not checkpoint_files:
         print(f"No checkpoint models found in run {run}")
         return
+    elif len(checkpoint_files) == 1:
+        print(f"Only one checkpoint model found in run {run}")
+        return
     model_name = model_files[0].split('/')[-1].split('_cp')[0]
 
     # Load ground truth data once
@@ -42,8 +46,8 @@ def main(run=None, suffix: str = 'v'):
     fig, axes = plt.subplots(2, len(domains), figsize=(4.5*len(domains), 6),
                              sharex=True, layout='constrained')
     if len(domains) == 1:
-        axes = [axes]
-
+        axes = np.atleast_2d(axes).T
+        
     colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
     for pred_file, color in zip(checkpoint_files, colors):
         # Load predictions for this checkpoint

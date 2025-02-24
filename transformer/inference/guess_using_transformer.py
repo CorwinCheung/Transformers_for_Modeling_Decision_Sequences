@@ -103,11 +103,21 @@ def main(run=None, model_name=None):
     model = GPT(config)
     model_path = fm.get_experiment_file(f'{model_name}.pth', run, subdir='models')
     print(model_path)
-    if model_name.find('cp') == -1:
+    # if model_name.find('cp') == -1:
+    #     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+    # else:
+    #     print(model_path)
+    #     checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+    #     print(checkpoint.keys())
+    #     model.load_state_dict(checkpoint['model_state_dict'])
+    try:
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-    else:
+    except Exception as e:
+        print(model_path)
         checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+        print(checkpoint.keys())
         model.load_state_dict(checkpoint['model_state_dict'])
+
     model.to(device)
     model.eval()
 
