@@ -104,11 +104,10 @@ def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None,
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
     logger.info("Saving model at: %s", model_path)
-    if compile:
-        torch.save(model._orig_mod.state_dict(), model_path)
-    elif is_checkpoint:
+    state_dict = model._orig_mod.state_dict() if compile else model.state_dict()
+    if is_checkpoint:
         checkpoint = {
-            'model_state_dict': model.state_dict(),
+            'model_state_dict': state_dict,
             'optimizer_state_dict': kwargs.get('optimizer').state_dict(),
             'step': step,  # Save the current step or epoch
             'best_val_loss': kwargs.get('best_val_loss'),
@@ -118,13 +117,13 @@ def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None,
         torch.save(checkpoint, model_path)
     else:
         # switch to saving in scratch?
-        torch.save(model.state_dict(), model_path)
+        torch.save(state_dict, model_path)
     # wandb.save(model_path)
 
 def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval, model_name):
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    xs = np.insert(np.arange(0, max_steps, eval_interval), -1, max_steps)
+    xs = np.concatenate([np.arange(0, max_steps, eval_interval), [max_steps]])
     ax.plot(xs, loss_steps, label='Training Loss')
     if isinstance(val_loss_steps, dict):
         for key, data in val_loss_steps.items():
@@ -265,6 +264,8 @@ def update_predictions_file(model_name, starting_step):
 
 def trim_loss_steps(losses, starting_step, eval_interval):
     
+    if starting_step < eval_interval:
+        return losses
     # Get the indices of the losses to keep.
     idcs = np.insert(np.arange(0, starting_step, eval_interval), -1, starting_step)
     num_idcs = len(idcs)
@@ -312,9 +313,7 @@ def main():
     initialize_logger(run_number)  # Initialize logger with the correct run number
     logger.info("Starting training script with args: %s", args)
 
-    # Add CUDA setup check
-    can_compile = check_cuda_setup()
-    if args.compile and not can_compile:
+    if args.compile and not check_cuda_setup():
         logger.warning("Compilation requested but CUDA setup incomplete. Will skip compilation.")
         args.compile = False
     
@@ -379,19 +378,19 @@ def main():
     ))
     model.to(ddp.device)
 
-    # I think optimizer can be configured here?
-    optimizer = model.configure_optimizers(
-        weight_decay=0.1,
-        learning_rate=lr_schedule['max_lr'],
-        device=ddp.device,
-        master_process=ddp.master_process
-    )
-
     # Check whether checkpoint or model already exists.
     if os.path.exists(fm.get_experiment_file(f'{model_name}.pth', run_number, subdir='models')):
         logger.info("Model already exists. Skipping training.")
         return None
     elif any(checkpoints := glob.glob(os.path.join(fm.get_run_dir(run_number), 'models', "*cp*.pth"))):
+
+        # I think optimizer can be configured here?
+        optimizer = model.configure_optimizers(
+            weight_decay=0.1,
+            learning_rate=lr_schedule['max_lr'],
+            device=ddp.device,
+            master_process=ddp.master_process)
+
         model_path = sorted(checkpoints)[-1]
         logger.info(f"Checkpoint already exists. Loading checkpoint from {model_path}.")
         checkpoint = torch.load(model_path, map_location=ddp.device)
@@ -409,7 +408,7 @@ def main():
 
         # Remove any predictions made after the checkpoint was saved.
         update_predictions_file(model_name, starting_step)
-
+        model.to(ddp.device)
     else:
         best_val_loss = float('inf')
         val_loss = None
@@ -417,7 +416,6 @@ def main():
         val_loss_steps = {}
         starting_step = 0
     
-    model.to(ddp.device)
     checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
     logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
     logger.info(f"Number of batches per epoch: {train_loader.batches_per_epoch}")
@@ -426,32 +424,39 @@ def main():
         model = torch.compile(model)
     if ddp.ddp:
         model = DDP(model, device_ids=[ddp.local_rank])
-    # raw_model = model.module if ddp.ddp else model
+    raw_model = model.module if ddp.ddp else model
 
-    if ddp.master_process:
-        wandb.init(
-            project="gpt-training",
-            config={
-                "run_number": run_number,
-                "total_batch_size": total_batch_size,
-                "max_lr": lr_schedule['max_lr'],
-                "min_lr": lr_schedule['min_lr'],
-                "warmup_steps": lr_schedule['warmup_steps'],
-                "max_steps": max_steps,
-                "B": B,
-                "T": T,
-                "grad_accum_steps": grad_accum_steps,
-                "vocab_size": 4,
-                "n_layer": args.n_layer,
-                "n_head": args.n_head,
-                "n_embd": args.n_embd,
-                # "learning_rate": args.max_lr,
-                "task_id": args.task_id
-            },
-            name=f"run_task_{args.task_id}",  # Name the run based on the task ID
-            dir="/tmp",
-        )
-        wandb.watch(model)
+    # I think optimizer can be configured here?
+    optimizer = raw_model.configure_optimizers(
+        weight_decay=0.1,
+        learning_rate=lr_schedule['max_lr'],
+        device=ddp.device,
+        master_process=ddp.master_process)
+
+    # if ddp.master_process:
+    #     wandb.init(
+    #         project="gpt-training",
+    #         config={
+    #             "run_number": run_number,
+    #             "total_batch_size": total_batch_size,
+    #             "max_lr": lr_schedule['max_lr'],
+    #             "min_lr": lr_schedule['min_lr'],
+    #             "warmup_steps": lr_schedule['warmup_steps'],
+    #             "max_steps": max_steps,
+    #             "B": B,
+    #             "T": T,
+    #             "grad_accum_steps": grad_accum_steps,
+    #             "vocab_size": 4,
+    #             "n_layer": args.n_layer,
+    #             "n_head": args.n_head,
+    #             "n_embd": args.n_embd,
+    #             # "learning_rate": args.max_lr,
+    #             "task_id": args.task_id
+    #         },
+    #         name=f"run_task_{args.task_id}",  # Name the run based on the task ID
+    #         dir="/tmp",
+    #     )
+    #     wandb.watch(model)
 
     # Training loop
     for step in range(starting_step, max_steps):
@@ -519,17 +524,17 @@ def main():
                 val_loss_choice = val_loss.get('choice_loss').item() if isinstance(val_loss, dict) else None
                 val_loss_reward = val_loss.get('reward_loss').item() if isinstance(val_loss, dict) else None
                 val_loss = val_loss.get('full_loss').item() if isinstance(val_loss, dict) else val_loss.item()
-                wandb.log({
-                    "step": step,
-                    "loss": loss_accum.item(),
-                    "val_loss": val_loss,
-                    "choice_loss": val_loss_choice,
-                    "reward_loss": val_loss_reward,
-                    "lr": lr,
-                    "grad_norm": norm,
-                    "step_time_ms": dt,
-                    "tokens_per_sec": tokens_per_sec,
-                })
+                # wandb.log({
+                #     "step": step,
+                #     "loss": loss_accum.item(),
+                #     "val_loss": val_loss,
+                #     "choice_loss": val_loss_choice,
+                #     "reward_loss": val_loss_reward,
+                #     "lr": lr,
+                #     "grad_norm": norm,
+                #     "step_time_ms": dt,
+                #     "tokens_per_sec": tokens_per_sec,
+                # })
                 
                 if step % (args.eval_interval*10) == 0:
                     logger.info(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
@@ -556,7 +561,7 @@ def main():
     if ddp.master_process:
         save_model(model, model_name, run_number, compile=args.compile)
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
-        wandb.finish()
+        # wandb.finish()
 
     if ddp.ddp:
         destroy_process_group()
