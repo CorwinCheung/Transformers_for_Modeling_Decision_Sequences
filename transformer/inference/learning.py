@@ -21,7 +21,6 @@ def initialize_logger(run):
 def load_predictions(run=None, model_name=None):
 
     """Load and process all prediction files for a run efficiently."""
-    run = run or fm.get_latest_run()
 
     # Get model info from metadata.
     model_info = fm.parse_model_info(run, model_name=model_name)
@@ -30,14 +29,36 @@ def load_predictions(run=None, model_name=None):
     model_name = model_info['model_name']
     pred_file = fm.get_experiment_file(f"learning_{model_name}_val_preds.txt", run, subdir='seqs')
 
-    predictions = pd.read_csv(pred_file, sep='\t')
+    try:
+        predictions = pd.read_csv(pred_file, sep='\t')
+    except FileNotFoundError:
+        # Permitting missing file in case training ended early but we still want to plot learning.
+        print(f"File not found: {pred_file}")
+        seqs_dir = fm.get_experiment_file('', run, subdir='seqs')
+        pred_files = [f for f in os.listdir(seqs_dir) if f.startswith('learning') and f.endswith('val_preds.txt')]
+        if not pred_files:
+            raise FileNotFoundError("No prediction file found in seqs directory")
+        elif len(pred_files) > 1:
+            print("Multiple prediction files found in seqs directory, defaulting to first")
+        else:
+            print(f"Model metadata missing but found prediction file {pred_files[0]}")
+        pred_file = fm.get_experiment_file(pred_files[0], run, subdir='seqs') # Take first matching file
+        model_name = pred_files[0].removeprefix('learning_').removesuffix('_val_preds.txt')
+        print(f"Model name: {model_name}")
+        model_info['model_name'] = model_name
+        predictions = pd.read_csv(pred_file, sep='\t')
+
     predictions = predictions.sort_values(['Step', 'Idx'])
 
     return predictions, model_info
 
 
-def load_behavior_data(model_info):
-    data_path = model_info['dataloader']['File validated on']
+def load_behavior_data(model_info, run=None):
+    try:
+        data_path = model_info['dataloader']['File validated on']
+    except KeyError:
+        data_path = fm.get_experiment_file('behavior_run_{}.txt', run, subdir='seqs', suffix='v')
+        print(f"Model metadata missing, defaulting to {data_path}")
     if not os.path.isfile(data_path):
         data_path = fm.convert_to_local_path(data_path)
     high_port_path = data_path.replace('behavior', 'high_port')
@@ -156,6 +177,7 @@ def preprocess_predictions(predictions, events):
 
 def main(run=None, model_name=None, step_min=0, step_max=None):
     
+    run = run or fm.get_latest_run()
     initialize_logger(run)
     
     predictions, model_info = load_predictions(run=run, model_name=model_name)
@@ -163,7 +185,7 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
     if step_max is None:
         step_max = predictions['Step'].max()
 
-    events = load_behavior_data(model_info)
+    events = load_behavior_data(model_info, run=run)
     predictions = preprocess_predictions(predictions, events)
 
     predictions = predictions.query('Step.between(@step_min, @step_max)')
@@ -171,9 +193,6 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
     if len(predictions) == 0:
         logger.info(f'No steps between {step_min} and {step_max}')
         return None
-    # run_dir = fm.get_run_dir(run)
-    
-    # os.makedirs(os.path.join(run_dir, 'learning'), exist_ok=True)
 
     plot_bpos_behavior_learning(predictions, model_name=model_name, run=run, step_max=step_max)
 
