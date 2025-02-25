@@ -282,41 +282,31 @@ class DDPConfig:
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
             
-            # Process environmental variables
-            self.local_rank = int(os.environ['LOCAL_RANK'])
+            # Use SLURM_LOCALID if available; fallback to LOCAL_RANK.
+            self.local_rank = int(os.environ.get('SLURM_LOCALID', os.environ['LOCAL_RANK']))
             self.rank = int(os.environ['RANK'])
             self.world_size = int(os.environ['WORLD_SIZE'])
             
-            # Check visible devices and get GPU IDs
             if 'CUDA_VISIBLE_DEVICES' in os.environ:
                 print(f"Rank {self.rank}: CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
             
-            # Get actual device count
-            device_count = torch.cuda.device_count()
-            print(f"Rank {self.rank}: {device_count} CUDA devices available")
-            
-            # Initialize process group with our local rank as the device
-            # Use the current PyTorch device as the device ID
-            dist.init_process_group(
-                backend="nccl",
-                timeout=timedelta(minutes=30),
-                init_method="env://"
-            )
-            
-            # Set device and make it explicit in the barrier call
-            self.device = torch.device(f'cuda:{self.local_rank % device_count}')
-            torch.cuda.set_device(self.local_rank % device_count)
+            # Use the local_rank to set the device
+            torch.cuda.set_device(self.local_rank)
+            self.device = torch.device(f'cuda:{self.local_rank}')
             
             self.master_process = (self.rank == 0)
             
-            # Add barrier with explicit device IDs
-            if device_count > 0:
-                # Use device_ids in barrier to avoid the warning
-                dist.barrier(device_ids=[self.local_rank % device_count])
-            else:
-                dist.barrier()
+            # Use a plain barrier to synchronize all processes.
+            dist.init_process_group(
+                backend="nccl",
+                timeout=timedelta(minutes=30),
+                init_method="env://",
+                rank=self.rank,
+                world_size=self.world_size
+            )
+            dist.barrier()
             
-            print(f"Process {self.rank} on node {os.uname()[1]} initialized (local_rank {self.local_rank}) using device {self.device}")
+            print(f"Process {self.rank} on node {os.uname()[1]}: master_process={self.master_process}, RANK={os.environ.get('RANK', 'not set')}")
         else:
             self.rank = 0
             self.local_rank = 0
