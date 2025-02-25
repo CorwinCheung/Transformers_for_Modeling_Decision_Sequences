@@ -22,24 +22,20 @@ I will explore various transformer architectures and sizes for this task, testin
 
 Project Organization
 ----------
-    ├── README.md                      <- Project overview and usage instructions
-    ├── requirements.txt               <- Environment setup and dependency management
-    ├── environment.yml                <- Conda environment configuration
+    ├── README.md                      <- Project overview and motivation
+    ├── requirements.txt               <- Packages and dependencies
+    ├── environment.yml                <- Environment setup
     │
-    ├── data/                          <- Data files for training and evaluation
-    │   ├── 2ABT_behavior_run_*.txt    <- Behavioral sequence outputs (L/R choices)
-    │   ├── 2ABT_high_port_run_*.txt   <- State sequences (0/1 for left/right port)
-    │   └── metadata.txt               <- Run configuration metadata
+    ├── evaluation/                    <- Evaluation and analysis code
+    │   ├── basic_evaluation.py        <- Core evaluation metrics
+    │   ├── graphs_on_trial_block_transitions.py <- Trial analysis visualizations  
+    │   └── graph_helper.py            <- Shared graphing utilities
     │
     ├── synthetic_data_generation/     <- Code for generating synthetic data
     │   ├── agent.py                   <- Agent implementations for decision making
     │   ├── environment.py             <- Environment implementations
     │   └── generate_data.py           <- Data generation pipeline
     │
-    ├── evaluation/                    <- Evaluation and analysis code
-    │   ├── basic_evaluation.py        <- Core evaluation metrics
-    │   ├── graphs_on_trial_block_transitions.py <- Trial analysis visualizations  
-    │   └── graph_helper.py            <- Shared graphing utilities
     │
     ├── transformer/                   <- Transformer model implementation
     │   ├── inference/                 <- Model inference code

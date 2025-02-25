@@ -2,10 +2,11 @@ import inspect
 import os
 import sys
 from dataclasses import dataclass
+from datetime import timedelta
+import torch.distributed as dist
 
 import torch
 import torch.nn as nn
-from torch.distributed import init_process_group
 from torch.nn import functional as F
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -281,27 +282,41 @@ class DDPConfig:
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
             
-            # Get SLURM-specific GPU assignment
-            self.rank = int(os.environ['RANK'])
+            # Process environmental variables
             self.local_rank = int(os.environ['LOCAL_RANK'])
+            self.rank = int(os.environ['RANK'])
             self.world_size = int(os.environ['WORLD_SIZE'])
             
-            # Initialize process group before setting device
-            init_process_group(backend="nccl")
+            # Check visible devices and get GPU IDs
+            if 'CUDA_VISIBLE_DEVICES' in os.environ:
+                print(f"Rank {self.rank}: CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
             
-            # Get number of available GPUs
-            n_gpus = torch.cuda.device_count()
-            if n_gpus == 0:
-                raise RuntimeError("No CUDA devices available")
-                
-            # Ensure local_rank is within bounds of available GPUs
-            self.local_rank = self.local_rank % n_gpus
-            self.device = torch.device(f'cuda:{self.local_rank}')
+            # Get actual device count
+            device_count = torch.cuda.device_count()
+            print(f"Rank {self.rank}: {device_count} CUDA devices available")
             
-            # Set device before any CUDA operations
-            torch.cuda.set_device(self.local_rank)  # Use integer index, not device object
+            # Initialize process group with our local rank as the device
+            # Use the current PyTorch device as the device ID
+            dist.init_process_group(
+                backend="nccl",
+                timeout=timedelta(minutes=30),
+                init_method="env://"
+            )
             
-            self.master_process = self.rank == 0
+            # Set device and make it explicit in the barrier call
+            self.device = torch.device(f'cuda:{self.local_rank % device_count}')
+            torch.cuda.set_device(self.local_rank % device_count)
+            
+            self.master_process = (self.rank == 0)
+            
+            # Add barrier with explicit device IDs
+            if device_count > 0:
+                # Use device_ids in barrier to avoid the warning
+                dist.barrier(device_ids=[self.local_rank % device_count])
+            else:
+                dist.barrier()
+            
+            print(f"Process {self.rank} on node {os.uname()[1]} initialized (local_rank {self.local_rank}) using device {self.device}")
         else:
             self.rank = 0
             self.local_rank = 0
@@ -309,5 +324,4 @@ class DDPConfig:
             self.master_process = True
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             
-        print(f"Process rank {self.rank} using device: {self.device} (local_rank: {self.local_rank})")
         self.device_type = "cuda" if str(self.device).startswith("cuda") else "cpu"
