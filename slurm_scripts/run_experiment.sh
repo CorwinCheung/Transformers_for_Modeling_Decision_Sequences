@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --time=00:05:00  
 #SBATCH --mem=80GB
-#SBATCH --partition=kempner_requeue
+#SBATCH --partition=gpu_test
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
 
@@ -42,7 +42,7 @@ python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run $RUN_NUMBER --enforce_data_epochs
+python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
 
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000

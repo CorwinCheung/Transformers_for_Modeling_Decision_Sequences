@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100, help='Number of Epochs looping through the training data.')
     parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
-    parser.add_argument('--run', type=int, default=None, help='ID of dataset to train/validate on')
+    parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
     parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
@@ -296,7 +296,7 @@ def main():
 
     # Data parameters
     global run_number
-    run_number = args.run or fm.get_latest_run()
+    run_number = args.run_number or fm.get_latest_run()
     initialize_logger(run_number)  # Initialize logger with the correct run number
     logger.info("Starting training script with args: %s", args)
 
@@ -313,7 +313,7 @@ def main():
     ddp = DDPConfig()
 
     # Training setup
-    total_batch_size = 6144  # number of tokens per batch
+    total_batch_size = 24576  # number of tokens per batch
     B = 256  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
     assert total_batch_size % (B * T * ddp.world_size) == 0, (

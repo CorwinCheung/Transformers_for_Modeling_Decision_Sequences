@@ -64,7 +64,7 @@ def train(ddp_mode=False):
         T=T,
         process_rank=local_rank,
         num_processes=world_size,
-        run_number=1,
+        run_number=7,
         suffix='tr'
     )
 
@@ -83,10 +83,10 @@ def train(ddp_mode=False):
 
     # Training loop
     losses = []
-    steps = 100  # Small number of steps for testing
+    steps = 10000  # Small number of steps for testing
     
-    if ddp_mode:
-        verify_data_consistency(train_loader, device)
+    # if ddp_mode:
+        # verify_data_consistency(train_loader, device)
     
     for step in range(steps):
         optimizer.zero_grad()

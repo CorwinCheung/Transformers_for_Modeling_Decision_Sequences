@@ -3,13 +3,13 @@
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=08:00:00  
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=4
+#SBATCH --gpus-per-node=4
+#SBATCH --cpus-per-task=4
+#SBATCH --time=04:00:00
 #SBATCH --mem=60GB
-#SBATCH --partition=kempner_requeue
+#SBATCH --partition=gpu_test
 
 BASE_PATH="."  # Get parent directory of script location
 INFERENCE_PATH="${BASE_PATH}/transformer/inference"
@@ -24,7 +24,7 @@ mamba activate ~/.conda/envs/transformers || source ~/.conda/envs/transformers/b
 
 # Get latest run number from experiments directory
 get_next_run() {
-    local latest=$(ls -d experiments/run_* 2>/dev/null | sort -t_ -k2 -n | tail -n1 | sed 's/.*run_//')
+    local latest=$(find experiments -maxdepth 1 -type d -regex '.*/run_[0-9]+$' 2>/dev/null | sort -t_ -k2 -n | tail -n1 | sed 's/.*run_//')
     if [ -z "$latest" ]; then
         echo 1
     else
@@ -39,7 +39,7 @@ echo "Starting run $RUN_NUMBER"
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "\ngenerate_data.py"
 # Reduced num_steps to 1000 for testing
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 1000000
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"
@@ -52,7 +52,33 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "train.py\n"
 
-python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run $RUN_NUMBER
+# Get SLURM variables
+export MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4))
+export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
+export WORLD_SIZE=$(($SLURM_NNODES * $SLURM_NTASKS_PER_NODE))
+export RANK=$SLURM_PROCID
+export LOCAL_RANK=$SLURM_LOCALID
+
+# Ensure CUDA sees the correct devices
+export CUDA_VISIBLE_DEVICES=$SLURM_LOCALID
+
+# Add before torchrun command
+echo "Debug information:"
+echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
+echo "SLURM_LOCALID: $SLURM_LOCALID"
+echo "Number of GPUs: $(nvidia-smi -L | wc -l)"
+
+# Run the training script with proper distributed setup
+srun --cpu-bind=none --gpus-per-task=1 torchrun \
+    --nnodes=$SLURM_NNODES \
+    --nproc_per_node=$SLURM_GPUS_PER_NODE \
+    --rdzv_id=$SLURM_JOB_ID \
+    --rdzv_backend=c10d \
+    --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
+    ${BASE_PATH}/transformer/train.py \
+    --predict \
+    --epochs=100 \
+    --run_number $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "learning.py\n"
