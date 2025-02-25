@@ -319,7 +319,7 @@ def main():
     #torchrun --standalone --nproc_per_node=2 train.py  # to launch ddp
 
     # Training setup
-    total_batch_size = 24576  # number of tokens per batch
+    total_batch_size = 36864  # number of tokens per batch
     B = 256  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
