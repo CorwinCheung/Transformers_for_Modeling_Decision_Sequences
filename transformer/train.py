@@ -176,7 +176,7 @@ def get_lr(step, lr_schedule, max_steps):
 
 def estimate_loss(model, val_loader, ddp, step, predict=False):
     model.eval()
-    losses = {}
+    val_losses = {}
     if predict:
         predictions = {
             'step': [],
@@ -192,15 +192,17 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
             x, y = val_loader.next_batch()
         x, y = x.to(ddp.device), y.to(ddp.device)
         with torch.no_grad():
-            logits, loss = model(x, y, by_feature=True)
+            logits, loss = model(x, y, by_feature=False)
             
             if isinstance(loss, dict):
                 for key, value in loss.items():
-                    if key not in losses:
-                        losses[key] = []  # Initialize a list for each key if not already present
-                    losses[key].append(value)  # Append the loss value for this key
+                    if key not in val_losses:
+                        val_losses[key] = []  # Initialize a list for each key if not already present
+                    val_losses[key].append(value)  # Append the loss value for this key
             else:
-                losses.append(loss)  # Handle the single value case
+                if _ == 0:
+                    val_losses = []
+                val_losses.append(loss)  # Handle the single value case
 
             if predict:
                 # Get predicted next tokens
@@ -216,11 +218,11 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
 
     avg_loss = {}
     # Calculate average loss for each key if losses is a dictionary
-    if isinstance(losses, dict):
-        for key in losses.keys():
-            avg_loss[key] = torch.stack(losses[key]).mean()
+    if isinstance(val_losses, dict):
+        for key in val_losses.keys():
+            avg_loss[key] = torch.stack(val_losses[key]).mean()
     else:
-        avg_loss = torch.stack(losses).mean()
+        avg_loss = torch.stack(val_losses).mean()
 
     # Reduce the loss across all processes if using DDP
     if ddp.ddp:
