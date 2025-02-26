@@ -65,9 +65,17 @@ def write_guess_metadata(model_name, run, behavior_file, pred_file, config):
         meta_file.write(f"  Number of heads: {config.n_head}\n")
         meta_file.write(f"  Embedding size: {config.n_embd}\n")
 
-    print(f"Guess metadata saved to {metadata_file}")
+    logger.info(f"Guess metadata saved to {metadata_file}")
+
+logger = None
+
+def initialize_logger(run_number):
+    global logger
+    logger = fm.setup_logging(run_number, 'inference')
 
 def main(run=None, model_name=None):
+    initialize_logger(run)
+    logger.info("Starting inference with model: %s", model_name)
 
     if run is None:
         run = fm.get_latest_run()
@@ -75,12 +83,14 @@ def main(run=None, model_name=None):
     model, model_info, config = load_trained_model(run=run, model_name=model_name, device=device, weights_only=True)
     if model_name is None:
         model_name = model_info['model_name']
-
+    else:
+        assert (model_info['model_name'] == model_name) or (model_info['model_name'] == model_name.split('_cp')[0]), (
+            'did not recover correct model')
     # Load and preprocess the new data
     behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
     text = fm.read_sequence(behavior_file)
     tokens = encode_sequence(text)
-    print(f"Loaded {len(tokens)} tokens from ground truth data.")
+    logger.info(f"Loaded {len(tokens)} tokens from ground truth data.")
 
     # Set start_token_idx to 'R' or 'L' randomly half the time
     start_tokens = ['R', 'L']
@@ -94,17 +104,19 @@ def main(run=None, model_name=None):
     context_length = model_info['dataloader'].get('Sequence length (T)', 12)
     predicted_indices = generate_predictions(model, tokens, max_context_length=context_length)
     predicted_chars = [itos[idx] for idx in predicted_indices]
-    print(f"Generated {len(predicted_chars)} predicted characters.")
+    logger.info(f"Generated {len(predicted_chars)} predicted characters.")
 
     # Write predictions to a file
     pred_file = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
     fm.write_sequence(pred_file, predicted_chars)
     write_guess_metadata(model_name, run, behavior_file, pred_file, config)
 
-    print(f"Model predictions saved to {pred_file}")
+    logger.info(f"Model predictions saved to {pred_file}")
 
 # Main code
 if __name__ == "__main__":
+    print('-' * 80)
+    print('guess_using_transformer.py\n')
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)

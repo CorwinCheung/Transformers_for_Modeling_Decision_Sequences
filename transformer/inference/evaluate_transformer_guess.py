@@ -11,6 +11,9 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 import utils.file_management as fm
 from utils.parse_data import align_predictions_with_gt, parse_simulated_data
 
+def initialize_logger(run):
+    global logger
+    logger = fm.setup_logging(run, 'inference', 'evaluate_transformer_guess')
 
 def print_accuracy(aligned_data):
 
@@ -18,26 +21,26 @@ def print_accuracy(aligned_data):
     correct = np.sum(aligned_data['k0'] == aligned_data['pred_k0'])
     total = len(aligned_data)
     accuracy = correct / total if total > 0 else 0
-    print(f"\n{' ':>37}Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
+    logger.raw(f"\n{' ':>37}Accuracy: {accuracy:.2%} ({correct}/{total} correct predictions)")
 
     # Compute and print the adjusted accuracy (choice only scoring)
     choice_accuracy = np.mean(aligned_data['pred_choice'] == aligned_data['choice'])
-    print(f"{' ':>10}Choice only Accuracy (R-r,L-l same): {choice_accuracy:.2%}")
+    logger.raw(f"{' ':>10}Choice only Accuracy (Right/Left same): {choice_accuracy:.2%}")
 
     # Compute and print the accuracy on reward predictions
     reward_accuracy = np.mean(aligned_data['pred_reward'] == aligned_data['reward'])
-    print(f"{' ':>15}Reward Accuracy (R-r,L-l same): {reward_accuracy:.2%}")
+    logger.raw(f"{' ':>15}Reward Accuracy (Upper/Lower same): {reward_accuracy:.2%}")
 
 
-def plot_confusion_matrix(aligned_data, run, model_name, context=''):
+def plot_confusion_matrix(aligned_data, run, model_name, domain=''):
 
     ground_truth_tokens = list(aligned_data['k0'].values)
     prediction_tokens = list(aligned_data['pred_k0'].values)
     confusion = Counter((gt, pred) for gt, pred in zip(ground_truth_tokens, prediction_tokens))
-    print("\nConfusion Matrix:")
-    print("Ground Truth -> Prediction: Count")
+    logger.raw("\nConfusion Matrix:")
+    logger.raw("Ground Truth -> Prediction: Count")
     for (gt_char, pred_char), count in sorted(confusion.items(), key=lambda x: x[1], reverse=True):
-        print(f"{gt_char} -> {pred_char}: {count}")
+        logger.raw(f"{gt_char} -> {pred_char}: {count}")
 
     labels = sorted(set(ground_truth_tokens + prediction_tokens))
     label_map = {label: i for i, label in enumerate(labels)}
@@ -52,8 +55,8 @@ def plot_confusion_matrix(aligned_data, run, model_name, context=''):
     sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
                 xticklabels=labels, yticklabels=labels, ax=ax)
     ax.set(xlabel="Predicted Label", ylabel="Ground Truth Label", title="Confusion Matrix")
-    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{context}", subdir='predictions')
-    print(f'saved confusion matrix to {cm_file}')
+    cm_file = fm.get_experiment_file("cm_pred_run_{}.png", run, f"_{model_name}_{domain}", subdir='predictions')
+    logger.info(f'saved confusion matrix to {cm_file}')
     fig.savefig(cm_file)
 
 
@@ -61,8 +64,8 @@ def print_switches(aligned_data):
     # # Compute and print switch percentages
     gt_switch_percentage = round(aligned_data.switch.mean() * 100, 2)
     pred_switch_percentage = round(aligned_data.pred_switch.mean() * 100, 2)
-    print(f"\nSwitch Percentage (model): {pred_switch_percentage:.2f}%")
-    print(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
+    logger.raw(f"\nSwitch Percentage (model): {pred_switch_percentage:.2f}%")
+    logger.raw(f"Switch Percentage (ground truth): {gt_switch_percentage:.2f}%")
 
 
 def calculate_accuracy_ignore_case(ground_truth, predictions):
@@ -100,15 +103,17 @@ session boundaries'''
 def load_data(run, model_name):
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
     high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'v', subdir='seqs')
-    context_filename = fm.get_experiment_file("context_transitions_run_{}.txt", run, 'v', subdir='seqs')
+    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, 'v', subdir='seqs')
     predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
 
-    print(behavior_filename, '\n', high_port_filename, '\n', context_filename)
+    logger.info(f'behavior_filename: {behavior_filename}')
+    logger.info(f'high_port_filename: {high_port_filename}')
+    logger.info(f'session_filename: {session_filename}')
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, context_filename, predictions_filename)
+    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename, predictions_filename)
 
     # Parse the ground truth events and map in predictions
-    ground_truth = parse_simulated_data(behavior_filename, high_port_filename, context_filename)    
+    ground_truth = parse_simulated_data(behavior_filename, high_port_filename, session_filename)    
     predictions = list(fm.read_sequence(predictions_filename))
 
     assert len(ground_truth) == len(predictions), (
@@ -123,19 +128,23 @@ def main(run=None, model_name=None):
     if run is None:
         run = fm.get_latest_run()
 
+    initialize_logger(run)
+
     if model_name is None:
         # Get model info from metadata
         model_info = fm.parse_model_info(run, model_name=model_name)
         model_name = model_info['model_name']
     aligned_data = load_data(run, model_name)
 
-    for context, data in aligned_data.groupby('context'):
-        print(f'\n\nAnalysis for Context {context}')
+    for domain, data in aligned_data.groupby('domain'):
+        logger.raw(f'\nAnalysis for Domain {domain}')
         print_accuracy(data)
         print_switches(data)
-        plot_confusion_matrix(data, run, model_name, context)
+        plot_confusion_matrix(data, run, model_name, domain)
 
 if __name__ == "__main__":
+    print('-' * 80)
+    print('evaluate_transformer_guess.py\n')
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)

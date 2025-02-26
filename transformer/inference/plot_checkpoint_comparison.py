@@ -3,6 +3,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
@@ -14,7 +15,7 @@ from utils.parse_data import align_predictions_with_gt, parse_simulated_data
 
 def main(run=None, suffix: str = 'v'):
     
-    """Plot behavior comparisons across checkpoints and contexts."""
+    """Plot behavior comparisons across checkpoints and domains."""
     sns.set_theme(style='ticks', font_scale=1.0, rc={'axes.labelsize': 12,
                   'axes.titlesize': 12, 'savefig.transparent': False})
 
@@ -28,47 +29,50 @@ def main(run=None, suffix: str = 'v'):
     if not checkpoint_files:
         print(f"No checkpoint models found in run {run}")
         return
+    elif len(checkpoint_files) == 1:
+        print(f"Only one checkpoint model found in run {run}")
+        return
     model_name = model_files[0].split('/')[-1].split('_cp')[0]
 
     # Load ground truth data once
     behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
     high_port_file = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
-    context_file = fm.get_experiment_file("context_transitions_run_{}.txt", run, suffix, subdir='seqs')
+    session_file = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
     
-    gt_events = parse_simulated_data(behavior_file, high_port_file, context_file)
-    contexts = sorted(gt_events['context'].unique())
+    gt_events = parse_simulated_data(behavior_file, high_port_file, session_file)
+    domains = sorted(gt_events['domain'].unique())
 
-    # Create figure with two subplots for each context
-    fig, axes = plt.subplots(2, len(contexts), figsize=(4.5*len(contexts), 6),
+    # Create figure with two subplots for each domain
+    fig, axes = plt.subplots(2, len(domains), figsize=(4.5*len(domains), 6),
                              sharex=True, layout='constrained')
-    if len(contexts) == 1:
-        axes = [axes]
-
+    if len(domains) == 1:
+        axes = np.atleast_2d(axes).T
+        
     colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
     for pred_file, color in zip(checkpoint_files, colors):
         # Load predictions for this checkpoint
         predictions = fm.read_sequence(pred_file)
         events = align_predictions_with_gt(gt_events, predictions)
         bpos_ = calc_bpos_behavior(events,
-                                   add_cond_cols=['context', 'session'],
+                                   add_cond_cols=['domain', 'session'],
                                    add_agg_cols=['pred_switch', 'pred_selected_high'])
 
         label = pred_file.split("_cp")[-1].replace(".txt", "")
-        for ax_, (context, bpos_context) in zip(axes.T, bpos_.groupby('context')):
-            sns.lineplot(bpos_context.query('iInBlock.between(-11, 21)'),
+        for ax_, (domain, bpos_domain) in zip(axes.T, bpos_.groupby('domain')):
+            sns.lineplot(bpos_domain.query('iInBlock.between(-11, 21)'),
                          x='iInBlock', y='pred_selected_high', ax=ax_[0], color=color, legend=False)
-            sns.lineplot(bpos_context.query('iInBlock.between(-11, 21)'),
+            sns.lineplot(bpos_domain.query('iInBlock.between(-11, 21)'),
                          x='iInBlock', y='pred_switch', ax=ax_[1], color=color, label=label)
 
     # Ground truth data -- mimic as a checkpoint
-    for ax_, (context, bpos_context) in zip(axes.T, bpos_.groupby('context')):
-        sns.lineplot(bpos_context.query('iInBlock.between(-11, 21)'),
+    for ax_, (domain, bpos_domain) in zip(axes.T, bpos_.groupby('domain')):
+        sns.lineplot(bpos_domain.query('iInBlock.between(-11, 21)'),
                      x='iInBlock', y='selHigh', ax=ax_[0], color='k', legend=False, linewidth=3, errorbar=None)
-        sns.lineplot(bpos_context.query('iInBlock.between(-11, 21)'),
+        sns.lineplot(bpos_domain.query('iInBlock.between(-11, 21)'),
                      x='iInBlock', y='Switch', ax=ax_[1], color='k', label='ground truth', linewidth=3, errorbar=None)
         ax_[0].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
         ax_[1].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
-        ax_[0].set(title=context,
+        ax_[0].set(title=domain,
                    ylabel='P(pred high)', ylim=(0, 1.1))
         ax_[1].set(xlabel='block position', xlim=(-10, 20),
                    ylabel='P(pred switch)', ylim=(0, 0.3))

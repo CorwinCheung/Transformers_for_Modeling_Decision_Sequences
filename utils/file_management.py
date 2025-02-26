@@ -1,5 +1,7 @@
 import glob
 import os
+import logging
+import sys
 
 
 def get_latest_run():
@@ -19,7 +21,7 @@ def get_run_dir(run=None):
     return os.path.join(base_path, "experiments", f"run_{run}")
 
 
-def ensure_run_dir(run, overwrite=False, subdir=None):
+def ensure_run_dir(run, overwrite=True, subdir=None):
     """Create run directory and subdirectory if they don't exist."""
     run_dir = get_run_dir(run)
     if subdir:
@@ -64,13 +66,18 @@ def get_experiment_file(filename_template, run=None, suffix='tr', subdir=None):
 
 
 def format_tokens(tokens):
-    """Format the number of tokens to nearest thousand (K) or million (M)."""
-    if tokens >= 1_000_000:
-        return f"{tokens // 1_000_000}M"  # Nearest million
-    elif tokens >= 1_000:
-        return f"{tokens // 1_000}K"      # Nearest thousand
-    else:
-        return str(tokens)
+    """Format the number of tokens to a concise string label (K, M, B, etc.)."""
+    if tokens < 0:
+        raise ValueError("Token count cannot be negative.")
+    
+    suffixes = ['', 'K', 'M', 'B', 'T']  # Add more suffixes as needed
+    index = 0
+    
+    while tokens >= 1000 and index < len(suffixes) - 1:
+        tokens /= 1000.0
+        index += 1
+    
+    return f"{int(tokens)}{suffixes[index]}"
 
 
 def parse_model_info(run=None, model_name=None):
@@ -153,7 +160,7 @@ def convert_to_local_path(original_path):
     return os.path.join(os.path.expanduser("~"), "GitHub", relative_path)
 
 
-def check_files_exist(*filepaths):
+def check_files_exist(*filepaths, verbose=True):
     """Check if all specified files exist.
 
     Args:
@@ -164,9 +171,74 @@ def check_files_exist(*filepaths):
     missing_files = [f for f in filepaths if not os.path.exists(f)]
 
     if missing_files:
-        print("Missing files:")
-        for f in missing_files:
-            print(f"  {f}")
+        if verbose:
+            print("Missing files:")
+            for f in missing_files:
+                print(f"  {f}")
         return False
 
     return True
+
+
+class ConditionalFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None):
+        super().__init__(fmt, datefmt)
+    
+    def format(self, record):
+        if getattr(record, 'no_format', False):
+            return record.getMessage()
+        return super().format(record)
+
+
+class FormattedLogger(logging.LoggerAdapter):
+    def __init__(self, logger, extra):
+        super().__init__(logger, extra)
+    
+    def raw(self, msg, *args):
+        """Log a message without the standard formatting"""
+        if args:
+            msg = msg % args
+        self.logger.info(msg, extra={'no_format': True})
+
+
+def setup_logging(run_number, component_name, module_name=None):
+    """Set up logging for experiment scripts.
+    
+    Args:
+        run_number (int): The experiment run number
+        component_name (str): Name of the component for log file (e.g., 'data_generation', 'training')
+        module_name (str, optional): Name of the module for logger. If None, uses component_name
+    """
+    run_dir = get_run_dir(run_number)
+    log_dir = os.path.join(run_dir, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Get SLURM job ID from environment variable, default to 'local' if not running in SLURM
+    job_id = os.environ.get('SLURM_JOB_ID', 'local')
+    
+    # Configure logging to write to both component-specific file and console
+    log_file = os.path.join(log_dir, f'{component_name}.log')
+    
+    # Clear any existing handlers
+    logging.getLogger().handlers = []
+
+    formatter = ConditionalFormatter(
+        fmt='%(asctime)s - job_%(job_id)s - %(name)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    handlers = [logging.FileHandler(log_file)]
+    if job_id == 'local':  # Only add StreamHandler when not running in SLURM
+        handlers.append(logging.StreamHandler(sys.stdout))  # Explicitly use stdout
+    
+    for handler in handlers:
+        handler.setFormatter(formatter)
+    
+    logging.basicConfig(level=logging.INFO, handlers=handlers)
+    
+    # Create a logger specific to the module
+    logger = logging.getLogger(module_name or component_name)
+    
+    # Add SLURM job ID to logger's context
+    logger = FormattedLogger(logger, {'job_id': job_id})
+    return logger

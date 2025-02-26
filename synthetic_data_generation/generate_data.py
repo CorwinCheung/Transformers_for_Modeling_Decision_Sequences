@@ -14,16 +14,22 @@ from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.file_management import (ensure_run_dir, get_experiment_file,
-                                   get_latest_run, write_sequence)
+import utils.file_management as fm
+from pprint import pformat
 
+logger = None
+
+def initialize_logger(run_number):
+    global logger
+    logger = fm.setup_logging(run_number, 'data_generation', 'generate_data')
 
 def parse_args():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)
     parser.add_argument('--profile', type=bool, default=False)
-    parser.add_argument('--overwrite', type=bool, default=False)
+    parser.add_argument('--no_overwrite', action='store_false', default=True,
+                        help='Pass flag to prevent overwriting existing data')
     parser.add_argument('--num_steps', type=int, default=100000)
 
     # Agent parameters
@@ -36,15 +42,15 @@ def parse_args():
     parser.add_argument('--high_reward_prob', type=float, default=0.8)
     parser.add_argument('--low_reward_prob', type=float, default=0.2)
     parser.add_argument('--transition_prob', type=float, default=0.02)
-    parser.add_argument('--multiple_contexts', type=bool, default=False,
+    parser.add_argument('--multiple_domains', action='store_true', default=False,
                         help='Whether to vary parameters across sessions')
-    parser.add_argument('--context_id', type=str, default=None,
+    parser.add_argument('--domain_id', type=str, default=None,
                         help='shortcut to task parameters, overrides individual param args')
     return parser.parse_args()
 
 
 def load_param_sets():
-    config_path = os.path.join(os.path.dirname(__file__), 'domains.ini')
+    config_path = os.path.join(os.path.dirname(__file__), 'sticky_unsticky_domains.ini')
     config = configparser.ConfigParser()
     config.read(config_path)
 
@@ -83,27 +89,27 @@ def get_session_params(task_params):
 
     # For now, keep environment and agent behaviors locked together, so choose
     # them together by ID
-    context_id = random.choice(list(task_params.keys()))
-    env_params = task_params[context_id]['environment']
-    agent_params = task_params[context_id]['agent']
-    return context_id, env_params, agent_params
+    domain_id = random.choice(list(task_params.keys()))
+    env_params = task_params[domain_id]['environment']
+    agent_params = task_params[domain_id]['agent']
+    return domain_id, env_params, agent_params
 
 
-def configure_task_params(task_params, multiple_contexts=False):
-    """Configure task parameters based on whether multiple contexts are used,
+def configure_task_params(task_params, multiple_domains=False):
+    """Configure task parameters based on whether multiple domains are used,
     or whether any parameters are provided.
     
     Args:
         task_params (dict): Dictionary containing task parameters for
-        environment and agent. Each context should have environment and agent
+        environment and agent. Each domain should have environment and agent
         params. These can be None if no parameters are provided.
-        multiple_contexts (bool): Whether to use multiple contexts/parameter
+        multiple_domains (bool): Whether to use multiple domains/parameter
         sets.
         
     Returns:
-        dict: Configured task parameters. If multiple_contexts is False,
-        returns dict with single 'B' context. If True, returns original
-        multi-context dict. Fills in defaults if not multiiple_contexts and no
+        dict: Configured task parameters. If multiple_domains is False,
+        returns dict with single 'B' domain. If True, returns original
+        multi-domain dict. Fills in defaults if not multiple_cdomains and no
         parameters are provided.
     """
 
@@ -114,18 +120,18 @@ def configure_task_params(task_params, multiple_contexts=False):
                      'beta': 2.1,
                      'tau': 1.4,
                      'policy': 'probability_matching'}
-    if (not multiple_contexts) and (not any([task_params.get(k, False) for k in ['A', 'B', 'C']])):
+    if (not multiple_domains) and (not any([task_params.get(k, False) for k in ['A', 'B', 'C']])):
         task_params['environment'] = task_params.get('environment', default_environment)
         task_params['agent'] = task_params.get('agent', default_agent)
         task_params = {'B': task_params}
     return task_params
 
 
-def generate_data(num_steps, task_params=None, multiple_contexts=False):
+def generate_data(num_steps, task_params=None, multiple_domains=False):
     """Generate data across multiple sessions with varying parameters."""
     behavior_data = []
     high_port_data = []
-    context_transitions = []
+    session_transitions = []
 
     total_trials = 0
     trials_per_session_mean = 500
@@ -137,8 +143,8 @@ def generate_data(num_steps, task_params=None, multiple_contexts=False):
         session_trials = max(0, min(session_trials, num_steps - total_trials))  # Ensure reasonable bounds
 
         # Get parameters for this session
-        context_id, env_params, agent_params = get_session_params(task_params)
-        context_transitions.append((total_trials, context_id))
+        domain_id, env_params, agent_params = get_session_params(task_params)
+        session_transitions.append((total_trials, domain_id))
         # Initialize environment and agent for this session
         environment = Original_2ABT_Spouts(**env_params)
         agent = RFLR_mouse(**agent_params)
@@ -152,7 +158,7 @@ def generate_data(num_steps, task_params=None, multiple_contexts=False):
 
         total_trials += session_trials
 
-    return behavior_data, high_port_data, context_transitions
+    return behavior_data, high_port_data, session_transitions
 
 
 def plot_profiling_results(stats):
@@ -177,16 +183,16 @@ def plot_profiling_results(stats):
     plt.savefig("cprofile of training")
 
 
-def write_context_transitions(filepath, context_transitions):
-    """Write context transition data to file.
+def write_session_transitions(filepath, session_transitions):
+    """Write session transition data (and if multiple_domains, domain transitions) to file.
     
     Args:
         filepath (str): Path to output file
-        context_transitions (list): List of (trial_number, context_id) tuples
+        session_transitions (list): List of (trial_number, domain_id) tuples
     """
     with open(filepath, 'w') as f:
-        for trial, context in context_transitions:
-            f.write(f"{trial},{context}\n")
+        for trial, domain in session_transitions:
+            f.write(f"{trial},{domain}\n")
 
 
 def main(
@@ -194,69 +200,74 @@ def main(
         num_steps=100000,
         profile=False,
         include_val=True,
-        overwrite=False,
+        overwrite=True,
         task_params=None,
-        multiple_contexts=False):
+        multiple_domains=False):
+
+    initialize_logger(run)
+    # Format the dictionary nicely
+    args_str = pformat(locals(), indent=2)
+    logger.info("Starting data generation with args:\n%s", args_str)
 
     # Get next run number.
-    next_run = run or (get_latest_run() + 1)
-    run_dir = ensure_run_dir(next_run, overwrite=overwrite, subdir='seqs')
+    next_run = run or (fm.get_latest_run() + 1)
+    run_dir = fm.ensure_run_dir(next_run, subdir='seqs')
 
     datasets = ['tr', 'v'] if include_val else ['tr']
 
     # Configure task parameters here to make logging easier.
-    task_params = configure_task_params(task_params, multiple_contexts)
+    task_params = configure_task_params(task_params, multiple_domains)
 
     for suffix in datasets:
-        behavior_filename = get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
-        high_port_filename = get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
-        context_filename = get_experiment_file("context_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
+        behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
+        high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
+        sessions_filename = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
+        if fm.check_files_exist(behavior_filename, high_port_filename, sessions_filename, verbose=False) and (not overwrite):
+            logger.info(f"Files already exist for run_{next_run}, skipping data generation")
+            return None
+
         if profile:
             with cProfile.Profile() as pr:
-                behavior_data, high_port_data, context_transitions = generate_data(num_steps, task_params, multiple_contexts)
+                behavior_data, high_port_data, session_transitions = generate_data(num_steps, task_params, multiple_domains)
             stats = pstats.Stats(pr)
             stats.sort_stats('cumtime')
             plot_profiling_results(stats)
         else:
-            behavior_data, high_port_data, context_transitions = generate_data(num_steps, task_params, multiple_contexts)
+            behavior_data, high_port_data, session_transitions = generate_data(num_steps, task_params, multiple_domains)
 
-        write_sequence(behavior_filename, behavior_data)
-        write_sequence(high_port_filename, high_port_data)
-        write_context_transitions(context_filename, context_transitions)
+        fm.write_sequence(behavior_filename, behavior_data)
+        fm.write_sequence(high_port_filename, high_port_data)
+        write_session_transitions(sessions_filename, session_transitions)
         # Write metadata
-        metadata_filename = get_experiment_file("metadata.txt", next_run)
+        metadata_filename = fm.get_experiment_file("metadata.txt", next_run)
         with open(metadata_filename, 'a') as meta_file:
             meta_file.write(f"Run {next_run}\n")
             meta_file.write(f"Dataset {suffix}\n")
             meta_file.write(f"Number of steps: {num_steps:,}\n")
-            meta_file.write(f"Multiple contexts: {multiple_contexts:,}\n")
+            meta_file.write(f"Multiple domains: {multiple_domains:,}\n")
             meta_file.write(f"Task parameters:\n")
-            for context, params in task_params.items():
-                meta_file.write(f"{' '*2}{context}\n")
+            for domain, params in task_params.items():
+                meta_file.write(f"{' '*2}{domain}\n")
                 meta_file.write(f"{' '*2}Environment parameters:\n{' '*4}{params['environment']}\n")
                 meta_file.write(f"{' '*2}Agent parameters:\n{' '*4}{params['agent']}\n")
-    
-            # meta_file.write(f"Environment parameters: high_reward_prob={environment.high_reward_prob}, "
-            #                 f"low_reward_prob={environment.low_reward_prob}, "
-            #                 f"transition_prob={environment.transition_prob}\n")
-            # meta_file.write(f"Agent parameters: alpha={agent.alpha}, beta={agent.beta}, tau={agent.tau}\n")
-            # meta_file.write(f"Agent policy: {agent.policy}\n")
             meta_file.write(f"\n")
-
-        print(f"Generated data for run_{next_run}")
-        print(f"Files saved to {run_dir}")
-    print(f"Metadata saved to {metadata_filename}")
+        logger.info(f"Generated data for run_{next_run}")
+        logger.info(f"Files saved to {run_dir}")
+    logger.info(f"Metadata saved to {metadata_filename}")
 
 
 if __name__ == "__main__":
 
+    print('-' * 80)
+    print('generate_data.py\n')
+
     args = parse_args()
-    print("Context ID:", args.context_id)
-    if args.multiple_contexts or args.context_id:
+    print("Domain ID:", args.domain_id)
+    if args.multiple_domains or args.domain_id:
         task_params = load_param_sets()
-        if args.context_id:
-            task_params = {args.context_id: task_params[args.context_id]}
-            print(task_params)
+        if args.domain_id:
+            task_params = {args.domain_id: task_params[args.domain_id]}
+            print(pformat(task_params, indent=2))
     else:
         task_params = {}
         if all(v is None for v in [args.alpha, args.beta, args.tau, args.policy]):
@@ -269,7 +280,6 @@ if __name__ == "__main__":
                 'policy': args.policy
         }
             task_params['agent'] = agent_params
-
 
         if all(v is None for v in [args.high_reward_prob,
                                    args.low_reward_prob,
@@ -286,7 +296,7 @@ if __name__ == "__main__":
     # Set profile to True to enable profiling, False to skip
     main(run=args.run,
          profile=args.profile,
-         overwrite=args.overwrite,
+         overwrite=args.no_overwrite,
          num_steps=args.num_steps,
          task_params=task_params,
-         multiple_contexts=args.multiple_contexts)
+         multiple_domains=args.multiple_domains)

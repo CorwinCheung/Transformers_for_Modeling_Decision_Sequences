@@ -86,6 +86,7 @@ class GPTConfig:
     n_layer: int = 1
     n_head: int = 1
     n_embd: int = 64
+    device: str = 'cpu'
 
 
 class GPT(nn.Module):
@@ -101,6 +102,7 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.lm_head.weight = self.transformer.wte.weight
         self.apply(self._init_weights)
+        self.device = config.device
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -111,7 +113,43 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None, return_attn_weights=False):
+    def combine_logits_by_group(self, logits, targets, group_label=''):
+
+        group_idcs = {
+            'choice': [[0, 1], [2, 3]],  # Right and left
+            'reward': [[0, 2], [1, 3]]   # Reward and unreward
+        }
+
+        grouped_logits = []
+        combined_targets = torch.empty_like(targets)
+
+        for i, idcs in enumerate(group_idcs.get(group_label)):
+            grouped_logits.append(logits[:, :, idcs].sum(dim=2))
+            # Create a boolean mask for targets
+            mask = torch.isin(targets, torch.tensor(idcs).to(self.device))  # Porting across devices may be costly
+            combined_targets[mask] = i  # Assign the group index to combined_targets
+    
+        # Create a new logits tensor with shape [batch_size, sequence_length, 2]
+        combined_logits = torch.stack(grouped_logits, dim=2)  # Shape: [batch_size, sequence_length,            
+
+        return combined_logits, combined_targets
+
+    def calculate_loss(self, logits, targets=None, by_feature=False):
+
+        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
+
+        if by_feature:
+            logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
+            logits_reward, targets_reward = self.combine_logits_by_group(logits, targets, 'reward')
+            loss = {'full_loss': loss,
+                    'choice_loss': F.cross_entropy(logits_choice.view(-1, logits_choice.size(-1)),
+                                                   targets_choice.view(-1)),
+                    'reward_loss': F.cross_entropy(logits_reward.view(-1, logits_reward.size(-1)),
+                                                    targets_reward.view(-1))
+                }
+        return loss
+
+    def forward(self, idx, targets=None, return_attn_weights=False, **kwargs):
         B, T = idx.size()
         assert T <= self.config.block_size, f"Sequence length {T} exceeds block size {self.config.block_size}"
 
@@ -127,8 +165,7 @@ class GPT(nn.Module):
                 x = block(x)
 
         logits = self.lm_head(self.transformer.ln_f(x))
-        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
-
+        loss = self.calculate_loss(logits, targets, **kwargs)
         if return_attn_weights:
             # Each attn_weights is of shape (batch_size, num_heads, seq_len, seq_len)
             return logits, loss, attn_weights_all_layers
@@ -176,7 +213,7 @@ class GPT(nn.Module):
         return optimizer
 
 
-class DataLoaderLite:
+class BaseDataLoader:
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         """Initialize data loader for training or validation.
         
@@ -188,15 +225,22 @@ class DataLoaderLite:
             run_number (int, optional): Run number to load. Defaults to latest run.
             suffix (str, optional): Dataset suffix ('tr' or 'v'). Defaults to 'tr'.
         """
+
         self.B = B
         self.T = T
         self.process_rank = process_rank
         self.num_processes = num_processes
         
         # Get the behavior file path using the file management utility
-        behavior_file = get_experiment_file(f"behavior_run_{{}}.txt", run_number, suffix, subdir='seqs')
+        behavior_file = get_experiment_file("behavior_run_{}.txt", run_number, suffix, subdir='seqs')
         text = read_sequence(behavior_file)
-
+        sessions_file = behavior_file.replace('behavior', 'session_transitions')
+        self.session_transitions = []
+        with open(sessions_file, 'r') as f:
+            for line in f:
+                self.session_transitions.append(int(line.strip().split(',')[0]))
+        self.valid_indices = self.get_valid_indices(T + 1)  # +1 because we need T+1 tokens for x and y
+        
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
@@ -204,13 +248,89 @@ class DataLoaderLite:
         
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
+        self.behavior_file = behavior_file
+
+    def is_valid_sequence(self, start_idx, length):
+        """Check if a sequence of given length starting at start_idx crosses any session boundary."""
+        end_idx = start_idx + length - 1
+        for transition in self.session_transitions:
+            if start_idx < transition <= end_idx:
+                return False
+        return True
+
+    def get_valid_indices(self, min_length):
+        """Get all valid starting indices for sequences of at least min_length."""
+        valid_indices = []
+        prev_transition = 0
+        
+        for transition in self.session_transitions:
+            # For each session, find all valid starting points
+            for i in range(prev_transition, transition - min_length + 1):
+                valid_indices.append(i)
+            prev_transition = transition
+            
+        return torch.tensor(valid_indices, dtype=torch.long)
+        
+class DataLoader(BaseDataLoader):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+
+        # Assign indices to processes
+        self.indices_per_process = len(self.valid_indices) // num_processes
+        start_idx = process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
+        self.process_valid_indices = self.valid_indices[start_idx:end_idx]
+        
+        self.current_position = 0
+        self.batches_per_epoch = len(self.process_valid_indices) // B
+        self.suffix = suffix
+
+    def handle_batch_overflow(self):
+        if self.suffix == 'tr':
+            self.current_position = torch.randint(low=0, high=50, size=(1,)).item()  # to diversify batches
+        else:
+            self.current_position = 0
+    
+    def next_batch(self, return_indices=False):
+        """Get next batch of data."""
+        B, T = self.B, self.T
+
+        if self.current_position + B > len(self.process_valid_indices):
+            self.handle_batch_overflow()
+        
+        # Get starting indices for this batch
+        batch_start_indices = self.process_valid_indices[self.current_position:self.current_position+B]
+    
+        # Create a tensor of shape [B, T] with all required indices
+        offsets = torch.arange(T).unsqueeze(0).expand(B, -1)
+        indices = batch_start_indices.unsqueeze(1) + offsets
+        # Get x and y in a vectorized way
+        x = self.tokens[indices]
+        y = self.tokens[indices + 1]
+
+        self.current_position += B
+        
+        if return_indices:
+            y_indices = self.original_indices[indices + 1]
+            return x, y, y_indices
+        return x, y
+
+class DataLoaderLite(BaseDataLoader):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
         self.current_position = self.B * self.T * self.process_rank
         self.batches_per_epoch = len(self.tokens) // (self.B * self.T)
-        self.behavior_file = behavior_file
+
+    def handle_batch_overflow(self):
+        self.current_position = self.B * self.T * self.process_rank
 
     def next_batch(self, return_indices=False):
         """Get next batch of data."""
         B, T = self.B, self.T
+
+        if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
+            self.handle_batch_overflow()
+    
         buf = self.tokens[self.current_position:self.current_position + B * T + 1]
         index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
 
@@ -220,42 +340,32 @@ class DataLoaderLite:
         y_indices = index_buf[1:].view(B, T)
 
         self.current_position += B * T * self.num_processes
-        if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
-        
+
         if return_indices:
             return x, y, y_indices
         return x, y
     
-class DataLoaderHeavy(DataLoaderLite):
+class DataLoaderShuffle(DataLoader):
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+        
+        torch.manual_seed(200 + process_rank)  # Use different seed for each process
 
-    def next_batch(self, return_indices=False):
-        """Get next batch of data."""
-        B, T = self.B, self.T
+         # Assign indices to processes
+        start_idx = process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
+        self.shuffled_indices = torch.randperm(len(self.valid_indices))
+        self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
         
-        # Get window of tokens for contexts (x) and targets (y)
-        x_indices = torch.arange(self.current_position, self.current_position + B) # Starting indices for each sequence
-        x_offsets = torch.arange(T).unsqueeze(0).expand(B, -1) # Offsets for each position in sequence
-        x_indices = x_indices.unsqueeze(1).expand(-1, T) # Expand indices to match offsets
-        x_positions = x_indices + x_offsets # [B, T] tensor of positions
-        
-        # Get the tokens at these positions
-        x = self.tokens[x_positions]  # [B, T]
-        y = self.tokens[x_positions + 1]  # [B, T] (shifted by 1)
-        y_indices = self.original_indices[x_positions + 1]  # [B, T]
-        
-        # Update position for next batch
-        self.current_position += B * self.num_processes
-        if self.current_position + B + T > len(self.tokens):
-            self.current_position = self.B * self.T * self.process_rank
-        
-        if return_indices:
-            return x, y, y_indices
-        return x, y
-
-
+    def handle_batch_overflow(self):
+        # Reshuffle for next epoch
+        self.current_position = 0
+        torch.manual_seed(200 + self.process_rank + int(torch.randint(1, 1000, (1,)).item()))
+        self.shuffled_indices = torch.randperm(len(self.valid_indices))
+        start_idx = self.process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process
+        self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
+    
 class DDPConfig:
 
     def __init__(self):

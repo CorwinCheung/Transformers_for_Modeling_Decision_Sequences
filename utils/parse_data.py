@@ -13,13 +13,13 @@ import utils.file_management as fm
 from transformer import GPT, GPTConfig
 
 
-def parse_simulated_data(behavior_filename, high_port_filename, context_filename, clip_short_blocks=False):
-    """Parse simulated data from behavior, high port, and context files.
+def parse_simulated_data(behavior_filename, high_port_filename, session_filename, clip_short_blocks=False):
+    """Parse simulated data from behavior, high port, and session files.
 
     Args:
         behavior_filename (str): Path to behavior file.
         high_port_filename (str): Path to high port file.
-        context_filename (str): Path to context file.
+        session_filename (str): Path to session file.
         clip_short_blocks (bool): Whether to clip short blocks.
 
     Returns:
@@ -55,20 +55,20 @@ def parse_simulated_data(behavior_filename, high_port_filename, context_filename
         'high_port': high_ports,
     })
 
-    context_df = pd.read_csv(context_filename, names=['trial_number', 'context'])
-    # Forward fill contexts for all trials
-    full_context = pd.merge_asof(
+    session_df = pd.read_csv(session_filename, names=['trial_number', 'domain'])
+    # Forward fill sessions and domains for all trials
+    full_sessions = pd.merge_asof(
         events[['trial_number']],
-        context_df.assign(session=np.arange(len(context_df))),
+        session_df.assign(session=np.arange(len(session_df))),
         on='trial_number',
         direction='backward'
     )
-    events['context'] = full_context['context']
-    events['session'] = full_context['session']
+    events['domain'] = full_sessions['domain']
+    events['session'] = full_sessions['session']
 
     # First trial in a session cannot be a switch or transition.
-    events.loc[events['trial_number'].isin(context_df['trial_number']), 'switch'] = np.nan
-    events.loc[events['trial_number'].isin(context_df['trial_number']), 'transition'] = np.nan
+    events.loc[events['trial_number'].isin(session_df['trial_number']), 'switch'] = np.nan
+    events.loc[events['trial_number'].isin(session_df['trial_number']), 'transition'] = np.nan
 
     events = get_block_positions(events)
     events = add_sequence_columns(events, seq_length=2)

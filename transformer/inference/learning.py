@@ -14,11 +14,13 @@ from bh.visualization import plot_trials as pts
 
 from utils.parse_data import add_sequence_columns, parse_simulated_data
 
+def initialize_logger(run):
+    global logger
+    logger = fm.setup_logging(run, 'inference', 'learning')
 
 def load_predictions(run=None, model_name=None):
 
     """Load and process all prediction files for a run efficiently."""
-    run = run or fm.get_latest_run()
 
     # Get model info from metadata.
     model_info = fm.parse_model_info(run, model_name=model_name)
@@ -27,19 +29,41 @@ def load_predictions(run=None, model_name=None):
     model_name = model_info['model_name']
     pred_file = fm.get_experiment_file(f"learning_{model_name}_val_preds.txt", run, subdir='seqs')
 
-    predictions = pd.read_csv(pred_file, sep='\t')
+    try:
+        predictions = pd.read_csv(pred_file, sep='\t')
+    except FileNotFoundError:
+        # Permitting missing file in case training ended early but we still want to plot learning.
+        print(f"File not found: {pred_file}")
+        seqs_dir = fm.get_experiment_file('', run, subdir='seqs')
+        pred_files = [f for f in os.listdir(seqs_dir) if f.startswith('learning') and f.endswith('val_preds.txt')]
+        if not pred_files:
+            raise FileNotFoundError("No prediction file found in seqs directory")
+        elif len(pred_files) > 1:
+            print("Multiple prediction files found in seqs directory, defaulting to first")
+        else:
+            print(f"Model metadata missing but found prediction file {pred_files[0]}")
+        pred_file = fm.get_experiment_file(pred_files[0], run, subdir='seqs') # Take first matching file
+        model_name = pred_files[0].removeprefix('learning_').removesuffix('_val_preds.txt')
+        print(f"Model name: {model_name}")
+        model_info['model_name'] = model_name
+        predictions = pd.read_csv(pred_file, sep='\t')
+
     predictions = predictions.sort_values(['Step', 'Idx'])
 
     return predictions, model_info
 
 
-def load_behavior_data(model_info):
-    data_path = model_info['dataloader']['File validated on']
+def load_behavior_data(model_info, run=None):
+    try:
+        data_path = model_info['dataloader']['File validated on']
+    except KeyError:
+        data_path = fm.get_experiment_file('behavior_run_{}.txt', run, subdir='seqs', suffix='v')
+        print(f"Model metadata missing, defaulting to {data_path}")
     if not os.path.isfile(data_path):
         data_path = fm.convert_to_local_path(data_path)
     high_port_path = data_path.replace('behavior', 'high_port')
-    context_path = data_path.replace('behavior', 'context_transitions')
-    events = parse_simulated_data(data_path, high_port_path, context_path)
+    sessions_path = data_path.replace('behavior', 'session_transitions')
+    events = parse_simulated_data(data_path, high_port_path, sessions_path)
     return events
 
 
@@ -79,7 +103,7 @@ def plot_bpos_behavior_learning(predictions,
     axs[1].get_legend().set(title='Step')
     fig_path = fm.get_experiment_file(f'bpos_{model_name}_{step_max}_{suffix}.png', run, subdir='learning')
     fig.savefig(fig_path)
-    print(f'saved bpos plot to {fig_path}')
+    logger.info(f'saved bpos plot to {fig_path}')
 
 
 def plot_conditional_switching_learning(predictions, model_name, seq_length, run, step_max=None):
@@ -102,14 +126,14 @@ def plot_conditional_switching_learning(predictions, model_name, seq_length, run
     ax.get_legend().set(bbox_to_anchor=(1.05, 0), loc='lower left', title='Step')
     fig_path = fm.get_experiment_file(f"learning_{model_name}_val_preds_seq{seq_length}_{step_max}.png", run, subdir='learning')
     fig.savefig(fig_path)
-    print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
+    logger.info(f'saved conditional probabilities for {seq_length} trials to {fig_path}')
 
 
 def add_choice_metrics(df, prefix=''):
     """Add choice-related metrics with optional prefix for predicted values."""
     source = 'Predicted' if prefix == 'pred_' else 'True'
 
-    # Get previous choice from context
+    # Get previous choice from encoded sequence
     df['prev_choice'] = df['seq2_RL'].apply(lambda x: x[-1].upper()
                                             if not pd.isna(x) else None)
 
@@ -133,7 +157,7 @@ def preprocess_predictions(predictions, events):
         'block_position': 'iInBlock',
         'block_length': 'blockLength',
         'high_port': 'high_port',
-        'context': 'context',
+        'domain': 'domain',
         'session': 'session'
     }
     for event_col, pred_col in behavioral_cols.items():
@@ -152,23 +176,23 @@ def preprocess_predictions(predictions, events):
 
 
 def main(run=None, model_name=None, step_min=0, step_max=None):
-
+    
+    run = run or fm.get_latest_run()
+    initialize_logger(run)
+    
     predictions, model_info = load_predictions(run=run, model_name=model_name)
     model_name = model_info['model_name']
     if step_max is None:
         step_max = predictions['Step'].max()
 
-    events = load_behavior_data(model_info)
+    events = load_behavior_data(model_info, run=run)
     predictions = preprocess_predictions(predictions, events)
 
     predictions = predictions.query('Step.between(@step_min, @step_max)')
     
     if len(predictions) == 0:
-        print(f'No steps between {step_min} and {step_max}')
+        logger.info(f'No steps between {step_min} and {step_max}')
         return None
-    run_dir = fm.get_run_dir(run)
-    
-    os.makedirs(os.path.join(run_dir, 'learning'), exist_ok=True)
 
     plot_bpos_behavior_learning(predictions, model_name=model_name, run=run, step_max=step_max)
 
@@ -176,6 +200,8 @@ def main(run=None, model_name=None, step_min=0, step_max=None):
         plot_conditional_switching_learning(predictions, model_name, N, run, step_max=step_max)
 
 if __name__ == "__main__":
+    print('-' * 80)
+    print('learning.py\n')
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=int, default=None)
