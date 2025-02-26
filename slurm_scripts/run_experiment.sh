@@ -44,13 +44,13 @@ python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-python ${BASE_PATH}/transformer/train.py --epochs=10000 --run $RUN_NUMBER # --checkpoint_interval=1000 --eval_interval=100 # --enforce_data_epochs # --compile 
+python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
 
-# python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
-# python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000
-# python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
-# python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000
-# python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=100
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_max=1000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000
+python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER
 
 # Automatically remove large learning files
 # rm "${BASE_PATH}/experiments/run_${RUN_NUMBER}/seqs/learning_model"*"val_preds.txt"

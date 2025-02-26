@@ -2,10 +2,12 @@ import inspect
 import os
 import sys
 from dataclasses import dataclass
+from datetime import timedelta
+import torch.distributed as dist
+import subprocess
 
 import torch
 import torch.nn as nn
-from torch.distributed import init_process_group
 from torch.nn import functional as F
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -397,25 +399,92 @@ class DataLoaderShuffle(DataLoader):
         self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
     
 class DDPConfig:
-
     def __init__(self):
-        self.ddp = int(os.environ.get('RANK', -1)) != -1
-
+        # Check if we're in a SLURM environment
+        slurm_job_id = os.environ.get('SLURM_JOB_ID')
+        slurm_procid = os.environ.get('SLURM_PROCID')
+        slurm_localid = os.environ.get('SLURM_LOCALID')
+        
+        # Check if we're in a PyTorch DDP environment
+        rank = os.environ.get('RANK')
+        local_rank = os.environ.get('LOCAL_RANK')
+        world_size = os.environ.get('WORLD_SIZE')
+        
+        # Determine if we're in a distributed environment
+        self.ddp = (rank is not None and int(rank) != -1) or (slurm_procid is not None)
+        
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
-            init_process_group(backend="nccl")
-            self.rank = int(os.environ['RANK'])
-            self.local_rank = int(os.environ['LOCAL_RANK'])
-            self.world_size = int(os.environ['WORLD_SIZE'])
+            
+            # Set up rank, local_rank, and world_size based on available environment variables
+            if slurm_procid is not None:
+                # We're in a SLURM environment
+                self.rank = int(slurm_procid)
+                self.local_rank = int(slurm_localid) if slurm_localid is not None else 0
+                self.world_size = int(os.environ.get('SLURM_NTASKS', 1))
+                
+                # Set PyTorch DDP environment variables if they're not already set
+                if rank is None:
+                    os.environ['RANK'] = str(self.rank)
+                if local_rank is None:
+                    os.environ['LOCAL_RANK'] = str(self.local_rank)
+                if world_size is None:
+                    os.environ['WORLD_SIZE'] = str(self.world_size)
+                
+                # Set master address and port if not already set
+                if 'MASTER_ADDR' not in os.environ:
+                    # Get the first node in the job
+                    cmd = "scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1"
+                    master_addr = subprocess.check_output(cmd, shell=True).decode().strip()
+                    os.environ['MASTER_ADDR'] = master_addr
+                
+                if 'MASTER_PORT' not in os.environ:
+                    os.environ['MASTER_PORT'] = '12355'  # Default port
+            else:
+                # We're in a PyTorch DDP environment
+                self.rank = int(rank)
+                self.local_rank = int(local_rank) if local_rank is not None else 0
+                self.world_size = int(world_size) if world_size is not None else 1
+            
+            if 'CUDA_VISIBLE_DEVICES' in os.environ:
+                print(f"Rank {self.rank}: CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
+            
+            # Use the local_rank to set the device
+            torch.cuda.set_device(self.local_rank)
             self.device = torch.device(f'cuda:{self.local_rank}')
-            torch.cuda.set_device(self.device)
-            self.master_process = self.rank == 0
+            
+            self.master_process = (self.rank == 0)
+            
+            # Initialize the process group
+            try:
+                dist.init_process_group(
+                    backend="nccl",
+                    timeout=timedelta(minutes=30),
+                    init_method="env://",
+                    rank=self.rank,
+                    world_size=self.world_size
+                )
+                dist.barrier()
+            except Exception as e:
+                print(f"Error initializing process group: {e}")
+                print(f"Environment variables: RANK={os.environ.get('RANK')}, LOCAL_RANK={os.environ.get('LOCAL_RANK')}, "
+                      f"WORLD_SIZE={os.environ.get('WORLD_SIZE')}, MASTER_ADDR={os.environ.get('MASTER_ADDR')}, "
+                      f"MASTER_PORT={os.environ.get('MASTER_PORT')}")
+                # Fall back to single-process mode
+                self.ddp = False
+                self.rank = 0
+                self.local_rank = 0
+                self.world_size = 1
+                self.master_process = True
+                self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            
+            print(f"Process {self.rank} on node {os.uname()[1]}: master_process={self.master_process}, "
+                  f"RANK={os.environ.get('RANK', 'not set')}, LOCAL_RANK={os.environ.get('LOCAL_RANK', 'not set')}")
         else:
             self.rank = 0
             self.local_rank = 0
             self.world_size = 1
             self.master_process = True
-            self.device = torch.device('mps' if torch.backends.mps.is_available() else 'cuda'
-                                       if torch.cuda.is_available() else 'cpu')
-        print(f"using device: {self.device}")
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            
         self.device_type = "cuda" if str(self.device).startswith("cuda") else "cpu"

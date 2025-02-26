@@ -3,13 +3,13 @@
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=16
-#SBATCH --time=06:00:00  
-#SBATCH --mem=120GB
-#SBATCH --partition=kempner_requeue
+#SBATCH --nodes=3
+#SBATCH --ntasks-per-node=4
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=8
+#SBATCH --time=08:00:00  
+#SBATCH --mem=60GB
+#SBATCH --partition=kempner
 
 BASE_PATH="."  # Get parent directory of script location
 INFERENCE_PATH="${BASE_PATH}/transformer/inference"
@@ -37,13 +37,45 @@ RUN_NUMBER=$(get_next_run)
 RUN_NUMBER=20  # Override for testing; remove if you want automatic run numbering.
 echo "Starting run $RUN_NUMBER"
 
-# Reduced num_steps to 1000 for testing
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --no_overwrite
+printf '%*s\n' 80 '' | tr ' ' '-'
+echo -e "\ngenerate_data.py"
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 1000000
+
+printf '%*s\n' 80 '' | tr ' ' '-'
+echo -e "basic_evaluation.py\n"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
-# Reduced epochs to 10 for testing
-python ${BASE_PATH}/transformer/train.py --predict --epochs=10000 --run $RUN_NUMBER --eval_interval=10000 --checkpoint_interval=1000 --enforce_data_epochs
+printf '%*s\n' 80 '' | tr ' ' '-'
+echo -e "train.py\n"
+
+# Set up distributed training environment variables
+export MASTER_PORT=12355 # there may be a smarter way to set this, but this port is almost always open
+export WORLD_SIZE=$(($SLURM_NNODES * $SLURM_NTASKS_PER_NODE)) # world size is equal to number of nodes and number of tasks per node
+echo "WORLD_SIZE=$WORLD_SIZE"
+echo "MASTER_PORT=$MASTER_PORT"
+
+# Define a master address for communication between GPUs
+master_addr=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export MASTER_ADDR=$master_addr
+echo "MASTER_ADDR=$MASTER_ADDR"
+
+# Record the start time
+start_time=$(date +%s)
+
+# Launch distributed training with srun
+# This will run the training script on all tasks across all nodes
+export SLURM_PROCID=$SLURM_PROCID
+export RANK=$SLURM_PROCID
+srun python ${BASE_PATH}/transformer/train.py \
+    --predict \
+    --epochs=100 \
+    --run_number $RUN_NUMBER
+
+# Record the end time
+end_time=$(date +%s)
+total_time=$((end_time-start_time))
+echo "Total Training Time= $total_time seconds"
 
 # Only run first two step ranges for testing
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000

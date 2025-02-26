@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import glob
+import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,10 +25,15 @@ logger = None
 
 username = getpass.getuser()
 
-def initialize_logger(run_number):
+def initialize_logger(run_number, is_master_process=False):
     """Initialize the logger with the correct run number."""
     global logger
-    logger = fm.setup_logging(run_number, 'training', 'train')
+    if is_master_process:
+        logger = fm.setup_logging(run_number, 'training', 'train')
+    else:
+        # Create a null logger for non-master processes
+        logger = logging.getLogger('null_logger')
+        logger.addHandler(logging.NullHandler())
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train GPT model with hyperparameter tuning.')
@@ -38,7 +44,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100, help='Number of Epochs looping through the training data.')
     parser.add_argument('--max_lr', type=float, default=6e-4, help='Learning rate for the optimizer.')
     parser.add_argument('--task_id', type=int, default=None, help='SLURM task ID.')
-    parser.add_argument('--run', type=int, default=None, help='ID of dataset to train/validate on')
+    parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
     parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
@@ -48,7 +54,6 @@ def parse_args():
     return args
 
 def write_predictions(model_name, predictions, last_step=False):
-    
     # Define the vocabulary and mappings
     vocab = ['R', 'r', 'L', 'l']
     itos = {i: ch for i, ch in enumerate(vocab)}
@@ -121,7 +126,6 @@ def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None,
     # wandb.save(model_path)
 
 def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval, model_name):
-
     fig, ax = plt.subplots(figsize=(10, 6))
     xs = np.concatenate([np.arange(0, max_steps, eval_interval), [max_steps]])
     ax.plot(xs, loss_steps, label='Training Loss')
@@ -309,11 +313,16 @@ def main():
     # Parse arguments
     args = parse_args()
 
+    # Set up DDP if using, mimic it if not.
+    ddp = DDPConfig()
+
     # Data parameters
     global run_number
-    run_number = args.run or fm.get_latest_run()
-    initialize_logger(run_number)  # Initialize logger with the correct run number
-    logger.info("Starting training script with args: %s", args)
+    run_number = args.run_number or fm.get_latest_run()
+    initialize_logger(run_number, is_master_process=ddp.master_process)
+    
+    if ddp.master_process:
+        logger.info("Starting training script with args: %s", args)
 
     if args.compile and not check_cuda_setup():
         logger.warning("Compilation requested but CUDA setup incomplete. Will skip compilation.")
@@ -328,12 +337,8 @@ def main():
 
     #torchrun --standalone --nproc_per_node=2 train.py  # to launch ddp
 
-    # Set up DDP if using, mimic it if not.
-    ddp = DDPConfig()
-
-    print(ddp)
     # Training setup
-    total_batch_size = 6144  # number of tokens per batch
+    total_batch_size = 36864  # number of tokens per batch
     B = 256  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
@@ -420,8 +425,9 @@ def main():
         starting_step = 0
     
     checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
-    logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
-    logger.info(f"Number of batches per epoch: {train_loader.batches_per_epoch}")
+    if ddp.master_process:
+        logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
+        logger.info(f"Number of batches per epoch: {train_loader.batches_per_epoch}")
 
     if args.compile:
         model = torch.compile(model)
@@ -436,7 +442,10 @@ def main():
         device=ddp.device,
         master_process=ddp.master_process)
 
-    # if ddp.master_process:
+    # if ddp.ddp:
+        dist.barrier()
+
+    if ddp.rank == 0:
     #     wandb.init(
     #         project="gpt-training",
     #         config={
@@ -509,10 +518,10 @@ def main():
         if step % args.eval_interval == 0 or step == max_steps - 1:
             if ddp.master_process:
                 if args.predict:
-                    val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
+                    val_loss, predictions = estimate_loss(model, val_loader, step, predict=True)
                     write_predictions(model_name, predictions, step==(max_steps-1))
                 else:
-                    val_loss = estimate_loss(model, val_loader, ddp, step, predict=False)
+                    val_loss = estimate_loss(model, val_loader, step, predict=False)
                 
                 if isinstance(val_loss, dict):
                     for key in val_loss.keys():
@@ -527,17 +536,17 @@ def main():
                 val_loss_choice = val_loss.get('choice_loss').item() if isinstance(val_loss, dict) else None
                 val_loss_reward = val_loss.get('reward_loss').item() if isinstance(val_loss, dict) else None
                 val_loss = val_loss.get('full_loss').item() if isinstance(val_loss, dict) else val_loss.item()
-                # wandb.log({
-                #     "step": step,
-                #     "loss": loss_accum.item(),
-                #     "val_loss": val_loss,
-                #     "choice_loss": val_loss_choice,
-                #     "reward_loss": val_loss_reward,
-                #     "lr": lr,
-                #     "grad_norm": norm,
-                #     "step_time_ms": dt,
-                #     "tokens_per_sec": tokens_per_sec,
-                # })
+                wandb.log({
+                    "step": step,
+                    "loss": loss_accum.item(),
+                    "val_loss": val_loss,
+                    "choice_loss": val_loss_choice,
+                    "reward_loss": val_loss_reward,
+                    "lr": lr,
+                    "grad_norm": norm,
+                    "step_time_ms": dt,
+                    "tokens_per_sec": tokens_per_sec,
+                })
                 
                 if step % (args.eval_interval*10) == 0:
                     logger.info(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
@@ -557,18 +566,19 @@ def main():
                 logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
 
             if args.enforce_data_epochs:
+                if ddp.master_process:
+                    logger.info(f'prior to data reset (training): {train_loader.current_position}')
                 train_loader.current_position = 0
 
     # Call this function after the model training code
     if ddp.master_process:
         save_model(model, model_name, run_number, compile=args.compile)
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
-        # wandb.finish()
+        wandb.finish()
+        plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
     if ddp.ddp:
         destroy_process_group()
-
-    plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
 if __name__ == "__main__":
     print('-' * 80)
