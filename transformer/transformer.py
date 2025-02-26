@@ -3,8 +3,11 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import timedelta
+import datetime
 import torch.distributed as dist
 import subprocess
+import socket
+import time
 
 import torch
 import torch.nn as nn
@@ -275,94 +278,155 @@ class DataLoader:
             return x, y, y_indices
         return x, y
 
-
 class DDPConfig:
     def __init__(self):
-        # Check if we're in a SLURM environment
-        slurm_job_id = os.environ.get('SLURM_JOB_ID')
-        slurm_procid = os.environ.get('SLURM_PROCID')
-        slurm_localid = os.environ.get('SLURM_LOCALID')
+        """Initialize distributed data parallel configuration with robust handling for multi-node setups."""
+        import os
+        import socket
+        import time
+        import torch
+        import torch.distributed as dist
         
-        # Check if we're in a PyTorch DDP environment
-        rank = os.environ.get('RANK')
-        local_rank = os.environ.get('LOCAL_RANK')
-        world_size = os.environ.get('WORLD_SIZE')
+        # Get SLURM environment variables
+        self.slurm_procid = os.environ.get('SLURM_PROCID')
+        self.slurm_localid = os.environ.get('SLURM_LOCALID')
+        self.slurm_nodeid = os.environ.get('SLURM_NODEID')
+        self.slurm_ntasks = os.environ.get('SLURM_NTASKS')
         
-        # Determine if we're in a distributed environment
-        self.ddp = (rank is not None and int(rank) != -1) or (slurm_procid is not None)
-        
-        if self.ddp:
-            assert torch.cuda.is_available(), "need CUDA for DDP"
+        # Set up process identity based on SLURM variables
+        if self.slurm_procid is not None:
+            self.rank = int(self.slurm_procid)
+            self.local_rank = int(self.slurm_localid) if self.slurm_localid else 0
+            self.world_size = int(self.slurm_ntasks) if self.slurm_ntasks else 1
             
-            # Set up rank, local_rank, and world_size based on available environment variables
-            if slurm_procid is not None:
-                # We're in a SLURM environment
-                self.rank = int(slurm_procid)
-                self.local_rank = int(slurm_localid) if slurm_localid is not None else 0
-                self.world_size = int(os.environ.get('SLURM_NTASKS', 1))
-                
-                # Set PyTorch DDP environment variables if they're not already set
-                if rank is None:
-                    os.environ['RANK'] = str(self.rank)
-                if local_rank is None:
-                    os.environ['LOCAL_RANK'] = str(self.local_rank)
-                if world_size is None:
-                    os.environ['WORLD_SIZE'] = str(self.world_size)
-                
-                # Set master address and port if not already set
-                if 'MASTER_ADDR' not in os.environ:
-                    # Get the first node in the job
-                    cmd = "scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1"
-                    master_addr = subprocess.check_output(cmd, shell=True).decode().strip()
-                    os.environ['MASTER_ADDR'] = master_addr
-                
-                if 'MASTER_PORT' not in os.environ:
-                    os.environ['MASTER_PORT'] = '12355'  # Default port
+            # Print detailed node/process information
+            hostname = socket.gethostname()
+            print(f"Process {self.rank}/{self.world_size} (local_rank={self.local_rank}) "
+                  f"on node {self.slurm_nodeid} ({hostname})")
+            
+            # Force only IPv4 connections
+            self._force_ipv4()
+            
+            # Set up environment variables for PyTorch DDP
+            os.environ['RANK'] = str(self.rank)
+            os.environ['LOCAL_RANK'] = str(self.local_rank)
+            os.environ['WORLD_SIZE'] = str(self.world_size)
+            
+            # Configure device
+            if torch.cuda.is_available():
+                torch.cuda.set_device(self.local_rank)
+                self.device = torch.device(f'cuda:{self.local_rank}')
+                gpu_name = torch.cuda.get_device_name(self.local_rank)
+                print(f"Process {self.rank} using GPU {self.local_rank}: {gpu_name}")
             else:
-                # We're in a PyTorch DDP environment
-                self.rank = int(rank)
-                self.local_rank = int(local_rank) if local_rank is not None else 0
-                self.world_size = int(world_size) if world_size is not None else 1
+                self.device = torch.device('cpu')
+                print(f"Process {self.rank} using CPU")
             
-            if 'CUDA_VISIBLE_DEVICES' in os.environ:
-                print(f"Rank {self.rank}: CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
-            
-            # Use the local_rank to set the device
-            torch.cuda.set_device(self.local_rank)
-            self.device = torch.device(f'cuda:{self.local_rank}')
-            
+            # Set master_process flag
             self.master_process = (self.rank == 0)
             
-            # Initialize the process group
-            try:
-                dist.init_process_group(
-                    backend="nccl",
-                    timeout=timedelta(minutes=30),
-                    init_method="env://",
-                    rank=self.rank,
-                    world_size=self.world_size
-                )
-                dist.barrier()
-            except Exception as e:
-                print(f"Error initializing process group: {e}")
-                print(f"Environment variables: RANK={os.environ.get('RANK')}, LOCAL_RANK={os.environ.get('LOCAL_RANK')}, "
-                      f"WORLD_SIZE={os.environ.get('WORLD_SIZE')}, MASTER_ADDR={os.environ.get('MASTER_ADDR')}, "
-                      f"MASTER_PORT={os.environ.get('MASTER_PORT')}")
-                # Fall back to single-process mode
-                self.ddp = False
-                self.rank = 0
-                self.local_rank = 0
-                self.world_size = 1
-                self.master_process = True
-                self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            
-            print(f"Process {self.rank} on node {os.uname()[1]}: master_process={self.master_process}, "
-                  f"RANK={os.environ.get('RANK', 'not set')}, LOCAL_RANK={os.environ.get('LOCAL_RANK', 'not set')}")
+            # Initialize DDP
+            self.ddp = self._initialize_process_group()
         else:
+            # Single-process mode
             self.rank = 0
             self.local_rank = 0
             self.world_size = 1
             self.master_process = True
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            
+            self.ddp = False
+        
+        # Set device type
         self.device_type = "cuda" if str(self.device).startswith("cuda") else "cpu"
+    
+    def _force_ipv4(self):
+        """Force socket connections to use IPv4 only."""
+        import socket
+        
+        # Save original function
+        original_getaddrinfo = socket.getaddrinfo
+        
+        # Define IPv4-only version
+        def getaddrinfo_ipv4_only(*args, **kwargs):
+            responses = original_getaddrinfo(*args, **kwargs)
+            return [response for response in responses if response[0] == socket.AF_INET]
+        
+        # Replace with our version
+        socket.getaddrinfo = getaddrinfo_ipv4_only
+        print(f"Process {self.rank}: Forced IPv4-only connections")
+    
+    def _initialize_process_group(self, max_retries=3):
+        """Initialize the process group with retries."""
+        import torch.distributed as dist
+        import time
+        from datetime import timedelta
+        
+        # Print connection details
+        master_addr = os.environ.get('MASTER_ADDR', 'Unknown')
+        master_port = os.environ.get('MASTER_PORT', 'Unknown')
+        print(f"Process {self.rank} connecting to {master_addr}:{master_port}")
+        
+        # Add staggered start - delay based on rank
+        if self.rank != 0:
+            delay = 1 + (self.rank * 0.5)
+            print(f"Process {self.rank} waiting {delay:.1f}s for initialization")
+            time.sleep(delay)
+        
+        # Try to initialize with retries
+        for attempt in range(max_retries):
+            try:
+                # Initialize the process group
+                if not dist.is_initialized():
+                    print(f"Process {self.rank} initializing DDP (attempt {attempt+1}/{max_retries})")
+                    
+                    # Set timeout
+                    timeout = timedelta(minutes=5)
+                    
+                    # Initialize with NCCL
+                    dist.init_process_group(
+                        backend="nccl",
+                        timeout=timeout
+                    )
+                    
+                    # Verify with simple collective operation
+                    if self._verify_process_group():
+                        print(f"Process {self.rank} DDP initialization successful")
+                        return True
+                    else:
+                        print(f"Process {self.rank} DDP verification failed")
+                        if dist.is_initialized():
+                            dist.destroy_process_group()
+            except Exception as e:
+                print(f"Process {self.rank} DDP initialization attempt {attempt+1} failed: {e}")
+                # Wait before retry with increasing backoff
+                time.sleep(5 * (attempt + 1))
+        
+        print(f"Process {self.rank} failed all DDP initialization attempts")
+        return False
+    
+    def _verify_process_group(self):
+        """Verify the process group is working correctly with a simple collective operation."""
+        import torch.distributed as dist
+        import torch
+        
+        try:
+            # Create a small tensor for verification
+            tensor = torch.tensor([self.rank + 1], device=self.device)
+            
+            # Try to all-reduce it
+            dist.all_reduce(tensor)
+            
+            # Calculate expected sum: 1 + 2 + ... + world_size
+            expected = self.world_size * (self.world_size + 1) // 2
+            
+            # Check if result matches expected
+            result = tensor.item()
+            if abs(result - expected) < 1e-3:  # Allow small floating point difference
+                print(f"Process {self.rank} collective operation verified: {result} == {expected}")
+                return True
+            else:
+                print(f"Process {self.rank} collective operation gave wrong result: {result} != {expected}")
+                return False
+        except Exception as e:
+            print(f"Process {self.rank} verification failed: {e}")
+            return False

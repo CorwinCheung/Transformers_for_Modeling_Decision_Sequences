@@ -30,6 +30,7 @@ def initialize_logger(run_number, is_master_process=False):
     global logger
     if is_master_process:
         logger = fm.setup_logging(run_number, 'training', 'train')
+        logger.info(f"Initialized master logger (rank 0)")
     else:
         # Create a null logger for non-master processes
         logger = logging.getLogger('null_logger')
@@ -268,7 +269,8 @@ def update_predictions_file(model_name, starting_step):
         logger.info(f"Excess steps: {excess_steps[0]} to {excess_steps[-1]}")
 
 def trim_loss_steps(losses, starting_step, eval_interval):
-    
+    if starting_step < eval_interval:
+        return losses
     # Get the indices of the losses to keep.
     idcs = np.insert(np.arange(0, starting_step, eval_interval), -1, starting_step)
     num_idcs = len(idcs)
@@ -286,7 +288,42 @@ def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_step
     checkpoint_steps = (checkpoint_interval * steps_per_epoch)
     return checkpoint_steps
 
+def print_gpu_info():
+    """Print information about the current process and GPU."""
+    import os
+    import socket
+    import torch
+    
+    # Get process information
+    pid = os.getpid()
+    hostname = socket.gethostname()
+    
+    # Get GPU information
+    gpu_count = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    
+    # Print SLURM variables
+    slurm_procid = os.environ.get('SLURM_PROCID', 'N/A')
+    slurm_localid = os.environ.get('SLURM_LOCALID', 'N/A')
+    slurm_ntasks = os.environ.get('SLURM_NTASKS', 'N/A')
+    node_id = os.environ.get('SLURM_NODEID', 'N/A')
+    
+    print(f"Process Info: PID={pid}, Host={hostname}, Node ID={node_id}")
+    print(f"SLURM: PROCID={slurm_procid}, LOCALID={slurm_localid}, NTASKS={slurm_ntasks}")
+    print(f"GPU Count on this node: {gpu_count}")
+    
+    # Return values for potential use
+    return {
+        'pid': pid,
+        'hostname': hostname,
+        'slurm_procid': slurm_procid,
+        'slurm_localid': slurm_localid,
+        'gpu_count': gpu_count
+    }
+
 def main():
+    # Print GPU information - this will print from all processes
+    print_gpu_info()
+    
     # Set random seeds
     seed = 200
     np.random.seed(seed)
@@ -298,9 +335,23 @@ def main():
     # Parse arguments
     args = parse_args()
 
-    # Set up DDP if using, mimic it if not.
+    # Set up DDP
     ddp = DDPConfig()
-
+    
+    # If DDP initialization was successful, add explicit barrier
+    if ddp.ddp:
+        try:
+            print(f"Process {ddp.rank} waiting at barrier...")
+            dist.barrier()
+            print(f"Process {ddp.rank} passed barrier")
+        except Exception as e:
+            print(f"Process {ddp.rank} barrier error: {e}")
+            # Continue anyway, but mark DDP as failed
+            ddp.ddp = False
+    
+    # After DDP setup, print again with the configured rank
+    print(f"After DDP setup: I am process with rank={ddp.rank}, local_rank={ddp.local_rank}, master_process={ddp.master_process}")
+    
     # Data parameters
     global run_number
     run_number = args.run_number or fm.get_latest_run()
@@ -469,8 +520,6 @@ def main():
             if ddp.ddp:
                 model.require_backward_grad_sync = (micro_step == grad_accum_steps - 1)
             loss.backward()  # Backpropagate gradients
-        if ddp.ddp:
-            dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
 
         # Clip gradients to prevent exploding gradients
         norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -493,10 +542,10 @@ def main():
         if step % args.eval_interval == 0 or step == max_steps - 1:
             if ddp.master_process:
                 if args.predict:
-                    val_loss, predictions = estimate_loss(model, val_loader, step, predict=True)
+                    val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
                     write_predictions(model_name, predictions, step==(max_steps-1))
                 else:
-                    val_loss = estimate_loss(model, val_loader, step, predict=False)
+                    val_loss = estimate_loss(model, val_loader, ddp, step, predict=False)
                 
                 if isinstance(val_loss, dict):
                     for key in val_loss.keys():
@@ -547,10 +596,26 @@ def main():
 
     # Call this function after the model training code
     if ddp.master_process:
+        if ddp.ddp:
+            # DDP model - access through .module
+            write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.module.config)
+        else:
+            # Regular model
+            write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         save_model(model, model_name, run_number, compile=args.compile)
-        write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         wandb.finish()
         plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
+
+    if ddp.ddp:
+        # Make sure all processes reach this point before saving
+        dist.barrier()
+        
+        # Only the master process should save the model
+        if ddp.master_process:
+            save_model(model, model_name, run_number, compile=args.compile)
+        
+        # Wait for save to complete
+        dist.barrier()
 
     if ddp.ddp:
         destroy_process_group()
