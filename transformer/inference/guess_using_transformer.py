@@ -4,14 +4,11 @@ import sys
 import time
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 # Add the project root directory to Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from transformer.transformer import GPT, GPTConfig
-from utils.file_management import (get_experiment_file, get_latest_run, parse_model_info,
-                                   read_sequence, write_sequence)
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
+import utils.file_management as fm
+from utils.parse_data import load_trained_model
 
 seed = 200
 random.seed(seed)
@@ -54,7 +51,7 @@ def generate_predictions(model, tokens, max_context_length):
     return predicted_indices
 
 def write_guess_metadata(model_name, run, behavior_file, pred_file, config):
-    metadata_file = get_experiment_file("metadata.txt", run)
+    metadata_file = fm.get_experiment_file("metadata.txt", run)
 
     with open(metadata_file, 'a') as meta_file:
         meta_file.write(f"Run: {run}\n")
@@ -73,35 +70,15 @@ def write_guess_metadata(model_name, run, behavior_file, pred_file, config):
 def main(run=None, model_name=None):
 
     if run is None:
-        run = get_latest_run()
+        run = fm.get_latest_run()
 
-    # Get model info from metadata
-    model_info = parse_model_info(run, model_name=model_name)
+    model, model_info, config = load_trained_model(run=run, model_name=model_name, device=device, weights_only=True)
     if model_name is None:
         model_name = model_info['model_name']
-    else:
-        assert (model_info['model_name'] == model_name) or (model_info['model_name'] == model_name.split('_cp')[0]), (
-            'did not recover correct model')
-
-    # Configure model using metadata
-    config = GPTConfig(
-        block_size=model_info['config'].get('Block size', 12),
-        vocab_size=model_info['config'].get('Vocab size', 4),
-        n_layer=model_info['config'].get('Number of layers', 1),
-        n_head=model_info['config'].get('Number of heads', 1),
-        n_embd=model_info['config'].get('Embedding size', 64)
-    )
-    # Load the trained model
-    # config = GPTConfig()
-    model = GPT(config)
-    model_path = get_experiment_file(f'{model_name}.pth', run, subdir='models')
-    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-    model.to(device)
-    model.eval()
 
     # Load and preprocess the new data
-    behavior_file = get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
-    text = read_sequence(behavior_file)
+    behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
+    text = fm.read_sequence(behavior_file)
     tokens = encode_sequence(text)
     print(f"Loaded {len(tokens)} tokens from ground truth data.")
 
@@ -120,8 +97,8 @@ def main(run=None, model_name=None):
     print(f"Generated {len(predicted_chars)} predicted characters.")
 
     # Write predictions to a file
-    pred_file = get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
-    write_sequence(pred_file, predicted_chars)
+    pred_file = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
+    fm.write_sequence(pred_file, predicted_chars)
     write_guess_metadata(model_name, run, behavior_file, pred_file, config)
 
     print(f"Model predictions saved to {pred_file}")
