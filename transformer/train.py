@@ -14,7 +14,7 @@ import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from transformer import GPT, DataLoader, DDPConfig, GPTConfig
+from transformer.transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, DataLoaderShuffle
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
@@ -192,7 +192,7 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
             x, y = val_loader.next_batch()
         x, y = x.to(ddp.device), y.to(ddp.device)
         with torch.no_grad():
-            logits, loss = model(x, y, by_feature=False)
+            logits, loss = model(x, y, by_feature=True)
             
             if isinstance(loss, dict):
                 for key, value in loss.items():
@@ -331,6 +331,7 @@ def main():
     # Set up DDP if using, mimic it if not.
     ddp = DDPConfig()
 
+    print(ddp)
     # Training setup
     total_batch_size = 6144  # number of tokens per batch
     B = 256  # number of samples per batch
@@ -342,7 +343,7 @@ def main():
     grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
     # Configure train and validation dataloaders.
-    train_loader = DataLoader(
+    train_loader = DataLoaderShuffle(
         B=B,
         T=T,
         process_rank=ddp.rank,
@@ -358,7 +359,7 @@ def main():
         run_number=run_number,
         suffix='v'
     )
-
+    print('valid indices', len(train_loader.process_valid_indices))
     # Number steps required to pass over full dataset x n_epochs.
     max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
     tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
@@ -543,6 +544,7 @@ def main():
                 
                 loss_steps.append(loss_accum.item())
 
+        """CHECKPOINTING"""
         if (step % checkpoint_interval == 0):# and (step > 0):
             logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
@@ -552,11 +554,9 @@ def main():
                 save_model(model, model_name, run_number, is_checkpoint=True, compile=args.compile,
                            step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
                            val_loss_steps=val_loss_steps)
-                # args.checkpoint_interval *= 10
                 logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
 
             if args.enforce_data_epochs:
-                logger.info(f'prior to data reset (training): {train_loader.current_position}')
                 train_loader.current_position = 0
 
     # Call this function after the model training code
