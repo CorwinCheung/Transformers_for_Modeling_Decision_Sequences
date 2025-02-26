@@ -401,7 +401,6 @@ class DataLoaderShuffle(DataLoader):
 class DDPConfig:
     def __init__(self):
         # Check if we're in a SLURM environment
-        slurm_job_id = os.environ.get('SLURM_JOB_ID')
         slurm_procid = os.environ.get('SLURM_PROCID')
         slurm_localid = os.environ.get('SLURM_LOCALID')
         
@@ -410,8 +409,10 @@ class DDPConfig:
         local_rank = os.environ.get('LOCAL_RANK')
         world_size = os.environ.get('WORLD_SIZE')
         
+        print(slurm_procid, rank, local_rank, world_size)
         # Determine if we're in a distributed environment
-        self.ddp = (rank is not None and int(rank) != -1) or (slurm_procid is not None)
+        self.ddp = (int(os.environ.get('WORLD_SIZE', 1)) > 1) or (int(os.environ.get('SLURM_NTASKS', 1)) > 1)
+        # self.ddp = (rank is not None and int(rank) != -1) or (slurm_procid is not None)
         
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
@@ -422,7 +423,6 @@ class DDPConfig:
                 self.rank = int(slurm_procid)
                 self.local_rank = int(slurm_localid) if slurm_localid is not None else 0
                 self.world_size = int(os.environ.get('SLURM_NTASKS', 1))
-                
                 # Set PyTorch DDP environment variables if they're not already set
                 if rank is None:
                     os.environ['RANK'] = str(self.rank)
@@ -449,14 +449,12 @@ class DDPConfig:
             if 'CUDA_VISIBLE_DEVICES' in os.environ:
                 print(f"Rank {self.rank}: CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
             
-            # Use the local_rank to set the device
-            torch.cuda.set_device(self.local_rank)
-            self.device = torch.device(f'cuda:{self.local_rank}')
-            
             self.master_process = (self.rank == 0)
             
             # Initialize the process group
             try:
+                print(self.rank, self.local_rank, self.world_size)
+
                 dist.init_process_group(
                     backend="nccl",
                     timeout=timedelta(minutes=30),
@@ -464,7 +462,11 @@ class DDPConfig:
                     rank=self.rank,
                     world_size=self.world_size
                 )
-                dist.barrier()
+                dist.barrier()            
+                # Use the local_rank to set the device
+                torch.cuda.set_device(self.local_rank)
+                self.device = torch.device(f'cuda:{self.local_rank}')
+
             except Exception as e:
                 print(f"Error initializing process group: {e}")
                 print(f"Environment variables: RANK={os.environ.get('RANK')}, LOCAL_RANK={os.environ.get('LOCAL_RANK')}, "

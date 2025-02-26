@@ -305,9 +305,10 @@ def load_trained_model(run, model_name, device, **kwargs):
     # Load the trained model
     model = GPT(config)
     model_path = fm.get_experiment_file(f'{model_name}.pth', run, subdir='models')
+    
     try:
         model.load_state_dict(torch.load(model_path, map_location=device, **kwargs))
-    except Exception as e:
+    except Exception:
         print(model_path)
         checkpoint = torch.load(model_path, map_location=device,  **kwargs)
         print(checkpoint.keys())

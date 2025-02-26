@@ -9,6 +9,7 @@ import torch
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 import utils.file_management as fm
 from utils.parse_data import load_trained_model
+from torch.nn import functional as F
 
 seed = 200
 random.seed(seed)
@@ -27,7 +28,7 @@ itos = {i: ch for i, ch in enumerate(vocab)}
 def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
 
-def generate_predictions(model, tokens, max_context_length):
+def generate_predictions(model, tokens, max_context_length, policy='argmax'):
     model.eval()
     predicted_indices = []
     N = len(tokens)
@@ -41,10 +42,15 @@ def generate_predictions(model, tokens, max_context_length):
             logits, _ = model(input_ids)
 
         last_logits = logits[0, -1, :]
-        # predicted_index = torch.argmax(last_logits).item() #not drawing from it, just taking the most likely
-        probs = F.softmax(last_logits, dim=0) #drawing from the distribution
+    
+        if policy == 'softmax':
+            probs = F.softmax(last_logits, dim=0) #drawing from the distribution
+            predicted_index = torch.multinomial(probs, 1).item()  # Sample from the full distribution
+        elif policy == 'argmax':
+            predicted_index = torch.argmax(last_logits).item() #not drawing from it, just taking the most likely
+        else:
+            raise ValueError(f"Invalid policy: {policy}")
         
-        predicted_index = torch.multinomial(probs, 1).item()  # Sample from the full distribution
         predicted_indices.append(predicted_index) #sanity check
 
         # if i % 1000 == 0 and i > 0:

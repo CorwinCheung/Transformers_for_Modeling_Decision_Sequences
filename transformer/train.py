@@ -109,7 +109,12 @@ def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None,
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
     logger.info("Saving model at: %s", model_path)
-    state_dict = model._orig_mod.state_dict() if compile else model.state_dict()
+    if isinstance(model, DDP):
+        state_dict = model.module.state_dict()
+    elif compile:
+        state_dict = model._orig_mod.state_dict()
+    else:
+        state_dict = model.state_dict()
     if is_checkpoint:
         checkpoint = {
             'model_state_dict': state_dict,
@@ -230,12 +235,15 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
 
     # Reduce the loss across all processes if using DDP
     if ddp.ddp:
-        dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
+        
         if isinstance(avg_loss, dict):
+            # dist.all_reduce(avg_loss['full_loss'], op=dist.ReduceOp.SUM)
             for key in avg_loss.keys():
-                avg_loss[key] = avg_loss[key] / ddp.world_size
+                dist.all_reduce(avg_loss[key], op=dist.ReduceOp.SUM)
+                # avg_loss[key] = avg_loss[key] / ddp.world_size
         else:
-            avg_loss = avg_loss / ddp.world_size
+            dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
+            # avg_loss = avg_loss / ddp.world_size
     model.train()  # Switch back to training mode
     if predict:
         return avg_loss, predictions
@@ -335,10 +343,8 @@ def main():
         'warmup_steps': 1000,
     }
 
-    #torchrun --standalone --nproc_per_node=2 train.py  # to launch ddp
-
     # Training setup
-    total_batch_size = 36864  # number of tokens per batch
+    total_batch_size = 6144 * ddp.world_size # 36864  # number of tokens per batch
     B = 256  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
@@ -348,7 +354,7 @@ def main():
     grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
     # Configure train and validation dataloaders.
-    train_loader = DataLoaderShuffle(
+    train_loader = DataLoader(
         B=B,
         T=T,
         process_rank=ddp.rank,
@@ -368,7 +374,8 @@ def main():
     # Number steps required to pass over full dataset x n_epochs.
     max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
     tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
-    model_name = f"model_seen{fm.format_tokens(tokens_trained_on)}"
+    n_samples = B * train_loader.batches_per_epoch * args.epochs * ddp.world_size
+    model_name = f"model_seen{fm.format_tokens(n_samples)}"
 
     if ddp.master_process:
         logger.info(f"total desired batch size: {total_batch_size}")
@@ -442,33 +449,34 @@ def main():
         device=ddp.device,
         master_process=ddp.master_process)
 
-    # if ddp.ddp:
+    if ddp.ddp:
         dist.barrier()
-
-    if ddp.rank == 0:
-    #     wandb.init(
-    #         project="gpt-training",
-    #         config={
-    #             "run_number": run_number,
-    #             "total_batch_size": total_batch_size,
-    #             "max_lr": lr_schedule['max_lr'],
-    #             "min_lr": lr_schedule['min_lr'],
-    #             "warmup_steps": lr_schedule['warmup_steps'],
-    #             "max_steps": max_steps,
-    #             "B": B,
-    #             "T": T,
-    #             "grad_accum_steps": grad_accum_steps,
-    #             "vocab_size": 4,
-    #             "n_layer": args.n_layer,
-    #             "n_head": args.n_head,
-    #             "n_embd": args.n_embd,
-    #             # "learning_rate": args.max_lr,
-    #             "task_id": args.task_id
-    #         },
-    #         name=f"run_task_{args.task_id}",  # Name the run based on the task ID
-    #         dir="/tmp",
-    #     )
-    #     wandb.watch(model)
+    print(f"Rank: {ddp.rank}, Local Rank: {ddp.local_rank}, World Size: {ddp.world_size}")
+    print(f"Rank: {ddp.rank},", train_loader.process_valid_indices[:10])
+    if ddp.master_process:
+        wandb.init(
+            project="gpt-training",
+            config={
+                "run_number": run_number,
+                "total_batch_size": total_batch_size,
+                "max_lr": lr_schedule['max_lr'],
+                "min_lr": lr_schedule['min_lr'],
+                "warmup_steps": lr_schedule['warmup_steps'],
+                "max_steps": max_steps,
+                "B": B,
+                "T": T,
+                "grad_accum_steps": grad_accum_steps,
+                "vocab_size": 4,
+                "n_layer": args.n_layer,
+                "n_head": args.n_head,
+                "n_embd": args.n_embd,
+                # "learning_rate": args.max_lr,
+                "task_id": args.task_id
+            },
+            name=f"run_task_{args.task_id}",  # Name the run based on the task ID
+            dir="/tmp",
+        )
+        wandb.watch(model)
 
     # Training loop
     for step in range(starting_step, max_steps):
@@ -516,13 +524,13 @@ def main():
         """VALIDATION SAMPLING"""
         # Print logging information every 100 steps
         if step % args.eval_interval == 0 or step == max_steps - 1:
+            if args.predict:
+                val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
+                write_predictions(model_name, predictions, step==(max_steps-1))
+            else:
+                val_loss = estimate_loss(model, val_loader, ddp, step, predict=False)
+            
             if ddp.master_process:
-                if args.predict:
-                    val_loss, predictions = estimate_loss(model, val_loader, step, predict=True)
-                    write_predictions(model_name, predictions, step==(max_steps-1))
-                else:
-                    val_loss = estimate_loss(model, val_loader, step, predict=False)
-                
                 if isinstance(val_loss, dict):
                     for key in val_loss.keys():
                         if key not in val_loss_steps:
@@ -554,16 +562,15 @@ def main():
                 loss_steps.append(loss_accum.item())
 
         """CHECKPOINTING"""
-        if (step % checkpoint_interval == 0):# and (step > 0):
+        if (step % checkpoint_interval == 0) and ddp.master_process:# and (step > 0):
             logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
-            if ddp.master_process:
-                # Save the model checkpoint
-                save_model(model, model_name, run_number, is_checkpoint=True, compile=args.compile,
-                           step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
-                           val_loss_steps=val_loss_steps)
-                logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
+            # Save the model checkpoint
+            save_model(model, model_name, run_number, is_checkpoint=True, compile=args.compile,
+                        step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
+                        val_loss_steps=val_loss_steps)
+            logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
 
             if args.enforce_data_epochs:
                 if ddp.master_process:
@@ -572,6 +579,8 @@ def main():
 
     # Call this function after the model training code
     if ddp.master_process:
+        if ddp.ddp:
+            model = model.module
         save_model(model, model_name, run_number, compile=args.compile)
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         wandb.finish()
