@@ -250,14 +250,6 @@ class BaseDataLoader:
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
         self.behavior_file = behavior_file
 
-    def is_valid_sequence(self, start_idx, length):
-        """Check if a sequence of given length starting at start_idx crosses any session boundary."""
-        end_idx = start_idx + length - 1
-        for transition in self.session_transitions:
-            if start_idx < transition <= end_idx:
-                return False
-        return True
-
     def get_valid_indices(self, min_length):
         """Get all valid starting indices for sequences of at least min_length."""
         valid_indices = []
@@ -315,35 +307,73 @@ class DataLoader(BaseDataLoader):
             return x, y, y_indices
         return x, y
 
-class DataLoaderLite(BaseDataLoader):
+class DataLoaderLite(DataLoader):
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         super().__init__(B, T, process_rank, num_processes, run_number, suffix)
-        self.current_position = self.B * self.T * self.process_rank
-        self.batches_per_epoch = len(self.tokens) // (self.B * self.T)
+        # self.current_position = 0 # self.B * self.T * self.process_rank
+        self.valid_indices = self.filter_overlapping_indices(self.valid_indices, T)
+        # self.batches_per_epoch = len(self.valid_indices) // (self.B * self.T)
+
+        # Assign indices to processes
+        self.indices_per_process = len(self.valid_indices) // num_processes
+        start_idx = process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
+        self.process_valid_indices = self.valid_indices[start_idx:end_idx]
+        
+        self.current_position = 0
+        self.batches_per_epoch = len(self.process_valid_indices) // B
+        self.suffix = suffix
 
     def handle_batch_overflow(self):
-        self.current_position = self.B * self.T * self.process_rank
+        self.current_position = 0 # self.B * self.T * self.process_rank
 
-    def next_batch(self, return_indices=False):
-        """Get next batch of data."""
-        B, T = self.B, self.T
+    # def next_batch(self, return_indices=False):
+    #     """Get next batch of data."""
+    #     B, T = self.B, self.T
 
-        if self.current_position + B * T * self.num_processes + 1 > len(self.tokens):
-            self.handle_batch_overflow()
+    #     if self.current_position + B * T * self.num_processes + 1 > len(self.valid_indices):
+    #         self.handle_batch_overflow()
     
-        buf = self.tokens[self.current_position:self.current_position + B * T + 1]
-        index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
+    #     buf = self.tokens[self.current_position:self.current_position + B * T + 1]
+    #     index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
 
-        x = buf[:-1].view(B, T)
-        y = buf[1:].view(B, T)
-        # Track original indices for each target token
-        y_indices = index_buf[1:].view(B, T)
+    #     x = buf[:-1].view(B, T)
+    #     y = buf[1:].view(B, T)
+    #     # Track original indices for each target token
+    #     y_indices = index_buf[1:].view(B, T)
 
-        self.current_position += B * T * self.num_processes
+    #     self.current_position += B * T * self.num_processes
 
-        if return_indices:
-            return x, y, y_indices
-        return x, y
+    #     if return_indices:
+    #         return x, y, y_indices
+    #     return x, y
+    
+    def filter_overlapping_indices(self, indices, context_length):
+        """Filter out indices that would be included within the context length of other indices.
+        
+        Args:
+            indices (torch.Tensor): Tensor of valid starting indices
+            context_length (int): Context length (T)
+            
+        Returns:
+            torch.Tensor: Filtered indices with no overlaps
+        """
+        if len(indices) == 0:
+            return indices
+            
+        # Sort indices first
+        sorted_indices = torch.sort(indices)[0]
+        
+        # Initialize with the first index
+        filtered_indices = [sorted_indices[0].item()]
+        
+        # Iterate through sorted indices
+        for idx in sorted_indices[1:]:
+            # Check if this index is at least T positions away from the last accepted index
+            if idx >= filtered_indices[-1] + context_length:
+                filtered_indices.append(idx.item())
+        
+        return torch.tensor(filtered_indices, dtype=torch.long)
     
 class DataLoaderShuffle(DataLoader):
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):

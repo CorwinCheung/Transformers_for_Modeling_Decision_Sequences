@@ -14,7 +14,7 @@ import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from transformer.transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, DataLoaderShuffle
+from transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, DataLoaderShuffle
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm

@@ -10,7 +10,7 @@ import pandas as pd
 import torch
 
 import utils.file_management as fm
-from transformer import GPT, GPTConfig
+from transformer.transformer import GPT, GPTConfig
 
 
 def parse_simulated_data(behavior_filename, high_port_filename, session_filename, clip_short_blocks=False):
@@ -305,7 +305,13 @@ def load_trained_model(run, model_name, device, **kwargs):
     # Load the trained model
     model = GPT(config)
     model_path = fm.get_experiment_file(f'{model_name}.pth', run, subdir='models')
-    model.load_state_dict(torch.load(model_path, map_location=device, **kwargs))
+    try:
+        model.load_state_dict(torch.load(model_path, map_location=device, **kwargs))
+    except Exception as e:
+        print(model_path)
+        checkpoint = torch.load(model_path, map_location=device,  **kwargs)
+        print(checkpoint.keys())
+        model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
 
