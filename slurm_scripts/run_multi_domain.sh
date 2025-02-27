@@ -15,6 +15,7 @@ BASE_PATH="."  # Get parent directory of script location
 INFERENCE_PATH="${BASE_PATH}/transformer/inference"
 
 module load python/3.12.5-fasrc01
+# module load cuda/12.2.0-fasrc01
 
 # Initialize Conda/Mamba properly
 eval "$(conda shell.bash hook)"  # Initialize shell hook
@@ -33,7 +34,7 @@ get_next_run() {
 }
 
 RUN_NUMBER=$(get_next_run)
-# RUN_NUMBER=1  # Override for testing; remove if you want automatic run numbering.
+RUN_NUMBER=20  # Override for testing; remove if you want automatic run numbering.
 echo "Starting run $RUN_NUMBER"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
@@ -43,9 +44,6 @@ python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
-
-printf '%*s\n' 80 '' | tr ' ' '-'
-echo -e "graphs_on_trial_block_transitions.py\n"
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
 printf '%*s\n' 80 '' | tr ' ' '-'
@@ -77,8 +75,6 @@ end_time=$(date +%s)
 total_time=$((end_time-start_time))
 echo "Total Training Time= $total_time seconds"
 
-printf '%*s\n' 80 '' | tr ' ' '-'
-echo -e "learning.py\n"
 # Only run first two step ranges for testing
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000
 python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000

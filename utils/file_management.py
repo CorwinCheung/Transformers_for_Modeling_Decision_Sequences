@@ -185,6 +185,10 @@ class ConditionalFormatter(logging.Formatter):
         super().__init__(fmt, datefmt)
     
     def format(self, record):
+        # Add default job_id if not present
+        if not hasattr(record, 'job_id'):
+            record.job_id = 'unknown'
+            
         if getattr(record, 'no_format', False):
             return record.getMessage()
         return super().format(record)
@@ -239,6 +243,6 @@ def setup_logging(run_number, component_name, module_name=None):
     # Create a logger specific to the module
     logger = logging.getLogger(module_name or component_name)
     
-    # Add SLURM job ID to logger's context
+    # Add SLURM job ID to logger's context  
     logger = FormattedLogger(logger, {'job_id': job_id})
     return logger

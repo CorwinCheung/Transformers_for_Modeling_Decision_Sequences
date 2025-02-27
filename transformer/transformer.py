@@ -218,7 +218,7 @@ class GPT(nn.Module):
         return optimizer
 
 
-class DataLoader:
+class BaseDataLoader:
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         """Initialize data loader for training or validation.
         
@@ -230,6 +230,7 @@ class DataLoader:
             run_number (int, optional): Run number to load. Defaults to latest run.
             suffix (str, optional): Dataset suffix ('tr' or 'v'). Defaults to 'tr'.
         """
+
         self.B = B
         self.T = T
         self.process_rank = process_rank
@@ -238,7 +239,13 @@ class DataLoader:
         # Get the behavior file path using the file management utility
         behavior_file = get_experiment_file("behavior_run_{}.txt", run_number, suffix, subdir='seqs')
         text = read_sequence(behavior_file)
-
+        sessions_file = behavior_file.replace('behavior', 'session_transitions')
+        self.session_transitions = []
+        with open(sessions_file, 'r') as f:
+            for line in f:
+                self.session_transitions.append(int(line.strip().split(',')[0]))
+        self.valid_indices = self.get_valid_indices(T + 1)  # +1 because we need T+1 tokens for x and y
+        
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
@@ -247,43 +254,170 @@ class DataLoader:
         
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
-        self.current_position = 0
-        self.batches_per_epoch = (len(self.tokens) - self.T) // (self.B * self.num_processes)  # double check this
         self.behavior_file = behavior_file
-        print(f"actual_position: {self.current_position + (self.process_rank * B)}, for process rank {self.process_rank}")
 
+    def get_valid_indices(self, min_length):
+        """Get all valid starting indices for sequences of at least min_length."""
+        valid_indices = []
+        prev_transition = 0
+        
+        for transition in self.session_transitions:
+            # For each session, find all valid starting points
+            for i in range(prev_transition, transition - min_length + 1):
+                valid_indices.append(i)
+            prev_transition = transition
+            
+        return torch.tensor(valid_indices, dtype=torch.long)
+        
+class DataLoader(BaseDataLoader):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+
+        # Assign indices to processes
+        self.indices_per_process = len(self.valid_indices) // num_processes
+        start_idx = process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
+        self.process_valid_indices = self.valid_indices[start_idx:end_idx]
+        
+        self.current_position = 0
+        self.batches_per_epoch = len(self.process_valid_indices) // B
+        self.suffix = suffix
+
+    def handle_batch_overflow(self):
+        if self.suffix == 'tr':
+            self.current_position = torch.randint(low=0, high=50, size=(1,)).item()  # to diversify batches
+        else:
+            self.current_position = 0
+    
     def next_batch(self, return_indices=False):
         """Get next batch of data."""
         B, T = self.B, self.T
-        data_size = len(self.tokens)
+
+        if self.current_position + B > len(self.process_valid_indices):
+            self.handle_batch_overflow()
         
-        # Calculate actual position including process offset
-        actual_position = self.current_position + (self.process_rank * B)
-        
-        # Create a range of starting positions, wrapping around if needed
-        x_indices = torch.tensor([(actual_position + i) % (data_size - T) for i in range(B)])
-        x_offsets = torch.arange(T).unsqueeze(0).expand(B, -1)
-        x_indices = x_indices.unsqueeze(1).expand(-1, T)
-        x_positions = x_indices + x_offsets
-        
-        # Get the tokens at these positions
-        x = self.tokens[x_positions]
-        y = self.tokens[(x_positions + 1) % data_size]
-        y_indices = self.original_indices[(x_positions + 1) % data_size]
-        
-        # Update position for next batch
-        self.current_position += B * self.num_processes
-        if self.current_position + B * self.num_processes + T > data_size:
-            self.current_position = 0
+        # Get starting indices for this batch
+        batch_start_indices = self.process_valid_indices[self.current_position:self.current_position+B]
+    
+        # Create a tensor of shape [B, T] with all required indices
+        offsets = torch.arange(T).unsqueeze(0).expand(B, -1)
+        indices = batch_start_indices.unsqueeze(1) + offsets
+        # Get x and y in a vectorized way
+        x = self.tokens[indices]
+        y = self.tokens[indices + 1]
+
+        self.current_position += B
         
         if return_indices:
+            y_indices = self.original_indices[indices + 1]
             return x, y, y_indices
         return x, y
 
+class DataLoaderLite(DataLoader):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+        # self.current_position = 0 # self.B * self.T * self.process_rank
+        self.valid_indices = self.filter_overlapping_indices(self.valid_indices, T)
+        # self.batches_per_epoch = len(self.valid_indices) // (self.B * self.T)
+
+        # Assign indices to processes
+        self.indices_per_process = len(self.valid_indices) // num_processes
+        start_idx = process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
+        self.process_valid_indices = self.valid_indices[start_idx:end_idx]
+        
+        self.current_position = 0
+        self.batches_per_epoch = len(self.process_valid_indices) // B
+        self.suffix = suffix
+
+    def handle_batch_overflow(self):
+        self.current_position = 0 # self.B * self.T * self.process_rank
+
+    # def next_batch(self, return_indices=False):
+    #     """Get next batch of data."""
+    #     B, T = self.B, self.T
+
+    #     if self.current_position + B * T * self.num_processes + 1 > len(self.valid_indices):
+    #         self.handle_batch_overflow()
+    
+    #     buf = self.tokens[self.current_position:self.current_position + B * T + 1]
+    #     index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
+
+    #     x = buf[:-1].view(B, T)
+    #     y = buf[1:].view(B, T)
+    #     # Track original indices for each target token
+    #     y_indices = index_buf[1:].view(B, T)
+
+    #     self.current_position += B * T * self.num_processes
+
+    #     if return_indices:
+    #         return x, y, y_indices
+    #     return x, y
+    
+    def filter_overlapping_indices(self, indices, context_length):
+        """Filter out indices that would be included within the context length of other indices.
+        
+        Args:
+            indices (torch.Tensor): Tensor of valid starting indices
+            context_length (int): Context length (T)
+            
+        Returns:
+            torch.Tensor: Filtered indices with no overlaps
+        """
+        if len(indices) == 0:
+            return indices
+            
+        # Sort indices first
+        sorted_indices = torch.sort(indices)[0]
+        
+        # Initialize with the first index
+        filtered_indices = [sorted_indices[0].item()]
+        
+        # Iterate through sorted indices
+        for idx in sorted_indices[1:]:
+            # Check if this index is at least T positions away from the last accepted index
+            if idx >= filtered_indices[-1] + context_length:
+                filtered_indices.append(idx.item())
+        
+        return torch.tensor(filtered_indices, dtype=torch.long)
+    
+class DataLoaderShuffle(DataLoader):
+    def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
+        super().__init__(B, T, process_rank, num_processes, run_number, suffix)
+        
+        torch.manual_seed(200 + process_rank)  # Use different seed for each process
+
+         # Assign indices to processes
+        start_idx = process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
+        self.shuffled_indices = torch.randperm(len(self.valid_indices))
+        self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
+        
+    def handle_batch_overflow(self):
+        # Reshuffle for next epoch
+        self.current_position = 0
+        torch.manual_seed(200 + self.process_rank + int(torch.randint(1, 1000, (1,)).item()))
+        self.shuffled_indices = torch.randperm(len(self.valid_indices))
+        start_idx = self.process_rank * self.indices_per_process
+        end_idx = start_idx + self.indices_per_process
+        self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
+    
 class DDPConfig:
     def __init__(self):
-        self.ddp = int(os.environ.get('RANK', -1)) != -1
-
+        # Check if we're in a SLURM environment
+        slurm_procid = os.environ.get('SLURM_PROCID')
+        slurm_localid = os.environ.get('SLURM_LOCALID')
+        
+        # Check if we're in a PyTorch DDP environment
+        rank = os.environ.get('RANK')
+        local_rank = os.environ.get('LOCAL_RANK')
+        world_size = os.environ.get('WORLD_SIZE')
+        
+        print(slurm_procid, rank, local_rank, world_size)
+        # Determine if we're in a distributed environment
+        self.ddp = (int(os.environ.get('WORLD_SIZE', 1)) > 1) or (int(os.environ.get('SLURM_NTASKS', 1)) > 1)
+        # self.ddp = (rank is not None and int(rank) != -1) or (slurm_procid is not None)
+        
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
             
@@ -293,34 +427,36 @@ class DDPConfig:
             self.world_size = int(os.environ.get('WORLD_SIZE'))
             
             
-            # Use the local_rank to set the device
-            torch.cuda.set_device(self.local_rank)
-            self.device = torch.device(f'cuda:{self.local_rank}')
-            
             self.master_process = (self.rank == 0)
             
-            # Initialize process group with retries for potential port conflicts
-            max_retries = 3
-            retry_count = 0
-            while retry_count < max_retries:
-                try:
-                    # Use a plain barrier to synchronize all processes
-                    dist.init_process_group(
-                        backend="nccl",
-                        timeout=timedelta(minutes=30),
-                        init_method="env://",
-                        rank=self.rank,
-                        world_size=self.world_size
-                    )
-                    dist.barrier()
-                    break
-                except RuntimeError as e:
-                    retry_count += 1
-                    if "address already in use" in str(e).lower() and retry_count < max_retries:
-                        print(f"Port conflict detected. Retrying in 10 seconds... ({retry_count}/{max_retries})")
-                        time.sleep(10)  # Wait before retrying
-                    else:
-                        raise  # Re-raise if max retries reached or different error
+            # Initialize the process group
+            try:
+                print(self.rank, self.local_rank, self.world_size)
+
+                dist.init_process_group(
+                    backend="nccl",
+                    timeout=timedelta(minutes=30),
+                    init_method="env://",
+                    rank=self.rank,
+                    world_size=self.world_size
+                )
+                dist.barrier()            
+                # Use the local_rank to set the device
+                torch.cuda.set_device(self.local_rank)
+                self.device = torch.device(f'cuda:{self.local_rank}')
+
+            except Exception as e:
+                print(f"Error initializing process group: {e}")
+                print(f"Environment variables: RANK={os.environ.get('RANK')}, LOCAL_RANK={os.environ.get('LOCAL_RANK')}, "
+                      f"WORLD_SIZE={os.environ.get('WORLD_SIZE')}, MASTER_ADDR={os.environ.get('MASTER_ADDR')}, "
+                      f"MASTER_PORT={os.environ.get('MASTER_PORT')}")
+                # Fall back to single-process mode
+                self.ddp = False
+                self.rank = 0
+                self.local_rank = 0
+                self.world_size = 1
+                self.master_process = True
+                self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             
             print(f"Process {self.rank} initialized successfully: "
                   f"local_rank={self.local_rank}, master_process={self.master_process}")

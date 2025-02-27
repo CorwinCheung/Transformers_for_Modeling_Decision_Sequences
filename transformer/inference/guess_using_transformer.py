@@ -4,13 +4,12 @@ import sys
 import time
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 # Add the project root directory to Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from transformer.transformer import GPT, GPTConfig
+sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 import utils.file_management as fm
+from utils.parse_data import load_trained_model
+from torch.nn import functional as F
 
 seed = 200
 random.seed(seed)
@@ -29,7 +28,7 @@ itos = {i: ch for i, ch in enumerate(vocab)}
 def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
 
-def generate_predictions(model, tokens, max_context_length):
+def generate_predictions(model, tokens, max_context_length, policy='argmax'):
     model.eval()
     predicted_indices = []
     N = len(tokens)
@@ -43,10 +42,15 @@ def generate_predictions(model, tokens, max_context_length):
             logits, _ = model(input_ids)
 
         last_logits = logits[0, -1, :]
-        # predicted_index = torch.argmax(last_logits).item() #not drawing from it, just taking the most likely
-        probs = F.softmax(last_logits, dim=0) #drawing from the distribution
+    
+        if policy == 'softmax':
+            probs = F.softmax(last_logits, dim=0) #drawing from the distribution
+            predicted_index = torch.multinomial(probs, 1).item()  # Sample from the full distribution
+        elif policy == 'argmax':
+            predicted_index = torch.argmax(last_logits).item() #not drawing from it, just taking the most likely
+        else:
+            raise ValueError(f"Invalid policy: {policy}")
         
-        predicted_index = torch.multinomial(probs, 1).item()  # Sample from the full distribution
         predicted_indices.append(predicted_index) #sanity check
 
         # if i % 1000 == 0 and i > 0:
@@ -85,35 +89,12 @@ def main(run=None, model_name=None):
     if run is None:
         run = fm.get_latest_run()
 
-    # Get model info from metadata
-    model_info = fm.parse_model_info(run, model_name=model_name)
+    model, model_info, config = load_trained_model(run=run, model_name=model_name, device=device, weights_only=True)
     if model_name is None:
         model_name = model_info['model_name']
     else:
         assert (model_info['model_name'] == model_name) or (model_info['model_name'] == model_name.split('_cp')[0]), (
             'did not recover correct model')
-
-    # Configure model using metadata
-    config = GPTConfig(
-        block_size=model_info['config'].get('Block size', 12),
-        vocab_size=model_info['config'].get('Vocab size', 4),
-        n_layer=model_info['config'].get('Number of layers', 1),
-        n_head=model_info['config'].get('Number of heads', 1),
-        n_embd=model_info['config'].get('Embedding size', 64)
-    )
-    # Load the trained model
-    # config = GPTConfig()
-    model = GPT(config)
-    model_path = fm.get_experiment_file(f'{model_name}.pth', run, subdir='models')
-    print(model_path)
-    if model_name.find('cp') == -1:
-        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
-    else:
-        checkpoint = torch.load(model_path, map_location=device, weights_only=True)
-        model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device)
-    model.eval()
-
     # Load and preprocess the new data
     behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
     text = fm.read_sequence(behavior_file)

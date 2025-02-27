@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 
 import utils.file_management as fm
 from evaluation.graph_helper import (calc_bpos_behavior, plot_bpos_behavior,
-                                     plot_conditional_switching)
+                                     plot_conditional_switching, get_data_filenames)
 from utils import parse_data
 
 logger = None
@@ -17,16 +17,10 @@ def initialize_logger(run_number):
 def main(run=None, suffix: str = 'v'):
 
     initialize_logger(run)
-    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
-    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
-    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
-    logger.info(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
+    files = get_data_filenames(run, suffix=suffix)
+    logger.info(f"Analyzing data from:\n {f}\n" for f in files)
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
-
-    # Parse the files
-    events = parse_data.parse_simulated_data(behavior_filename, high_port_filename, session_filename)
-
+    events = parse_data.parse_simulated_data(*files)
     if events is not None:
         # Calculate and print the percent of trials with a switch
         percent_switches = events['switch'].mean()*100
