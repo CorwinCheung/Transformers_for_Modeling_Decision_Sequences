@@ -12,7 +12,7 @@ import utils.file_management as fm
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../../behavior-helpers/')))
 from bh.visualization import plot_trials as pts
 
-from utils.parse_data import add_sequence_columns, parse_simulated_data
+from utils.parse_data import add_sequence_columns, parse_simulated_data, get_data_filenames
 
 def initialize_logger(run):
     global logger

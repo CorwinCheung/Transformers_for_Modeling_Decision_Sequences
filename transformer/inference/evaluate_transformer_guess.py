@@ -9,7 +9,7 @@ import seaborn as sns
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
 import utils.file_management as fm
-from utils.parse_data import align_predictions_with_gt, parse_simulated_data
+from utils.parse_data import align_predictions_with_gt, parse_simulated_data, get_data_filenames
 
 def initialize_logger(run):
     global logger
@@ -101,19 +101,16 @@ session boundaries'''
 
 
 def load_data(run, model_name):
-    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
-    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'v', subdir='seqs')
-    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, 'v', subdir='seqs')
-    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
-
-    logger.info(f'behavior_filename: {behavior_filename}')
-    logger.info(f'high_port_filename: {high_port_filename}')
-    logger.info(f'session_filename: {session_filename}')
-
-    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename, predictions_filename)
 
     # Parse the ground truth events and map in predictions
-    ground_truth = parse_simulated_data(behavior_filename, high_port_filename, session_filename)    
+    files = get_data_filenames(run, suffix='v')
+    logger.info(f"Analyzing data from:\n {f}\n" for f in files)
+
+    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
+    assert fm.check_files_exist(predictions_filename)
+
+    # Parse the ground truth events and map in predictions
+    ground_truth = parse_simulated_data(*files)    
     predictions = list(fm.read_sequence(predictions_filename))
 
     assert len(ground_truth) == len(predictions), (

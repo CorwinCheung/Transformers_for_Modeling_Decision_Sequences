@@ -1,12 +1,10 @@
 import os
-# Add the project root directory to Python path
 import sys
-
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 import utils.file_management as fm
-from utils.parse_data import parse_simulated_data
+from utils.parse_data import parse_simulated_data, get_data_filenames
 
 logger = None
 
@@ -59,13 +57,10 @@ def print_switches(analysis):
 def main(run=None):
 
     initialize_logger(run)
-    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, 'tr', subdir='seqs')
-    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, 'tr', subdir='seqs')
-    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, 'tr', subdir='seqs')
+    files = get_data_filenames(run, suffix='tr')
 
-    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
-    logger.info(f"Analyzing data from:\n {behavior_filename}\n {high_port_filename}")
-    analysis = analyze_data(behavior_filename, high_port_filename, session_filename)
+    logger.info(f"Analyzing data from:\n {f}\n" for f in files)
+    analysis = analyze_data(*files)
     if analysis:
         for domain, stats in analysis.items():
             logger.raw(f'\n\nAnalysis for Domain {domain}')

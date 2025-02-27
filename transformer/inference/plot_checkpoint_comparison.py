@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 import utils.file_management as fm
 #so that I can import from a directory two levels up
 from evaluation.graph_helper import calc_bpos_behavior
-from utils.parse_data import align_predictions_with_gt, parse_simulated_data
+from utils.parse_data import align_predictions_with_gt, parse_simulated_data, get_data_filenames
 
 
 def main(run=None, suffix: str = 'v'):
@@ -35,11 +35,8 @@ def main(run=None, suffix: str = 'v'):
     model_name = model_files[0].split('/')[-1].split('_cp')[0]
 
     # Load ground truth data once
-    behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
-    high_port_file = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
-    session_file = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
-    
-    gt_events = parse_simulated_data(behavior_file, high_port_file, session_file)
+    files = get_data_filenames(run, suffix=suffix)
+    gt_events = parse_simulated_data(*files)
     domains = sorted(gt_events['domain'].unique())
 
     # Create figure with two subplots for each domain
