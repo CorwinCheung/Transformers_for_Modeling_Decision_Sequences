@@ -13,6 +13,14 @@ import utils.file_management as fm
 from transformer.transformer import GPT, GPTConfig
 
 
+def get_data_filenames(run, suffix='tr'):
+    behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
+    high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", run, suffix, subdir='seqs')
+    session_filename = fm.get_experiment_file("session_transitions_run_{}.txt", run, suffix, subdir='seqs')
+    assert fm.check_files_exist(behavior_filename, high_port_filename, session_filename)
+    return behavior_filename, high_port_filename, session_filename
+
+
 def parse_simulated_data(behavior_filename, high_port_filename, session_filename, clip_short_blocks=False):
     """Parse simulated data from behavior, high port, and session files.
 
