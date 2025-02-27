@@ -338,17 +338,10 @@ def main():
     # Set up DDP
     ddp = DDPConfig()
     
-    # If DDP initialization was successful, add explicit barrier
-    if ddp.ddp:
-        try:
-            print(f"Process {ddp.rank} waiting at barrier...")
-            dist.barrier()
-            print(f"Process {ddp.rank} passed barrier")
-        except Exception as e:
-            print(f"Process {ddp.rank} barrier error: {e}")
-            # Continue anyway, but mark DDP as failed
-            ddp.ddp = False
-    
+    ddp.rank = int(os.environ.get('SLURM_PROCID'))
+    ddp.local_rank = int(os.environ.get('SLURM_LOCALID'))
+    ddp.master_process = (ddp.rank == 0)
+    ddp.world_size = int(os.environ.get('SLURM_NTASKS'))
     # After DDP setup, print again with the configured rank
     print(f"After DDP setup: I am process with rank={ddp.rank}, local_rank={ddp.local_rank}, master_process={ddp.master_process}")
     
@@ -495,6 +488,7 @@ def main():
             dir="/tmp",
         )
         wandb.watch(model)
+        print("DDP WORLD SIZE: ", ddp.world_size)
 
     # Training loop
     for step in range(starting_step, max_steps):

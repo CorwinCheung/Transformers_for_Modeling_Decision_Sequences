@@ -242,36 +242,38 @@ class DataLoader:
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
-        print(f"read in {len(tokens)} tokens from {behavior_file}")
+        if process_rank == 0:
+            print(f"read in {len(tokens)} tokens from {behavior_file}")
         
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
         self.current_position = 0
         self.batches_per_epoch = (len(self.tokens) - self.T) // (self.B * self.num_processes)  # double check this
         self.behavior_file = behavior_file
+        print(f"actual_position: {self.current_position + (self.process_rank * B)}, for process rank {self.process_rank}")
 
     def next_batch(self, return_indices=False):
         """Get next batch of data."""
         B, T = self.B, self.T
+        data_size = len(self.tokens)
         
         # Calculate actual position including process offset
         actual_position = self.current_position + (self.process_rank * B)
         
-        # Get window of tokens for contexts (x) and targets (y)
-        x_indices = torch.arange(actual_position, actual_position + B) # Starting indices for each sequence
-        x_offsets = torch.arange(T).unsqueeze(0).expand(B, -1) # Offsets for each position in sequence
-        x_indices = x_indices.unsqueeze(1).expand(-1, T) # Expand indices to match offsets
-        x_positions = x_indices + x_offsets # [B, T] tensor of positions
-        
+        # Create a range of starting positions, wrapping around if needed
+        x_indices = torch.tensor([(actual_position + i) % (data_size - T) for i in range(B)])
+        x_offsets = torch.arange(T).unsqueeze(0).expand(B, -1)
+        x_indices = x_indices.unsqueeze(1).expand(-1, T)
+        x_positions = x_indices + x_offsets
         
         # Get the tokens at these positions
-        x = self.tokens[x_positions]  # [B, T]
-        y = self.tokens[x_positions + 1]  # [B, T] (shifted by 1)
-        y_indices = self.original_indices[x_positions + 1]  # [B, T]
+        x = self.tokens[x_positions]
+        y = self.tokens[(x_positions + 1) % data_size]
+        y_indices = self.original_indices[(x_positions + 1) % data_size]
         
         # Update position for next batch
         self.current_position += B * self.num_processes
-        if self.current_position + B * self.num_processes + T > len(self.tokens):
+        if self.current_position + B * self.num_processes + T > data_size:
             self.current_position = 0
         
         if return_indices:
@@ -280,153 +282,53 @@ class DataLoader:
 
 class DDPConfig:
     def __init__(self):
-        """Initialize distributed data parallel configuration with robust handling for multi-node setups."""
-        import os
-        import socket
-        import time
-        import torch
-        import torch.distributed as dist
-        
-        # Get SLURM environment variables
-        self.slurm_procid = os.environ.get('SLURM_PROCID')
-        self.slurm_localid = os.environ.get('SLURM_LOCALID')
-        self.slurm_nodeid = os.environ.get('SLURM_NODEID')
-        self.slurm_ntasks = os.environ.get('SLURM_NTASKS')
-        
-        # Set up process identity based on SLURM variables
-        if self.slurm_procid is not None:
-            self.rank = int(self.slurm_procid)
-            self.local_rank = int(self.slurm_localid) if self.slurm_localid else 0
-            self.world_size = int(self.slurm_ntasks) if self.slurm_ntasks else 1
+        self.ddp = int(os.environ.get('RANK', -1)) != -1
+
+        if self.ddp:
+            assert torch.cuda.is_available(), "need CUDA for DDP"
             
-            # Print detailed node/process information
-            hostname = socket.gethostname()
-            print(f"Process {self.rank}/{self.world_size} (local_rank={self.local_rank}) "
-                  f"on node {self.slurm_nodeid} ({hostname})")
+            # Use SLURM_LOCALID for local rank
+            self.local_rank = int(os.environ.get('SLURM_PROCID')) - int(os.environ.get('SLURM_NODEID')) * int(os.environ.get('SLURM_NTASKS_PER_NODE'))
+            self.rank = int(os.environ.get('SLURM_PROCID'))
+            self.world_size = int(os.environ.get('WORLD_SIZE'))
             
-            # Force only IPv4 connections
-            self._force_ipv4()
             
-            # Set up environment variables for PyTorch DDP
-            os.environ['RANK'] = str(self.rank)
-            os.environ['LOCAL_RANK'] = str(self.local_rank)
-            os.environ['WORLD_SIZE'] = str(self.world_size)
+            # Use the local_rank to set the device
+            torch.cuda.set_device(self.local_rank)
+            self.device = torch.device(f'cuda:{self.local_rank}')
             
-            # Configure device
-            if torch.cuda.is_available():
-                torch.cuda.set_device(self.local_rank)
-                self.device = torch.device(f'cuda:{self.local_rank}')
-                gpu_name = torch.cuda.get_device_name(self.local_rank)
-                print(f"Process {self.rank} using GPU {self.local_rank}: {gpu_name}")
-            else:
-                self.device = torch.device('cpu')
-                print(f"Process {self.rank} using CPU")
-            
-            # Set master_process flag
             self.master_process = (self.rank == 0)
             
-            # Initialize DDP
-            self.ddp = self._initialize_process_group()
+            # Initialize process group with retries for potential port conflicts
+            max_retries = 3
+            retry_count = 0
+            while retry_count < max_retries:
+                try:
+                    # Use a plain barrier to synchronize all processes
+                    dist.init_process_group(
+                        backend="nccl",
+                        timeout=timedelta(minutes=30),
+                        init_method="env://",
+                        rank=self.rank,
+                        world_size=self.world_size
+                    )
+                    dist.barrier()
+                    break
+                except RuntimeError as e:
+                    retry_count += 1
+                    if "address already in use" in str(e).lower() and retry_count < max_retries:
+                        print(f"Port conflict detected. Retrying in 10 seconds... ({retry_count}/{max_retries})")
+                        time.sleep(10)  # Wait before retrying
+                    else:
+                        raise  # Re-raise if max retries reached or different error
+            
+            print(f"Process {self.rank} initialized successfully: "
+                  f"local_rank={self.local_rank}, master_process={self.master_process}")
         else:
-            # Single-process mode
             self.rank = 0
             self.local_rank = 0
             self.world_size = 1
             self.master_process = True
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            self.ddp = False
-        
-        # Set device type
+            
         self.device_type = "cuda" if str(self.device).startswith("cuda") else "cpu"
-    
-    def _force_ipv4(self):
-        """Force socket connections to use IPv4 only."""
-        import socket
-        
-        # Save original function
-        original_getaddrinfo = socket.getaddrinfo
-        
-        # Define IPv4-only version
-        def getaddrinfo_ipv4_only(*args, **kwargs):
-            responses = original_getaddrinfo(*args, **kwargs)
-            return [response for response in responses if response[0] == socket.AF_INET]
-        
-        # Replace with our version
-        socket.getaddrinfo = getaddrinfo_ipv4_only
-        print(f"Process {self.rank}: Forced IPv4-only connections")
-    
-    def _initialize_process_group(self, max_retries=3):
-        """Initialize the process group with retries."""
-        import torch.distributed as dist
-        import time
-        from datetime import timedelta
-        
-        # Print connection details
-        master_addr = os.environ.get('MASTER_ADDR', 'Unknown')
-        master_port = os.environ.get('MASTER_PORT', 'Unknown')
-        print(f"Process {self.rank} connecting to {master_addr}:{master_port}")
-        
-        # Add staggered start - delay based on rank
-        if self.rank != 0:
-            delay = 1 + (self.rank * 0.5)
-            print(f"Process {self.rank} waiting {delay:.1f}s for initialization")
-            time.sleep(delay)
-        
-        # Try to initialize with retries
-        for attempt in range(max_retries):
-            try:
-                # Initialize the process group
-                if not dist.is_initialized():
-                    print(f"Process {self.rank} initializing DDP (attempt {attempt+1}/{max_retries})")
-                    
-                    # Set timeout
-                    timeout = timedelta(minutes=5)
-                    
-                    # Initialize with NCCL
-                    dist.init_process_group(
-                        backend="nccl",
-                        timeout=timeout
-                    )
-                    
-                    # Verify with simple collective operation
-                    if self._verify_process_group():
-                        print(f"Process {self.rank} DDP initialization successful")
-                        return True
-                    else:
-                        print(f"Process {self.rank} DDP verification failed")
-                        if dist.is_initialized():
-                            dist.destroy_process_group()
-            except Exception as e:
-                print(f"Process {self.rank} DDP initialization attempt {attempt+1} failed: {e}")
-                # Wait before retry with increasing backoff
-                time.sleep(5 * (attempt + 1))
-        
-        print(f"Process {self.rank} failed all DDP initialization attempts")
-        return False
-    
-    def _verify_process_group(self):
-        """Verify the process group is working correctly with a simple collective operation."""
-        import torch.distributed as dist
-        import torch
-        
-        try:
-            # Create a small tensor for verification
-            tensor = torch.tensor([self.rank + 1], device=self.device)
-            
-            # Try to all-reduce it
-            dist.all_reduce(tensor)
-            
-            # Calculate expected sum: 1 + 2 + ... + world_size
-            expected = self.world_size * (self.world_size + 1) // 2
-            
-            # Check if result matches expected
-            result = tensor.item()
-            if abs(result - expected) < 1e-3:  # Allow small floating point difference
-                print(f"Process {self.rank} collective operation verified: {result} == {expected}")
-                return True
-            else:
-                print(f"Process {self.rank} collective operation gave wrong result: {result} != {expected}")
-                return False
-        except Exception as e:
-            print(f"Process {self.rank} verification failed: {e}")
-            return False
