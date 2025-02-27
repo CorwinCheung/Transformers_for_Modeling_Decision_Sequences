@@ -298,36 +298,16 @@ def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_step
     checkpoint_steps = (checkpoint_interval * steps_per_epoch)
     return checkpoint_steps
 
-def check_cuda_setup():
-    """Verify CUDA setup for torch.compile()"""
-    logger.info("PyTorch version: %s", torch.__version__)
-    logger.info("CUDA available: %s", torch.cuda.is_available())
-    logger.info("CUDA version: %s", torch.version.cuda)
-    if torch.cuda.is_available():
-        logger.info("GPU device: %s", torch.cuda.get_device_name(0))
-    
-    can_compile = torch.cuda.is_available() and torch.version.cuda is not None
-    logger.info("Can use torch.compile(): %s", can_compile)
-    return can_compile
-
-def main():
-    # Print GPU information - this will print from all processes
-    print_gpu_info()
-    
-    # Set random seeds
+def main():    
     seed = 200
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
     torch.set_float32_matmul_precision('high')
-
-    # Parse arguments
     args = parse_args()
-
-    # Set up DDP
     ddp = DDPConfig()
-    
+    #redeclare variables if they didn't get passed through
     ddp.rank = int(os.environ.get('SLURM_PROCID'))
     ddp.local_rank = int(os.environ.get('SLURM_LOCALID'))
     ddp.master_process = (ddp.rank == 0)
@@ -335,7 +315,6 @@ def main():
     # After DDP setup, print again with the configured rank
     print(f"After DDP setup: I am process with rank={ddp.rank}, local_rank={ddp.local_rank}, master_process={ddp.master_process}")
     
-    # Data parameters
     global run_number
     run_number = args.run_number or fm.get_latest_run()
     initialize_logger(run_number, is_master_process=ddp.master_process)
@@ -343,11 +322,6 @@ def main():
     if ddp.master_process:
         logger.info("Starting training script with args: %s", args)
 
-    if args.compile and not check_cuda_setup():
-        logger.warning("Compilation requested but CUDA setup incomplete. Will skip compilation.")
-        args.compile = False
-    
-    # Learning rate schedule
     lr_schedule ={
         'max_lr': args.max_lr,
         'min_lr': args.max_lr * 0.1,
@@ -355,8 +329,8 @@ def main():
     }
 
     # Training setup
-    total_batch_size = 6144 * ddp.world_size # 36864  # number of tokens per batch
-    B = 256  # number of samples per batch
+    total_batch_size = 192 * ddp.world_size # number of tokens per batch = inference steps with our dense dataloader
+    B = 16  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
         "make sure total batch size is divisible by B * T * ddp.world_size")
@@ -364,7 +338,6 @@ def main():
     # Number of micro steps to reach total batch size (inner training loop).
     grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
-    # Configure train and validation dataloaders.
     train_loader = DataLoader(
         B=B,
         T=T,
@@ -374,7 +347,7 @@ def main():
         suffix='tr'
     )
     val_loader = DataLoader(
-        B=B,
+        B=512,
         T=T,
         process_rank=ddp.rank,
         num_processes=ddp.world_size,
@@ -384,7 +357,6 @@ def main():
     print('valid indices', len(train_loader.process_valid_indices))
     # Number steps required to pass over full dataset x n_epochs.
     max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
-    tokens_trained_on = total_batch_size * max_steps  # ~n_epochs * len(data)
     n_samples = B * train_loader.batches_per_epoch * args.epochs * ddp.world_size
     model_name = f"model_seen{fm.format_tokens(n_samples)}"
 
@@ -431,7 +403,6 @@ def main():
         logger.info(f"Starting from step {starting_step}")
         logger.info('Num loss steps: %d', len(loss_steps))
         logger.info('Adjusted from: %d', len(checkpoint['loss_steps']))
-
         # Remove any predictions made after the checkpoint was saved.
         update_predictions_file(model_name, starting_step)
         model.to(ddp.device)
@@ -453,7 +424,7 @@ def main():
         model = DDP(model, device_ids=[ddp.local_rank])
     raw_model = model.module if ddp.ddp else model
 
-    # I think optimizer can be configured here?
+    # Configure optimizer.
     optimizer = raw_model.configure_optimizers(
         weight_decay=0.1,
         learning_rate=lr_schedule['max_lr'],
@@ -481,7 +452,6 @@ def main():
                 "n_layer": args.n_layer,
                 "n_head": args.n_head,
                 "n_embd": args.n_embd,
-                # "learning_rate": args.max_lr,
                 "task_id": args.task_id
             },
             name=f"run_task_{args.task_id}",  # Name the run based on the task ID
@@ -494,7 +464,6 @@ def main():
     for step in range(starting_step, max_steps):
 
         if ddp.device_type == 'cuda':
-            # Synchronize for CUDA
             torch.cuda.synchronize()
         t0 = time.time()
         optimizer.zero_grad()
@@ -508,7 +477,7 @@ def main():
 
             # Forward pass and loss computation
             with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
-                _, loss = model(x, y)
+                _, loss = model(x, y, choice_only=True)
             loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
             loss_accum += loss.detach()  # Track the total loss
             if ddp.ddp:
@@ -524,7 +493,6 @@ def main():
 
         optimizer.step()
         if ddp.device_type == 'cuda':
-            # Synchronize for CUDA
             torch.cuda.synchronize()
         # Time the step and calculate tokens processed per second
         t1 = time.time()
@@ -532,7 +500,7 @@ def main():
         tokens_per_sec = (train_loader.B * train_loader.T) * grad_accum_steps * ddp.world_size/ (t1 - t0)
 
         """VALIDATION SAMPLING"""
-        # Print logging information every 100 steps
+        # Print logging information every eval_interval steps
         if step % args.eval_interval == 0 or step == max_steps - 1:
             if args.predict:
                 val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
@@ -572,7 +540,7 @@ def main():
                 loss_steps.append(loss_accum.item())
 
         """CHECKPOINTING"""
-        if (step % checkpoint_interval == 0) and ddp.master_process:# and (step > 0):
+        if (step % checkpoint_interval == 0) and ddp.master_process:
             logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
@@ -587,7 +555,6 @@ def main():
                     logger.info(f'prior to data reset (training): {train_loader.current_position}')
                 train_loader.current_position = 0
 
-    # Call this function after the model training code
     if ddp.master_process:
         if ddp.ddp:
             model = model.module
@@ -598,11 +565,9 @@ def main():
     if ddp.ddp:
         # Make sure all processes reach this point before saving
         dist.barrier()
-        
         # Only the master process should save the model
         if ddp.master_process:
             save_model(model, model_name, run_number, compile=args.compile)
-        
         # Wait for save to complete
         dist.barrier()
 

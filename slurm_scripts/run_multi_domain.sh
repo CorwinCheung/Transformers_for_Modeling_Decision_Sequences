@@ -39,7 +39,7 @@ echo "Starting run $RUN_NUMBER"
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "\ngenerate_data.py"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 1000000
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 10000
 
 printf '%*s\n' 80 '' | tr ' ' '-'
 echo -e "basic_evaluation.py\n"

@@ -3,11 +3,7 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import timedelta
-import datetime
 import torch.distributed as dist
-import subprocess
-import socket
-import time
 
 import torch
 import torch.nn as nn
@@ -139,9 +135,14 @@ class GPT(nn.Module):
 
         return combined_logits, combined_targets
 
-    def calculate_loss(self, logits, targets=None, by_feature=False):
-
-        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
+    def calculate_loss(self, logits, targets=None, choice_only=False, by_feature=False):
+        
+        if choice_only:
+            logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
+            loss = F.cross_entropy(logits_choice.view(-1, logits_choice.size(-1)),
+                                   targets_choice.view(-1))
+        else:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
 
         if by_feature:
             logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
@@ -332,27 +333,6 @@ class DataLoaderLite(DataLoader):
 
     def handle_batch_overflow(self):
         self.current_position = 0 # self.B * self.T * self.process_rank
-
-    # def next_batch(self, return_indices=False):
-    #     """Get next batch of data."""
-    #     B, T = self.B, self.T
-
-    #     if self.current_position + B * T * self.num_processes + 1 > len(self.valid_indices):
-    #         self.handle_batch_overflow()
-    
-    #     buf = self.tokens[self.current_position:self.current_position + B * T + 1]
-    #     index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
-
-    #     x = buf[:-1].view(B, T)
-    #     y = buf[1:].view(B, T)
-    #     # Track original indices for each target token
-    #     y_indices = index_buf[1:].view(B, T)
-
-    #     self.current_position += B * T * self.num_processes
-
-    #     if return_indices:
-    #         return x, y, y_indices
-    #     return x, y
     
     def filter_overlapping_indices(self, indices, context_length):
         """Filter out indices that would be included within the context length of other indices.
