@@ -362,7 +362,7 @@ def main():
         suffix='tr'
     )
     val_loader = DataLoader(
-        B=256,
+        B=512,
         T=T,
         process_rank=ddp.rank,
         num_processes=ddp.world_size,
