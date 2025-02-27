@@ -4,6 +4,7 @@ import sys
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
@@ -24,7 +25,8 @@ def main(run=None, suffix: str = 'v'):
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
     # Find all checkpoint files
-    checkpoint_files = sorted(glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_*cp*.txt")))
+    checkpoint_files = sorted(glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_*cp*.txt")), 
+                            key=lambda x: int(x.split('_cp')[-1].replace('.txt', '')))
     model_files = glob.glob(os.path.join(fm.get_run_dir(run), 'models', "model_*.pth"))
     if not checkpoint_files:
         print(f"No checkpoint models found in run {run}")
@@ -42,9 +44,14 @@ def main(run=None, suffix: str = 'v'):
     # Create figure with two subplots for each domain
     fig, axes = plt.subplots(2, len(domains), figsize=(4.5*len(domains), 6),
                              sharex=True, layout='constrained')
+    
+    # Convert axes to numpy array for consistent handling regardless of domain count
+    axes = np.array(axes)
+    
+    # If we have only one domain, reshape to maintain 2D structure
     if len(domains) == 1:
-        axes = np.atleast_2d(axes).T
-        
+        axes = axes.reshape(2, 1)
+
     colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
     for pred_file, color in zip(checkpoint_files, colors):
         # Load predictions for this checkpoint
@@ -74,8 +81,12 @@ def main(run=None, suffix: str = 'v'):
         ax_[1].set(xlabel='block position', xlim=(-10, 20),
                    ylabel='P(pred switch)', ylim=(0, 0.3))
 
-    [ax_[1].get_legend().set_visible(False) for ax_ in axes.T[:-1]]
-    ax_[1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Checkpoint')
+    # Modify legend display based on domains
+    if len(domains) > 1:
+        [ax_[1].get_legend().set_visible(False) for ax_ in axes.T[:-1]]
+        axes.T[-1][1].legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Checkpoint')
+    else:
+        axes[1, 0].legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Checkpoint')
 
     sns.despine()
     fig_path = fm.get_experiment_file(f'bpos_checkpoints_{model_name}.png', run, subdir='predictions')

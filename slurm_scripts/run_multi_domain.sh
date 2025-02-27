@@ -3,9 +3,9 @@
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
-#SBATCH --nodes=3
-#SBATCH --ntasks-per-node=4
-#SBATCH --gres=gpu:4
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=08:00:00  
 #SBATCH --mem=60GB
@@ -18,10 +18,10 @@ source "$(dirname "$0")/common_functions.sh"
 setup_environment
 
 # Initialize run number (optionally override)
-initialize_run
+initialize_run 20
 
 print_section_header "Data Generation"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 1000000
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 10000
 
 print_section_header "Basic Evaluation"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER

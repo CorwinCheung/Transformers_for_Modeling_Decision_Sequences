@@ -4,7 +4,6 @@ import sys
 from dataclasses import dataclass
 from datetime import timedelta
 import torch.distributed as dist
-import subprocess
 
 import torch
 import torch.nn as nn
@@ -136,9 +135,14 @@ class GPT(nn.Module):
 
         return combined_logits, combined_targets
 
-    def calculate_loss(self, logits, targets=None, by_feature=False):
-
-        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
+    def calculate_loss(self, logits, targets=None, choice_only=False, by_feature=False):
+        
+        if choice_only:
+            logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
+            loss = F.cross_entropy(logits_choice.view(-1, logits_choice.size(-1)),
+                                   targets_choice.view(-1))
+        else:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) if targets is not None else None
 
         if by_feature:
             logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
@@ -246,7 +250,8 @@ class BaseDataLoader:
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
-        print(f"read in {len(tokens)} tokens from {behavior_file}")
+        if process_rank == 0:
+            print(f"read in {len(tokens)} tokens from {behavior_file}")
         
         self.tokens = torch.tensor(tokens, dtype=torch.long)
         self.original_indices = torch.tensor(range(len(tokens)), dtype=torch.long)
@@ -328,27 +333,6 @@ class DataLoaderLite(DataLoader):
 
     def handle_batch_overflow(self):
         self.current_position = 0 # self.B * self.T * self.process_rank
-
-    # def next_batch(self, return_indices=False):
-    #     """Get next batch of data."""
-    #     B, T = self.B, self.T
-
-    #     if self.current_position + B * T * self.num_processes + 1 > len(self.valid_indices):
-    #         self.handle_batch_overflow()
-    
-    #     buf = self.tokens[self.current_position:self.current_position + B * T + 1]
-    #     index_buf = self.original_indices[self.current_position:self.current_position + B * T + 1]
-
-    #     x = buf[:-1].view(B, T)
-    #     y = buf[1:].view(B, T)
-    #     # Track original indices for each target token
-    #     y_indices = index_buf[1:].view(B, T)
-
-    #     self.current_position += B * T * self.num_processes
-
-    #     if return_indices:
-    #         return x, y, y_indices
-    #     return x, y
     
     def filter_overlapping_indices(self, indices, context_length):
         """Filter out indices that would be included within the context length of other indices.
@@ -417,37 +401,11 @@ class DDPConfig:
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
             
-            # Set up rank, local_rank, and world_size based on available environment variables
-            if slurm_procid is not None:
-                # We're in a SLURM environment
-                self.rank = int(slurm_procid)
-                self.local_rank = int(slurm_localid) if slurm_localid is not None else 0
-                self.world_size = int(os.environ.get('SLURM_NTASKS', 1))
-                # Set PyTorch DDP environment variables if they're not already set
-                if rank is None:
-                    os.environ['RANK'] = str(self.rank)
-                if local_rank is None:
-                    os.environ['LOCAL_RANK'] = str(self.local_rank)
-                if world_size is None:
-                    os.environ['WORLD_SIZE'] = str(self.world_size)
-                
-                # Set master address and port if not already set
-                if 'MASTER_ADDR' not in os.environ:
-                    # Get the first node in the job
-                    cmd = "scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1"
-                    master_addr = subprocess.check_output(cmd, shell=True).decode().strip()
-                    os.environ['MASTER_ADDR'] = master_addr
-                
-                if 'MASTER_PORT' not in os.environ:
-                    os.environ['MASTER_PORT'] = '12355'  # Default port
-            else:
-                # We're in a PyTorch DDP environment
-                self.rank = int(rank)
-                self.local_rank = int(local_rank) if local_rank is not None else 0
-                self.world_size = int(world_size) if world_size is not None else 1
+            # Use SLURM_LOCALID for local rank
+            self.local_rank = int(os.environ.get('SLURM_PROCID')) - int(os.environ.get('SLURM_NODEID')) * int(os.environ.get('SLURM_NTASKS_PER_NODE'))
+            self.rank = int(os.environ.get('SLURM_PROCID'))
+            self.world_size = int(os.environ.get('WORLD_SIZE'))
             
-            if 'CUDA_VISIBLE_DEVICES' in os.environ:
-                print(f"Rank {self.rank}: CUDA_VISIBLE_DEVICES={os.environ['CUDA_VISIBLE_DEVICES']}")
             
             self.master_process = (self.rank == 0)
             
@@ -480,8 +438,8 @@ class DDPConfig:
                 self.master_process = True
                 self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             
-            print(f"Process {self.rank} on node {os.uname()[1]}: master_process={self.master_process}, "
-                  f"RANK={os.environ.get('RANK', 'not set')}, LOCAL_RANK={os.environ.get('LOCAL_RANK', 'not set')}")
+            print(f"Process {self.rank} initialized successfully: "
+                  f"local_rank={self.local_rank}, master_process={self.master_process}")
         else:
             self.rank = 0
             self.local_rank = 0
