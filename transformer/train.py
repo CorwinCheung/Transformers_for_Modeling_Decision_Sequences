@@ -323,7 +323,6 @@ def main():
 
     # Set up DDP if using, mimic it if not.
     ddp = DDPConfig()
-
     # Data parameters
     global run_number
     run_number = args.run_number or fm.get_latest_run()
@@ -344,8 +343,8 @@ def main():
     }
 
     # Training setup
-    total_batch_size = 6144 * ddp.world_size # 36864  # number of tokens per batch
-    B = 256  # number of samples per batch
+    total_batch_size = 192 * ddp.world_size # 36864  # number of tokens per batch
+    B = 16  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
         "make sure total batch size is divisible by B * T * ddp.world_size")
@@ -363,7 +362,7 @@ def main():
         suffix='tr'
     )
     val_loader = DataLoader(
-        B=B,
+        B=256,
         T=T,
         process_rank=ddp.rank,
         num_processes=ddp.world_size,
