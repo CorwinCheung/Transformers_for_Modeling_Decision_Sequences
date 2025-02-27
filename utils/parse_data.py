@@ -288,6 +288,8 @@ def align_predictions_with_gt(events, predictions):
     events_['pred_switch'] = ((events_['pred_choice_str'] != events_['prev_choice'])
                               .where(events_['prev_choice'].notna(), np.nan)
                               .astype('Int64'))
+    events_['pred_correct_k0'] = events_['pred_k0'] == events_['k0']
+    events_['pred_correct_choice'] = events_['pred_choice'] == events_['choice']
 
     return events_
 
