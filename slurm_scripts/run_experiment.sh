@@ -2,32 +2,38 @@
 #SBATCH --job-name=basic-workflow
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --gpus-per-node=4
+#SBATCH --gres=gpu:4          
 #SBATCH --cpus-per-task=16
-#SBATCH --time=12:00:00  
-#SBATCH --mem=80GB
+#SBATCH --time=01:00:00  
+#SBATCH --mem=200GB
 #SBATCH --partition=kempner
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
 
 # Source common functions
-source "$(dirname "$0")/common_functions.sh"
+source "./slurm_scripts/common_functions.sh"
 
 # Setup environment
 setup_environment
 
 # Initialize run number (optionally override)
-initialize_run # 60
+initialize_run 5
 
 # Data generation and basic evaluation
 print_section_header "Data Generation"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 100000 --no_overwrite
+# python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 100000 --no_overwrite
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps_val=1000000 --no_overwrite  --num_steps_train=100000
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
+# Setup distributed environment
+setup_distributed_environment
+
 print_section_header "Model Training"
-python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
+# python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
+srun python ${BASE_PATH}/transformer/train.py --epochs=1000 --run $RUN_NUMBER --checkpoint_interval=100 --eval_interval=1000 --predict --batch_size=256 --choice_only # --enforce_data_epochs
 
 # Setup GPU environment for inference
 setup_gpu_environment
@@ -40,6 +46,7 @@ LEARNING_COMMANDS=(
     "python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=1000 --step_max=10000"
     "python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER --step_min=10000 --step_max=100000"
     "python ${INFERENCE_PATH}/learning.py --run $RUN_NUMBER"
+    "python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER"
 )
 
 # Run learning commands (will run sequentially if only 1 GPU)
@@ -47,9 +54,9 @@ run_on_gpus "${LEARNING_COMMANDS[@]}"
 
 # Transformer evaluation
 print_section_header "Transformer Evaluation"
-python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER
 python ${INFERENCE_PATH}/evaluate_transformer_guess.py --run $RUN_NUMBER
 python ${INFERENCE_PATH}/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER
+python ${BASE_PATH}/evaluation/inspect_data.py --run $RUN_NUMBER
 
 # Process checkpoints in parallel
 print_section_header "Processing Checkpoints"

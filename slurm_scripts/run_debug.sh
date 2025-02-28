@@ -13,7 +13,6 @@
 #SBATCH --error=slurm_output/%j.err
 
 # Source common functions
-
 source "./slurm_scripts/common_functions.sh"
 
 # Setup environment
@@ -32,7 +31,7 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 setup_distributed_environment
 
 # Run distributed training
-srun python ${BASE_PATH}/transformer/train.py --epochs=1000 --run $RUN_NUMBER --checkpoint_interval=100 --eval_interval=1000 --predict # --compile  # --enforce_data_epochs
+srun python ${BASE_PATH}/transformer/train.py --epochs=1000 --run $RUN_NUMBER --checkpoint_interval=100 --eval_interval=1000 --predict # --enforce_data_epochs
 
 # Setup GPU environment for inference
 setup_gpu_environment
