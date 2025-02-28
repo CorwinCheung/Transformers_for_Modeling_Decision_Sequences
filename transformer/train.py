@@ -51,6 +51,9 @@ def parse_args():
     parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
     parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of epochs between checkpoints')
     parser.add_argument('--enforce_data_epochs', action='store_true', default=False, help='Flag to force data loader to reset')
+    parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
+    parser.add_argument('--choice_only', action='store_true', default=False,
+                        help='Objective to optimize -- choice only excludes reward prediction')
     args = parser.parse_args()
     return args
 
@@ -329,9 +332,9 @@ def main():
     }
 
     # Training setup
-    total_batch_size = 192 * ddp.world_size # number of tokens per batch = inference steps with our dense dataloader
-    B = 16  # number of samples per batch
+    B = args.batch_size  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
+    total_batch_size = 2 * B * T * ddp.world_size # number of tokens per batch = inference steps with our dense dataloader
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
         "make sure total batch size is divisible by B * T * ddp.world_size")
 
@@ -354,6 +357,7 @@ def main():
         run_number=run_number,
         suffix='v'
     )
+    logger.info(f"Train loader class: {train_loader.__class__.__name__}")
     print('valid indices', len(train_loader.process_valid_indices))
     # Number steps required to pass over full dataset x n_epochs.
     max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
@@ -477,7 +481,7 @@ def main():
 
             # Forward pass and loss computation
             with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
-                _, loss = model(x, y, choice_only=True)
+                _, loss = model(x, y, choice_only=args.choice_only)
             loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
             loss_accum += loss.detach()  # Track the total loss
             if ddp.ddp:
@@ -554,22 +558,24 @@ def main():
                 if ddp.master_process:
                     logger.info(f'prior to data reset (training): {train_loader.current_position}')
                 train_loader.current_position = 0
-
+    
+    dist.barrier()
     if ddp.master_process:
         if ddp.ddp:
             model = model.module
         save_model(model, model_name, run_number, compile=args.compile)
+        write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         wandb.finish()
         plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
-    if ddp.ddp:
-        # Make sure all processes reach this point before saving
-        dist.barrier()
-        # Only the master process should save the model
-        if ddp.master_process:
-            save_model(model, model_name, run_number, compile=args.compile)
-        # Wait for save to complete
-        dist.barrier()
+    # if ddp.ddp:
+    #     # Make sure all processes reach this point before saving
+    #     dist.barrier()
+    #     # Only the master process should save the model
+    #     if ddp.master_process:
+    #         save_model(model, model_name, run_number, compile=args.compile)
+    #     # Wait for save to complete
+    #     dist.barrier()
 
     if ddp.ddp:
         destroy_process_group()
