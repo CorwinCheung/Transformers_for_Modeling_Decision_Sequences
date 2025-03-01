@@ -48,13 +48,16 @@ def parse_args():
     parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
     parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
-    parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
-    parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of epochs between checkpoints')
+    parser.add_argument('--eval_interval', type=int, default=None, help='Interval to evaluate the model')
+    parser.add_argument('--checkpoint_interval', type=int, default=None, help='Number of epochs between checkpoints')
     parser.add_argument('--enforce_data_epochs', action='store_true', default=False, help='Flag to force data loader to reset')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
     parser.add_argument('--choice_only', action='store_true', default=False,
                         help='Objective to optimize -- choice only excludes reward prediction')
     args = parser.parse_args()
+
+    if args.checkpoint_interval is None:
+        args.checkpoint_interval = int(args.epochs // 10)
     return args
 
 def write_predictions(model_name, predictions, last_step=False):
@@ -341,7 +344,7 @@ def main():
     # Number of micro steps to reach total batch size (inner training loop).
     grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
-    train_loader = DataLoader(
+    train_loader = DataLoaderShuffle(
         B=B,
         T=T,
         process_rank=ddp.rank,
@@ -363,6 +366,10 @@ def main():
     max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
     n_samples = B * train_loader.batches_per_epoch * args.epochs * ddp.world_size
     model_name = f"model_seen{fm.format_tokens(n_samples)}"
+
+    if args.eval_interval is None:
+        args.eval_interval = max(1, int(max_steps // 100))
+        logger.info(f"Setting eval interval to {args.eval_interval}")
 
     if ddp.master_process:
         logger.info(f"total desired batch size: {total_batch_size}")

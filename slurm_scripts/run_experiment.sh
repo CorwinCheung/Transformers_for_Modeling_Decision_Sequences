@@ -19,12 +19,12 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Initialize run number (optionally override)
-initialize_run 5
+initialize_run 21
 
 # Data generation and basic evaluation
 print_section_header "Data Generation"
 # python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 100000 --no_overwrite
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps_val=1000000 --no_overwrite  --num_steps_train=100000
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps_val=100_000 --no_overwrite  --num_steps_train=1_000
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
@@ -33,7 +33,7 @@ setup_distributed_environment
 
 print_section_header "Model Training"
 # python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
-srun python ${BASE_PATH}/transformer/train.py --epochs=1000 --run $RUN_NUMBER --checkpoint_interval=100 --eval_interval=1000 --predict --batch_size=256 --choice_only # --enforce_data_epochs
+srun python ${BASE_PATH}/transformer/train.py --epochs=1000 --run $RUN_NUMBER --predict --batch_size=16 # --enforce_data_epochs
 
 # Setup GPU environment for inference
 setup_gpu_environment
