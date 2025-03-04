@@ -9,7 +9,9 @@ import seaborn as sns
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
 import utils.file_management as fm
-from utils.parse_data import align_predictions_with_gt, parse_simulated_data, get_data_filenames
+from utils.parse_data import (align_predictions_with_gt, get_data_filenames,
+                              load_predictions, parse_simulated_data)
+
 
 def initialize_logger(run):
     global logger
@@ -77,47 +79,24 @@ def calculate_accuracy_ignore_case(ground_truth, predictions):
     return correct / len(ground_truth) if len(ground_truth) > 0 else 0
 
 
-'''Switch calculations should now be done on fully parsed file to handle
-session boundaries'''
-# def calculate_switch_percentage_with_gt(predictions, ground_truth):
-#     """ Calculate switch percentage between 'R'/'r' and 'L'/'l'"""
-#     upper_preds = [c.upper() for c in predictions]
-#     upper_gt = [c.upper() for c in ground_truth]
-#     switches = sum(
-#         1 for i in range(1, len(upper_preds))
-#         if upper_preds[i] != upper_gt[i - 1]
-#     )
-#     total_transitions = len(upper_preds) - 1
-#     return (switches / total_transitions) * 100 if total_transitions > 0 else 0
+# def load_data(run, model_name):
 
-# def calculate_switch_percentage_within_gt(ground_truth):
-#     upper_gt = [c.upper() for c in ground_truth]
-#     switches = sum(
-#         1 for i in range(1, len(upper_gt))
-#         if upper_gt[i] != upper_gt[i - 1]
-#     )
-#     total_transitions = len(upper_gt) - 1
-#     return (switches / total_transitions) * 100 if total_transitions > 0 else 0
+#     # Parse the ground truth events and map in predictions
+#     files = get_data_filenames(run, suffix='v')
+#     logger.info(f"Analyzing data from:\n {f}\n" for f in files)
 
+#     predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
+#     assert fm.check_files_exist(predictions_filename)
 
-def load_data(run, model_name):
+#     # Parse the ground truth events and map in predictions
+#     ground_truth = parse_simulated_data(*files)    
+#     predictions = list(fm.read_sequence(predictions_filename))
 
-    # Parse the ground truth events and map in predictions
-    files = get_data_filenames(run, suffix='v')
-    logger.info(f"Analyzing data from:\n {f}\n" for f in files)
+#     assert len(ground_truth) == len(predictions), (
+#         "Ground truth and predictions have different lengths")
 
-    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
-    assert fm.check_files_exist(predictions_filename)
-
-    # Parse the ground truth events and map in predictions
-    ground_truth = parse_simulated_data(*files)    
-    predictions = list(fm.read_sequence(predictions_filename))
-
-    assert len(ground_truth) == len(predictions), (
-        "Ground truth and predictions have different lengths")
-
-    aligned_data = align_predictions_with_gt(ground_truth, predictions)
-    return aligned_data
+#     aligned_data = align_predictions_with_gt(ground_truth, predictions)
+#     return aligned_data
 
 
 def main(run=None, model_name=None):
@@ -131,7 +110,8 @@ def main(run=None, model_name=None):
         # Get model info from metadata
         model_info = fm.parse_model_info(run, model_name=model_name)
         model_name = model_info['model_name']
-    aligned_data = load_data(run, model_name)
+    aligned_data = load_predictions(run, model_name, suffix='v')
+    aligned_data = aligned_data.dropna()
 
     for domain, data in aligned_data.groupby('domain'):
         logger.raw(f'\nAnalysis for Domain {domain}')

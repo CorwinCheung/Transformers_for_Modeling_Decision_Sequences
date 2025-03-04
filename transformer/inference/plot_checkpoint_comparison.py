@@ -2,16 +2,16 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
-import numpy as np
-import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
 import utils.file_management as fm
 #so that I can import from a directory two levels up
 from evaluation.graph_helper import calc_bpos_behavior
-from utils.parse_data import align_predictions_with_gt, parse_simulated_data, get_data_filenames
+from utils.parse_data import (align_predictions_with_gt, get_data_filenames,
+                              parse_simulated_data)
 
 
 def main(run=None, suffix: str = 'v'):
@@ -25,9 +25,10 @@ def main(run=None, suffix: str = 'v'):
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
     # Find all checkpoint files
-    checkpoint_files = sorted(glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_*cp*.txt")), 
-                            key=lambda x: int(x.split('_cp')[-1].replace('.txt', '')))
+    checkpoint_files = sorted(glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_model*cp*.txt")), key=lambda x: int(x.split('_cp')[-1].replace('.txt', '')))
+    indices_files = sorted(glob.glob(os.path.join(fm.get_run_dir(run), 'seqs', "pred_indices_model*cp*.txt")), key=lambda x: int(x.split('_cp')[-1].replace('.txt', '')))
     model_files = glob.glob(os.path.join(fm.get_run_dir(run), 'models', "model_*.pth"))
+        
     if not checkpoint_files:
         print(f"No checkpoint models found in run {run}")
         return
@@ -53,10 +54,18 @@ def main(run=None, suffix: str = 'v'):
         axes = axes.reshape(2, 1)
 
     colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
-    for pred_file, color in zip(checkpoint_files, colors):
+    for pred_file, indices_file, color in zip(checkpoint_files, indices_files, colors):
+        
+        # Extract checkpoint numbers
+        assert pred_file.split('_cp')[-1].replace('.txt', '') == indices_file.split('_cp')[-1].replace('.txt', ''), (
+            f"Checkpoint numbers don't match between prediction file ({pred_file}) and indices file ({indices_file})"
+        )
+        
         # Load predictions for this checkpoint
         predictions = fm.read_sequence(pred_file)
-        events = align_predictions_with_gt(gt_events, predictions)
+        with open(indices_file, 'r') as f:
+            indices = [int(line.strip()) for line in f]
+        events = align_predictions_with_gt(gt_events, predictions, indices)
         bpos_ = calc_bpos_behavior(events,
                                    add_cond_cols=['domain', 'session'],
                                    add_agg_cols=['pred_switch', 'pred_selected_high'])

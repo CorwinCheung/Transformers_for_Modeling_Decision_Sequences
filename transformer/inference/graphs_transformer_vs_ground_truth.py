@@ -10,38 +10,29 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
 import utils.file_management as fm
 from evaluation.graph_helper import calc_bpos_behavior, plot_bpos_behavior
-from utils.parse_data import align_predictions_with_gt, parse_simulated_data, get_data_filenames
+from utils.parse_data import (align_predictions_with_gt, get_data_filenames,
+                              load_predictions, parse_simulated_data)
+
 
 def initialize_logger(run):
     global logger
     logger = fm.setup_logging(run, 'inference', 'graphs_transformer_vs_ground_truth')
 
+
 def main(run=None, model_name: str = None, suffix: str = 'v'):
-    
+
     # Files will automatically use latest run if run=None
     run = run or fm.get_latest_run()
     initialize_logger(run)
-    run_dir = fm.get_run_dir(run)
-    os.makedirs(os.path.join(run_dir, 'predictions'), exist_ok=True)
+    # run_dir = fm.get_run_dir(run)
+    # os.makedirs(os.path.join(run_dir, 'predictions'), exist_ok=True)
 
     # Get model info from metadata
     if model_name is None:
         model_info = fm.parse_model_info(run, model_name=model_name)
         model_name = model_info['model_name']
 
-    files = get_data_filenames(run, suffix=suffix)
-    logger.info(f"Analyzing data from:\n {f}\n" for f in files)
-
-    # Parse the ground truth events
-    gt_events = parse_simulated_data(*files)
-
-    predictions_filename = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
-    logger.info(f'predictions_filename: {predictions_filename}')
-    predictions = fm.read_sequence(predictions_filename)
-    logger.info(f"Number of events: {len(gt_events)}")
-    logger.info(f"Number of predictions: {len(predictions)}")
-
-    events = align_predictions_with_gt(gt_events, predictions)
+    events = load_predictions(run, model_name, suffix=suffix)
 
     # Calculate and print the percent of trials with a switch.
     percent_switches = round(events.pred_switch.mean() * 100, 2)
