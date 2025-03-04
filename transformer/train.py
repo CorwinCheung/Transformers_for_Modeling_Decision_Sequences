@@ -242,14 +242,13 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
 
     # Reduce the loss across all processes if using DDP
     if ddp.ddp:
-        
         if isinstance(avg_loss, dict):
             # dist.all_reduce(avg_loss['full_loss'], op=dist.ReduceOp.SUM)
             for key in avg_loss.keys():
-                dist.all_reduce(avg_loss[key], op=dist.ReduceOp.SUM)
+                dist.all_reduce(avg_loss[key], op=dist.ReduceOp.AVG)
                 # avg_loss[key] = avg_loss[key] / ddp.world_size
         else:
-            dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
+            dist.all_reduce(avg_loss, op=dist.ReduceOp.AVG)
             # avg_loss = avg_loss / ddp.world_size
     model.train()  # Switch back to training mode
     if predict:
@@ -344,7 +343,7 @@ def main():
     # Number of micro steps to reach total batch size (inner training loop).
     grad_accum_steps = total_batch_size // (B * T * ddp.world_size)
 
-    train_loader = DataLoaderShuffle(
+    train_loader = DataLoader(
         B=B,
         T=T,
         process_rank=ddp.rank,
@@ -444,6 +443,7 @@ def main():
 
     if ddp.ddp:
         dist.barrier()
+
     print(f"Rank: {ddp.rank}, Local Rank: {ddp.local_rank}, World Size: {ddp.world_size}")
     print(f"Rank: {ddp.rank},", train_loader.process_valid_indices[:10])
     if ddp.master_process:
@@ -566,7 +566,9 @@ def main():
                     logger.info(f'prior to data reset (training): {train_loader.current_position}')
                 train_loader.current_position = 0
     
-    dist.barrier()
+    if ddp.ddp:
+        dist.barrier()
+
     if ddp.master_process:
         if ddp.ddp:
             model = model.module

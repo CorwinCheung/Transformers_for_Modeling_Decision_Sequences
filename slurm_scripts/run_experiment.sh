@@ -2,11 +2,11 @@
 #SBATCH --job-name=basic-workflow
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
-#SBATCH --gpus-per-node=4
-#SBATCH --gres=gpu:4          
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --gres=gpu:1          
 #SBATCH --cpus-per-task=16
-#SBATCH --time=01:00:00  
+#SBATCH --time=02:00:00  
 #SBATCH --mem=200GB
 #SBATCH --partition=kempner
 #SBATCH --output=slurm_output/%j.out
@@ -19,12 +19,12 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Initialize run number (optionally override)
-initialize_run 21
+initialize_run
 
 # Data generation and basic evaluation
 print_section_header "Data Generation"
 # python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 100000 --no_overwrite
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps_val=100_000 --no_overwrite  --num_steps_train=1_000
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps_val=100_000 --no_overwrite --num_steps_train=10_000
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
@@ -33,7 +33,7 @@ setup_distributed_environment
 
 print_section_header "Model Training"
 # python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
-srun python ${BASE_PATH}/transformer/train.py --epochs=1000 --run $RUN_NUMBER --predict --batch_size=16 # --enforce_data_epochs
+srun python ${BASE_PATH}/transformer/train.py --epochs=10000 --run $RUN_NUMBER --predict --batch_size=256 # --enforce_data_epochs
 
 # Setup GPU environment for inference
 setup_gpu_environment
