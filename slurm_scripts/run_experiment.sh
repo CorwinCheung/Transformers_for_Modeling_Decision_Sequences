@@ -33,7 +33,7 @@ setup_distributed_environment
 
 print_section_header "Model Training"
 # python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
-srun python ${BASE_PATH}/transformer/train.py --predict --epochs=10 --run $RUN_NUMBER --batch_size=256 # --choice_only # --enforce_data_epochs
+srun python ${BASE_PATH}/transformer/train.py --predict --epochs=10 --run $RUN_NUMBER --batch_size=64 # --choice_only # --enforce_data_epochs
 
 # Setup GPU environment for inference
 setup_gpu_environment

@@ -6,22 +6,22 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=08:00:00  
+#SBATCH --cpus-per-task=16
+#SBATCH --time=01:00:00  
 #SBATCH --mem=60GB
 #SBATCH --partition=kempner
 
 # Source common functions
-source "$(dirname "$0")/common_functions.sh"
+source "./slurm_scripts/common_functions.sh"
 
 # Setup environment
 setup_environment
 
 # Initialize run number (optionally override)
-initialize_run 20
+initialize_run
 
 print_section_header "Data Generation"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps 10000
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --multiple_domains --num_steps_val=1_000_000 --no_overwrite --num_steps_train=100_000
 
 print_section_header "Basic Evaluation"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
@@ -38,7 +38,7 @@ start_time=$(date +%s)
 # Launch distributed training with srun
 srun python ${BASE_PATH}/transformer/train.py \
     --predict \
-    --epochs=100 \
+    --epochs=10 \
     --run_number $RUN_NUMBER
 
 # Record the end time
