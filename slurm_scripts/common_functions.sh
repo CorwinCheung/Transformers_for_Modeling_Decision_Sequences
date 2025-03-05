@@ -160,7 +160,7 @@ process_checkpoints() {
             # These must run in sequence for each checkpoint
             CUDA_VISIBLE_DEVICES=$gpu_id python ${INFERENCE_PATH}/guess_using_transformer.py --run $RUN_NUMBER --model_name $model_name
             CUDA_VISIBLE_DEVICES=$gpu_id python ${INFERENCE_PATH}/evaluate_transformer_guess.py --run $RUN_NUMBER --model_name $model_name
-            CUDA_VISIBLE_DEVICES=$gpu_id python ${INFERENCE_PATH}/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model_name $model_name
+            # CUDA_VISIBLE_DEVICES=$gpu_id python ${INFERENCE_PATH}/graphs_transformer_vs_ground_truth.py --run $RUN_NUMBER --model_name $model_name
         ) &
         
         # Store process ID for this GPU

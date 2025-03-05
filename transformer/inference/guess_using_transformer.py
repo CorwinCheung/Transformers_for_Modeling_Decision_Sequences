@@ -34,7 +34,7 @@ def encode_sequence(seq):
 def generate_predictions_by_batch(model, run, max_context_length, device, policy='argmax'):
 
     val_loader = DataLoader(
-        B=512,
+        B=2048,
         process_rank=0,
         num_processes=1,
         T=max_context_length,
@@ -52,13 +52,13 @@ def generate_predictions_by_batch(model, run, max_context_length, device, policy
         x, y, y_indices = val_loader.next_batch(return_indices=True)
         x, y = x.to(device), y.to(device)
         with torch.no_grad():
-            logits, _ = model(x, y, by_feature=True)
+            logits, _ = model(x, y, by_feature=False)
 
         last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size] 
 
         if policy == 'softmax':
-            probs = F.softmax(last_logits, dim=0)  # drawing from the distribution
-            pred_tokens = torch.multinomial(probs, 1).item()  # Sample from the full distribution
+            probs = F.softmax(last_logits, dim=-1)  # drawing from the distribution for each sample
+            pred_tokens = torch.multinomial(probs, num_samples=1).squeeze(-1) 
         elif policy == 'argmax':
             pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
         else:
@@ -145,7 +145,7 @@ def main(run=None, model_name=None):
     # Generate predictions using the batch approach
     logger.info(f"Generating predictions using batch approach with context length {context_length}")
     t0 = time.time()
-    predictions, val_loader = generate_predictions_by_batch(model, run, context_length, device)
+    predictions, val_loader = generate_predictions_by_batch(model, run, context_length, device, policy='softmax')
     t1 = time.time()
     logger.info(f"Generated predictions for {len(predictions['pred_next'])} tokens in {t1-t0:.2f} seconds")
 

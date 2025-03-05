@@ -14,6 +14,7 @@ import torch.distributed as dist
 import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.nn.functional as F
 
 from transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, DataLoaderShuffle
 
@@ -190,7 +191,7 @@ def get_lr(step, lr_schedule, max_steps):
     decay_ratio = (step - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-def estimate_loss(model, val_loader, ddp, step, predict=False):
+def estimate_loss(model, val_loader, ddp, step, predict=False, policy='argmax'):
     model.eval()
     val_losses = {}
     if predict:
@@ -223,7 +224,13 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
             if predict:
                 # Get predicted next tokens
                 last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size]
-                pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+                if policy == 'argmax':
+                    pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+                elif policy == 'softmax':
+                    probs = F.softmax(last_logits, dim=-1)  # drawing from the distribution for each sample
+                    pred_tokens = torch.multinomial(probs, num_samples=1).squeeze(-1)  # [batch_size]                
+                else:
+                    raise ValueError(f"Invalid policy: {policy}")
 
                 # Store entire batch at once
                 predictions['context'] = torch.cat([predictions['context'], x.cpu()], dim=0)
@@ -352,7 +359,7 @@ def main():
         suffix='tr'
     )
     val_loader = DataLoader(
-        B=512,
+        B=2048,
         T=T,
         process_rank=ddp.rank,
         num_processes=ddp.world_size,
@@ -514,7 +521,7 @@ def main():
         # Print logging information every eval_interval steps
         if step % args.eval_interval == 0 or step == max_steps - 1:
             if args.predict:
-                val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
+                val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True, policy='softmax')
                 write_predictions(model_name, predictions, step==(max_steps-1))
             else:
                 val_loss = estimate_loss(model, val_loader, ddp, step, predict=False)
