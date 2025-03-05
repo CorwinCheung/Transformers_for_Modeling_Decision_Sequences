@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../')))
 
 import utils.file_management as fm
 from evaluation.graph_helper import (calc_bpos_behavior, plot_bpos_behavior,
-                                     plot_conditional_switching, get_data_filenames)
+                                     plot_conditional_switching)
 from utils import parse_data
 
 logger = None
@@ -17,7 +17,7 @@ def initialize_logger(run_number):
 def main(run=None, suffix: str = 'v'):
 
     initialize_logger(run)
-    files = get_data_filenames(run, suffix=suffix)
+    files = parse_data.get_data_filenames(run, suffix=suffix)
     logger.info(f"Analyzing data from:\n {f}\n" for f in files)
 
     events = parse_data.parse_simulated_data(*files)
@@ -32,8 +32,6 @@ def main(run=None, suffix: str = 'v'):
         plot_conditional_switching(events, seq_length=2, run=run, suffix=suffix, subdir='agent_behavior')
         plot_conditional_switching(events, seq_length=3, run=run, suffix=suffix, subdir='agent_behavior')
 
-
-# Main code
 if __name__ == "__main__":
 
     print('-' * 80)

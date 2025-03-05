@@ -14,6 +14,7 @@ import torch.distributed as dist
 import wandb
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.nn.functional as F
 
 from transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, DataLoaderShuffle
 
@@ -48,10 +49,16 @@ def parse_args():
     parser.add_argument('--run_number', type=int, default=None, help='ID of dataset to train/validate on')
     parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
     parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
-    parser.add_argument('--eval_interval', type=int, default=100, help='Interval to evaluate the model')
-    parser.add_argument('--checkpoint_interval', type=int, default=10, help='Number of epochs between checkpoints')
+    parser.add_argument('--eval_interval', type=int, default=None, help='Interval to evaluate the model')
+    parser.add_argument('--checkpoint_interval', type=int, default=None, help='Number of epochs between checkpoints')
     parser.add_argument('--enforce_data_epochs', action='store_true', default=False, help='Flag to force data loader to reset')
+    parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
+    parser.add_argument('--choice_only', action='store_true', default=False,
+                        help='Objective to optimize -- choice only excludes reward prediction')
     args = parser.parse_args()
+
+    if args.checkpoint_interval is None:
+        args.checkpoint_interval = int(args.epochs // 10)
     return args
 
 def write_predictions(model_name, predictions, last_step=False):
@@ -184,7 +191,7 @@ def get_lr(step, lr_schedule, max_steps):
     decay_ratio = (step - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (1 + math.cos(math.pi * decay_ratio)) * (max_lr - min_lr)
 
-def estimate_loss(model, val_loader, ddp, step, predict=False):
+def estimate_loss(model, val_loader, ddp, step, predict=False, policy='argmax'):
     model.eval()
     val_losses = {}
     if predict:
@@ -217,7 +224,13 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
             if predict:
                 # Get predicted next tokens
                 last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size]
-                pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+                if policy == 'argmax':
+                    pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+                elif policy == 'softmax':
+                    probs = F.softmax(last_logits, dim=-1)  # drawing from the distribution for each sample
+                    pred_tokens = torch.multinomial(probs, num_samples=1).squeeze(-1)  # [batch_size]                
+                else:
+                    raise ValueError(f"Invalid policy: {policy}")
 
                 # Store entire batch at once
                 predictions['context'] = torch.cat([predictions['context'], x.cpu()], dim=0)
@@ -236,14 +249,13 @@ def estimate_loss(model, val_loader, ddp, step, predict=False):
 
     # Reduce the loss across all processes if using DDP
     if ddp.ddp:
-        
         if isinstance(avg_loss, dict):
             # dist.all_reduce(avg_loss['full_loss'], op=dist.ReduceOp.SUM)
             for key in avg_loss.keys():
-                dist.all_reduce(avg_loss[key], op=dist.ReduceOp.SUM)
+                dist.all_reduce(avg_loss[key], op=dist.ReduceOp.AVG)
                 # avg_loss[key] = avg_loss[key] / ddp.world_size
         else:
-            dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
+            dist.all_reduce(avg_loss, op=dist.ReduceOp.AVG)
             # avg_loss = avg_loss / ddp.world_size
     model.train()  # Switch back to training mode
     if predict:
@@ -329,9 +341,9 @@ def main():
     }
 
     # Training setup
-    total_batch_size = 192 * ddp.world_size # number of tokens per batch = inference steps with our dense dataloader
-    B = 16  # number of samples per batch
+    B = args.batch_size  # number of samples per batch
     T = args.sequence_length  # number of trials per sample
+    total_batch_size = 2 * B * T * ddp.world_size # number of tokens per batch = inference steps with our dense dataloader
     assert total_batch_size % (B * T * ddp.world_size) == 0, (
         "make sure total batch size is divisible by B * T * ddp.world_size")
 
@@ -347,18 +359,23 @@ def main():
         suffix='tr'
     )
     val_loader = DataLoader(
-        B=512,
+        B=2048,
         T=T,
         process_rank=ddp.rank,
         num_processes=ddp.world_size,
         run_number=run_number,
         suffix='v'
     )
+    logger.info(f"Train loader class: {train_loader.__class__.__name__}")
     print('valid indices', len(train_loader.process_valid_indices))
     # Number steps required to pass over full dataset x n_epochs.
     max_steps = int(train_loader.batches_per_epoch * args.epochs / grad_accum_steps)
     n_samples = B * train_loader.batches_per_epoch * args.epochs * ddp.world_size
     model_name = f"model_seen{fm.format_tokens(n_samples)}"
+
+    if args.eval_interval is None:
+        args.eval_interval = max(1, int(max_steps // 100))
+        logger.info(f"Setting eval interval to {args.eval_interval}")
 
     if ddp.master_process:
         logger.info(f"total desired batch size: {total_batch_size}")
@@ -433,6 +450,7 @@ def main():
 
     if ddp.ddp:
         dist.barrier()
+
     print(f"Rank: {ddp.rank}, Local Rank: {ddp.local_rank}, World Size: {ddp.world_size}")
     print(f"Rank: {ddp.rank},", train_loader.process_valid_indices[:10])
     if ddp.master_process:
@@ -477,7 +495,7 @@ def main():
 
             # Forward pass and loss computation
             with torch.autocast(device_type=ddp.device_type, dtype=torch.bfloat16):
-                _, loss = model(x, y, choice_only=True)
+                _, loss = model(x, y, choice_only=args.choice_only)
             loss = loss / grad_accum_steps  # Normalize loss over gradient accumulation steps
             loss_accum += loss.detach()  # Track the total loss
             if ddp.ddp:
@@ -503,7 +521,7 @@ def main():
         # Print logging information every eval_interval steps
         if step % args.eval_interval == 0 or step == max_steps - 1:
             if args.predict:
-                val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True)
+                val_loss, predictions = estimate_loss(model, val_loader, ddp, step, predict=True, policy='softmax')
                 write_predictions(model_name, predictions, step==(max_steps-1))
             else:
                 val_loss = estimate_loss(model, val_loader, ddp, step, predict=False)
@@ -554,22 +572,26 @@ def main():
                 if ddp.master_process:
                     logger.info(f'prior to data reset (training): {train_loader.current_position}')
                 train_loader.current_position = 0
+    
+    if ddp.ddp:
+        dist.barrier()
 
     if ddp.master_process:
         if ddp.ddp:
             model = model.module
         save_model(model, model_name, run_number, compile=args.compile)
+        write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         wandb.finish()
         plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
-    if ddp.ddp:
-        # Make sure all processes reach this point before saving
-        dist.barrier()
-        # Only the master process should save the model
-        if ddp.master_process:
-            save_model(model, model_name, run_number, compile=args.compile)
-        # Wait for save to complete
-        dist.barrier()
+    # if ddp.ddp:
+    #     # Make sure all processes reach this point before saving
+    #     dist.barrier()
+    #     # Only the master process should save the model
+    #     if ddp.master_process:
+    #         save_model(model, model_name, run_number, compile=args.compile)
+    #     # Wait for save to complete
+    #     dist.barrier()
 
     if ddp.ddp:
         destroy_process_group()

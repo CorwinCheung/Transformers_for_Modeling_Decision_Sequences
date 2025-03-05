@@ -7,9 +7,11 @@ import torch
 
 # Add the project root directory to Python path
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
-import utils.file_management as fm
-from utils.parse_data import load_trained_model
 from torch.nn import functional as F
+
+import utils.file_management as fm
+from transformer.transformer import DataLoader
+from utils.parse_data import load_trained_model
 
 seed = 200
 random.seed(seed)
@@ -27,6 +29,47 @@ itos = {i: ch for i, ch in enumerate(vocab)}
 # Function to encode a sequence of characters to a tensor
 def encode_sequence(seq):
     return torch.tensor([stoi[ch] for ch in seq if ch in stoi], dtype=torch.long)
+
+
+def generate_predictions_by_batch(model, run, max_context_length, device, policy='argmax'):
+
+    val_loader = DataLoader(
+        B=2048,
+        process_rank=0,
+        num_processes=1,
+        T=max_context_length,
+        run_number=run,
+        suffix='v'
+    )
+
+    model.eval()
+    predictions = {
+        'pred_next': torch.empty(0, dtype=torch.long),
+        'y_indices': torch.empty(0, dtype=torch.long),
+    }
+    for _ in range(val_loader.batches_per_epoch):
+
+        x, y, y_indices = val_loader.next_batch(return_indices=True)
+        x, y = x.to(device), y.to(device)
+        with torch.no_grad():
+            logits, _ = model(x, y, by_feature=False)
+
+        last_logits = logits[:, -1, :]  # Shape: [batch_size, vocab_size] 
+
+        if policy == 'softmax':
+            probs = F.softmax(last_logits, dim=-1)  # drawing from the distribution for each sample
+            pred_tokens = torch.multinomial(probs, num_samples=1).squeeze(-1) 
+        elif policy == 'argmax':
+            pred_tokens = torch.argmax(last_logits, dim=-1)  # Shape: [batch_size]
+        else:
+            raise ValueError(f"Invalid policy: {policy}")
+
+        # Store entire batch at once
+        predictions['pred_next'] = torch.cat([predictions['pred_next'], pred_tokens.cpu()])
+        predictions['y_indices'] = torch.cat([predictions['y_indices'], y_indices[:, -1].cpu()])
+
+    return predictions, val_loader
+
 
 def generate_predictions(model, tokens, max_context_length, policy='argmax'):
     model.eval()
@@ -95,34 +138,39 @@ def main(run=None, model_name=None):
     else:
         assert (model_info['model_name'] == model_name) or (model_info['model_name'] == model_name.split('_cp')[0]), (
             'did not recover correct model')
-    # Load and preprocess the new data
-    behavior_file = fm.get_experiment_file("behavior_run_{}.txt", run, 'v', subdir='seqs')
-    text = fm.read_sequence(behavior_file)
-    tokens = encode_sequence(text)
-    logger.info(f"Loaded {len(tokens)} tokens from ground truth data.")
 
-    # Set start_token_idx to 'R' or 'L' randomly half the time
-    start_tokens = ['R', 'L']
-    start_token_char = random.choice(start_tokens)
-    start_token_idx = stoi[start_token_char]
-
-    # Prepend the start token to the tokens
-    tokens = torch.cat([torch.tensor([start_token_idx], dtype=torch.long), tokens]).to(device)
-
-    # Generate predictions
+    # Get context length from model info
     context_length = model_info['dataloader'].get('Sequence length (T)', 12)
-    predicted_indices = generate_predictions(model, tokens, max_context_length=context_length)
-    predicted_chars = [itos[idx] for idx in predicted_indices]
-    logger.info(f"Generated {len(predicted_chars)} predicted characters.")
 
-    # Write predictions to a file
-    pred_file = fm.get_experiment_file("pred_run_{}.txt", run, f"_{model_name}", subdir='seqs')
-    fm.write_sequence(pred_file, predicted_chars)
-    write_guess_metadata(model_name, run, behavior_file, pred_file, config)
+    # Generate predictions using the batch approach
+    logger.info(f"Generating predictions using batch approach with context length {context_length}")
+    t0 = time.time()
+    predictions, val_loader = generate_predictions_by_batch(model, run, context_length, device, policy='softmax')
+    t1 = time.time()
+    logger.info(f"Generated predictions for {len(predictions['pred_next'])} tokens in {t1-t0:.2f} seconds")
+
+    # Convert predictions to character format
+    pred_tokens = [itos[idx.item()] for idx in predictions['pred_next']]
+
+    # Write predictions to file
+    pred_file = fm.get_experiment_file(f"pred_{model_name}.txt", run, subdir='seqs')
+    fm.write_sequence(pred_file, pred_tokens)
+
+    # For downstream analysis, we need to save the indices for alignment
+    indices_file = fm.get_experiment_file(f"pred_indices_{model_name}.txt", run, subdir='seqs')
+    with open(indices_file, 'w') as f:
+        for idx in predictions['y_indices']:
+            f.write(f"{idx.item()}\n")
+
+    # Write metadata
+    write_guess_metadata(model_name, run, val_loader.behavior_file, pred_file, config)
 
     logger.info(f"Model predictions saved to {pred_file}")
+    logger.info(f"Prediction indices saved to {indices_file}")
 
-# Main code
+    return predictions
+
+
 if __name__ == "__main__":
     print('-' * 80)
     print('guess_using_transformer.py\n')

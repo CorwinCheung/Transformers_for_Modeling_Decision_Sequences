@@ -38,10 +38,10 @@ def compare_train_val(run, train_events, val_events, fig=None, axs=None):
 
     # Convert dictionaries to DataFrames for proper plotting
     overlap_norm_df = pd.DataFrame({'Sequence Length': list(T_overlap_normalized.keys()), 
-                                   'Overlap (%)': list(T_overlap_normalized.values())})
+                                    'Overlap (%)': list(T_overlap_normalized.values())})
     
     overlap_raw_df = pd.DataFrame({'Sequence Length': list(T_overlap_raw.keys()), 
-                                  'Overlap (%)': list(T_overlap_raw.values())})
+                                   'Overlap (%)': list(T_overlap_raw.values())})
 
     if fig is None:
         fig, axs = plt.subplots(ncols=2, figsize=(8,3), layout='constrained')
@@ -80,10 +80,9 @@ def compare_model_performance(run, train_events, val_events, model_name=None):
     fig, axs, aligned_data = compare_train_val(run, train_events, aligned_data, fig=fig, axs=axs)
     
     logger.info(f"Overall prediction accuracy: {aligned_data['pred_correct_k0'].mean() * 100:.2f}%")
-
     T_accuracy_unique = {}
     for T in range (2, 13):
-        T_accuracy_unique[T] = aligned_data.query(f'seq{T}_overlap == True')['pred_correct_k0'].mean()
+        T_accuracy_unique[T] = aligned_data.query(f'seq{T}_overlap == False')['pred_correct_k0'].mean() * 100
 
     # Convert to DataFrame for plotting
     accuracy_df = pd.DataFrame({
@@ -93,7 +92,7 @@ def compare_model_performance(run, train_events, val_events, model_name=None):
     sns.barplot(x='Sequence Length', y='Accuracy (%)', data=accuracy_df, ax=axs[-1])
     axs[-1].axhline(y=aligned_data['pred_correct_k0'].mean() * 100, color='k', linestyle='--')
     axs[-1].set(xlabel='sequence length', ylabel='prediction accuracy (%)', 
-            title='Model prediction accuracy\nby sequence uniqueness')
+            title='Model prediction accuracy\nby unique sequences')
     sns.despine()
     fig.savefig(fm.get_experiment_file(f"model_performance_{model_name}.png", run, subdir='models'))
 

@@ -12,6 +12,7 @@ import torch
 import utils.file_management as fm
 from transformer.transformer import GPT, GPTConfig
 
+logger = None
 
 def get_data_filenames(run, suffix='tr'):
     behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", run, suffix, subdir='seqs')
@@ -265,9 +266,9 @@ def add_sequence_columns(events, seq_length):
     return events
 
 
-def align_predictions_with_gt(events, predictions):
+def align_predictions_with_gt(events, predictions, indices=None):
     """Align predictions from trained model (e.g. transformer) with ground
-    truth events.
+    truth events assuming token-wise predictions.
 
     Args:
         events (pd.DataFrame): Ground truth events.
@@ -277,16 +278,27 @@ def align_predictions_with_gt(events, predictions):
         pd.DataFrame: Aligned events with predictions.
     """
 
+    if indices is None:
+        indices = events.index
+
+    assert len(indices) == len(predictions), (
+        'indices and predictions must have the same length')
+
     events_ = events.copy()
-    events_['pred_k0'] = [p for p in predictions]
-    events_['pred_choice'] = [int(c in ['R', 'r']) for c in predictions]
-    events_['pred_choice_str'] = [c.upper() for c in predictions]
-    events_['pred_reward'] = [int(c.isupper()) for c in predictions]
-    events_['pred_selected_high'] = (events_['pred_choice'] == events_['high_port']).astype(int)
+    events_['pred_k0'] = None
+    events_.loc[indices, 'pred_k0'] = [p for p in predictions]
+    events_['pred_choice'] = pd.Series(dtype='Int64')
+    events_.loc[indices, 'pred_choice'] = [c in ['R', 'r'] for c in predictions]
+    events_.loc[indices, 'pred_choice_str'] = events_.loc[indices, 'pred_k0'].str.upper()
+    events_['pred_reward'] = pd.Series(dtype='Int64')
+    events_.loc[indices, 'pred_reward'] = [c.isupper() for c in predictions]
+
+    events_['pred_selected_high'] = (events_['pred_choice'] == events_['high_port']).astype('Int64')
     events_['prev_choice'] = events_['seq2_RL'].apply(lambda x: x[-1].upper()
                                                       if not pd.isna(x) else None)
     events_['pred_switch'] = ((events_['pred_choice_str'] != events_['prev_choice'])
-                              .where(events_['prev_choice'].notna(), np.nan)
+                              .where(events_['prev_choice'].notna()
+                                     & events_['pred_choice_str'].notna(), np.nan)
                               .astype('Int64'))
     events_['pred_correct_k0'] = events_['pred_k0'] == events_['k0']
     events_['pred_correct_choice'] = events_['pred_choice'] == events_['choice']
@@ -328,3 +340,39 @@ def load_trained_model(run, model_name, device, **kwargs):
 
     return model, model_info, config
 
+
+def load_predictions(run, model_name, suffix='v'):
+
+    files = get_data_filenames(run, suffix=suffix)
+    gt_events = parse_simulated_data(*files)
+
+    predictions_filename = fm.get_experiment_file(f"pred_{model_name}.txt", run, subdir='seqs')
+    indices_filename = fm.get_experiment_file(f"pred_indices_{model_name}.txt", run, subdir='seqs')
+
+    predictions = fm.read_sequence(predictions_filename)
+
+    indices = None
+    try:
+        with open(indices_filename, 'r') as f:
+            indices = [int(line.strip()) for line in f]
+    except FileNotFoundError:
+        pass
+
+    # Align predictions with ground truth
+    aligned_data = align_predictions_with_gt(gt_events, predictions, indices)
+
+    if logger is not None:
+        logger.info(f"Analyzing data from:\n {f}\n" for f in files)
+        logger.info(f"Loading model predictions from: {predictions_filename}")
+
+        if indices is not None:
+            logger.info(f"Using indices file for alignment: {indices_filename}")
+        else:
+            logger.info("No indices file found, using sequential alignment")
+
+        logger.info(f"Number of events: {len(gt_events)}")
+        logger.info(f"Number of predictions: {len(predictions)}")
+
+        logger.info(f"Aligned {len(aligned_data)} events with predictions")
+
+    return aligned_data

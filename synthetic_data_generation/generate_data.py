@@ -30,8 +30,8 @@ def parse_args():
     parser.add_argument('--profile', type=bool, default=False)
     parser.add_argument('--no_overwrite', action='store_false', default=True,
                         help='Pass flag to prevent overwriting existing data')
-    parser.add_argument('--num_steps', type=int, default=100000)
-
+    parser.add_argument('--num_steps_train', type=int, default=100000)
+    parser.add_argument('--num_steps_val', type=int, default=100000)
     # Agent parameters
     parser.add_argument('--alpha', type=float, default=None)
     parser.add_argument('--beta', type=float, default=None)
@@ -197,7 +197,8 @@ def write_session_transitions(filepath, session_transitions):
 
 def main(
         run=None,
-        num_steps=100000,
+        num_steps_train=100000,
+        num_steps_val=100000,
         profile=False,
         include_val=True,
         overwrite=True,
@@ -214,11 +215,13 @@ def main(
     run_dir = fm.ensure_run_dir(next_run, subdir='seqs')
 
     datasets = ['tr', 'v'] if include_val else ['tr']
+    # If num_steps is a single value, repeat it for each dataset
+    num_steps = [num_steps_train, num_steps_val] if include_val else [num_steps_train]
 
     # Configure task parameters here to make logging easier.
     task_params = configure_task_params(task_params, multiple_domains)
 
-    for suffix in datasets:
+    for N, suffix in zip(num_steps, datasets):
         behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
         high_port_filename = fm.get_experiment_file("high_port_run_{}.txt", next_run, suffix, subdir='seqs')
         sessions_filename = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, suffix, subdir='seqs')
@@ -228,12 +231,12 @@ def main(
 
         if profile:
             with cProfile.Profile() as pr:
-                behavior_data, high_port_data, session_transitions = generate_data(num_steps, task_params, multiple_domains)
+                behavior_data, high_port_data, session_transitions = generate_data(N, task_params, multiple_domains)
             stats = pstats.Stats(pr)
             stats.sort_stats('cumtime')
             plot_profiling_results(stats)
         else:
-            behavior_data, high_port_data, session_transitions = generate_data(num_steps, task_params, multiple_domains)
+            behavior_data, high_port_data, session_transitions = generate_data(N, task_params, multiple_domains)
 
         fm.write_sequence(behavior_filename, behavior_data)
         fm.write_sequence(high_port_filename, high_port_data)
@@ -243,7 +246,7 @@ def main(
         with open(metadata_filename, 'a') as meta_file:
             meta_file.write(f"Run {next_run}\n")
             meta_file.write(f"Dataset {suffix}\n")
-            meta_file.write(f"Number of steps: {num_steps:,}\n")
+            meta_file.write(f"Number of steps: {N:,}\n")
             meta_file.write(f"Multiple domains: {multiple_domains:,}\n")
             meta_file.write(f"Task parameters:\n")
             for domain, params in task_params.items():
@@ -297,6 +300,7 @@ if __name__ == "__main__":
     main(run=args.run,
          profile=args.profile,
          overwrite=args.no_overwrite,
-         num_steps=args.num_steps,
+         num_steps_train=args.num_steps_train,
+         num_steps_val=args.num_steps_val,
          task_params=task_params,
          multiple_domains=args.multiple_domains)
