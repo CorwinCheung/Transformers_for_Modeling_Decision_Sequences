@@ -9,7 +9,8 @@ import seaborn as sns
 sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 
 import utils.file_management as fm
-from evaluation.graph_helper import calc_bpos_behavior, plot_bpos_behavior
+from evaluation.graph_helper import (calc_bpos_behavior, plot_bpos_behavior,
+                                     plot_conditional_switching_eval)
 from utils.parse_data import (align_predictions_with_gt, get_data_filenames,
                               load_predictions, parse_simulated_data)
 
@@ -48,6 +49,10 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
                             'pred_selected_high': ('P(High)', (0, 1)),
                             'pred_switch': ('P(Switch)', (0, 0.4)),
                         })
+
+    for seq in [2,3]:
+        plot_conditional_switching_eval(events, seq_length=seq, run=run, suffix=f'{model_name}_{suffix}',
+                               subdir='predictions')
 
     # # Calculate switch probabilities
     # sorted_patterns, sorted_probabilities, sorted_ci_lower, sorted_ci_upper, sorted_counts = calculate_switch_probabilities(events)
