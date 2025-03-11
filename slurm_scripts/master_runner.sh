@@ -60,7 +60,7 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Use the pre-assigned run number instead of generating a new one
-RUN_NUMBER=$run_number
+RUN_NUMBER=${run_number}
 
 echo "======================================================="
 echo "Starting experiment: $experiment_name"
@@ -68,7 +68,7 @@ echo "Model config: $layers layers, $heads heads, $embd_dim embedding dim"
 echo "Training config: $epochs epochs, $train_steps train steps, batch size $batch_size"
 echo "Context length: $context_length"
 echo "Domain config: $domain_config"
-echo "Run number: \$RUN_NUMBER"
+echo "Run number: \${RUN_NUMBER}"
 echo "======================================================="
 
 # Determine which script to run
@@ -92,12 +92,14 @@ case "$EXPERIMENT_TYPE" in
 esac
 
 # Update tracker file in the requested format BEFORE running the experiment
-echo "run\$RUN_NUMBER: $EXPERIMENT_TYPE, $epochs epochs, $train_steps train steps, $layers layers, $heads heads, $context_length context length, $embd_dim embedding dimensions, $domain_config" >> $TRACKER_FILE
+echo " " >> $TRACKER_FILE
+echo "run\${RUN_NUMBER}: $EXPERIMENT_TYPE, $epochs epochs, $train_steps train steps, $layers layers, $heads heads, $context_length context length, $embd_dim embedding dimensions, $domain_config" >> $TRACKER_FILE
+echo " " >> $TRACKER_FILE
 
 # Run the experiment
-bash \$SCRIPT \$RUN_NUMBER $layers $heads $epochs $train_steps $context_length $embd_dim $batch_size "$domain_config"
+bash \$SCRIPT \${RUN_NUMBER} $layers $heads $epochs $train_steps $context_length $embd_dim $batch_size "$domain_config"
 
-echo "Experiment completed: run\$RUN_NUMBER"
+echo "Experiment completed: run\${RUN_NUMBER}"
 EOL
 
     # Submit the job
@@ -122,7 +124,8 @@ for layers in "${LAYERS_ARRAY[@]}"; do
                         for batch_size in "${BATCH_SIZE_ARRAY[@]}"; do
                             for domain_config in "${DOMAIN_CONFIG_ARRAY[@]}"; do
                                 experiment_name="l${layers}_h${heads}_e${epochs}_c${context_length}_d${embd_dim}"
-                                submit_experiment "$experiment_name" "$layers" "$heads" "$epochs" "$train_steps" "$context_length" "$embd_dim" "$batch_size" "$domain_config"
+                                submit_experiment "$experiment_name" "$layers" "$heads" "$epochs" "$train_steps" "$context_length" "$embd_dim" "$batch_size" "$domain_config" "${NEXT_RUN_NUMBER}"
+                                NEXT_RUN_NUMBER=$((NEXT_RUN_NUMBER + 1))
                             done
                         done
                     done
