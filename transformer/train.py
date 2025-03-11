@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.distributed as dist
-import wandb
+# import wandb commented out for now because of permission errors
 from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.nn.functional as F
@@ -454,28 +454,28 @@ def main():
     print(f"Rank: {ddp.rank}, Local Rank: {ddp.local_rank}, World Size: {ddp.world_size}")
     print(f"Rank: {ddp.rank},", train_loader.process_valid_indices[:10])
     if ddp.master_process:
-        wandb.init(
-            project="gpt-training",
-            config={
-                "run_number": run_number,
-                "total_batch_size": total_batch_size,
-                "max_lr": lr_schedule['max_lr'],
-                "min_lr": lr_schedule['min_lr'],
-                "warmup_steps": lr_schedule['warmup_steps'],
-                "max_steps": max_steps,
-                "B": B,
-                "T": T,
-                "grad_accum_steps": grad_accum_steps,
-                "vocab_size": 4,
-                "n_layer": args.n_layer,
-                "n_head": args.n_head,
-                "n_embd": args.n_embd,
-                "task_id": args.task_id
-            },
-            name=f"run_task_{args.task_id}",  # Name the run based on the task ID
-            dir="/tmp",
-        )
-        wandb.watch(model)
+        # wandb.init(
+        #     project="gpt-training",
+        #     config={
+        #         "run_number": run_number,
+        #         "total_batch_size": total_batch_size,
+        #         "max_lr": lr_schedule['max_lr'],
+        #         "min_lr": lr_schedule['min_lr'],
+        #         "warmup_steps": lr_schedule['warmup_steps'],
+        #         "max_steps": max_steps,
+        #         "B": B,
+        #         "T": T,
+        #         "grad_accum_steps": grad_accum_steps,
+        #         "vocab_size": 4,
+        #         "n_layer": args.n_layer,
+        #         "n_head": args.n_head,
+        #         "n_embd": args.n_embd,
+        #         "task_id": args.task_id
+        #     },
+        #     name=f"run_task_{args.task_id}",  # Name the run based on the task ID
+        #     dir="/tmp",
+        # )
+        # wandb.watch(model)
         print("DDP WORLD SIZE: ", ddp.world_size)
 
     # Training loop
@@ -540,17 +540,17 @@ def main():
                 val_loss_choice = val_loss.get('choice_loss').item() if isinstance(val_loss, dict) else None
                 val_loss_reward = val_loss.get('reward_loss').item() if isinstance(val_loss, dict) else None
                 val_loss = val_loss.get('full_loss').item() if isinstance(val_loss, dict) else val_loss.item()
-                wandb.log({
-                    "step": step,
-                    "loss": loss_accum.item(),
-                    "val_loss": val_loss,
-                    "choice_loss": val_loss_choice,
-                    "reward_loss": val_loss_reward,
-                    "lr": lr,
-                    "grad_norm": norm,
-                    "step_time_ms": dt,
-                    "tokens_per_sec": tokens_per_sec,
-                })
+                # wandb.log({
+                #     "step": step,
+                #     "loss": loss_accum.item(),
+                #     "val_loss": val_loss,
+                #     "choice_loss": val_loss_choice,
+                #     "reward_loss": val_loss_reward,
+                #     "lr": lr,
+                #     "grad_norm": norm,
+                #     "step_time_ms": dt,
+                #     "tokens_per_sec": tokens_per_sec,
+                # })
                 
                 if step % (args.eval_interval*10) == 0:
                     logger.info(f"step {step} | loss: {loss_accum.item():.4f} | val_loss: {val_loss:.4f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f} ms | tok/sec: {tokens_per_sec:.2f}")
@@ -581,7 +581,7 @@ def main():
             model = model.module
         save_model(model, model_name, run_number, compile=args.compile)
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
-        wandb.finish()
+        # wandb.finish()
         plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
 
     # if ddp.ddp:
