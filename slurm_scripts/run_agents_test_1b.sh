@@ -25,11 +25,11 @@ print_section_header "Data Generation"
 
 python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
     --run $RUN_NUMBER \
-    --num_steps_train=100_000 \
+    --num_steps_train=1_000_000 \
     --num_steps_val=100_000 \
     --no_overwrite \
     --multiple_domains \
-    --config_file sticky_unsticky_agent_domains.ini
+    --config_file evidence_based_agent_domains.ini
 
 print_section_header "Basic Evaluation"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
@@ -42,11 +42,11 @@ start_time=$(date +%s)
 
 # Run training directly 
 python ${BASE_PATH}/transformer/train.py \
-    --n_layer=12 \
-    --sequence_length=24 \
-    --n_head=12 \
-    --n_embd=768 \
-    --epochs=500 \
+    --n_layer=8 \
+    --sequence_length=6 \
+    --n_head=8 \
+    --n_embd=64 \
+    --epochs=100 \
     --run_number $RUN_NUMBER
 
 # Record the end time
