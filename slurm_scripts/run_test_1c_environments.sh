@@ -18,18 +18,30 @@ source "./slurm_scripts/common_functions.sh"
 # Setup environment
 setup_environment
 
-# Initialize run number (optionally override)
-initialize_run
+# Accept parameters from master runner
+RUN_NUMBER=${1:-$(get_next_run)}
+N_LAYER=${2:-4}
+N_HEAD=${3:-4}
+EPOCHS=${4:-100}
+TRAIN_STEPS=${5:-100000}
+CONTEXT_LENGTH=${6:-12}
+EMBD_DIM=${7:-64}
+BATCH_SIZE=${8:-256}
+DOMAIN_CONFIG=${9:-"vary_environment_domains.ini"}
+
+# Export run number
+export RUN_NUMBER
+echo "Using run number: $RUN_NUMBER"
 
 print_section_header "Data Generation"
 # Generate training data from domain B and validation from domains A and C
 python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
     --run $RUN_NUMBER \
-    --num_steps_train=100_000 \
+    --num_steps_train=$TRAIN_STEPS \
     --num_steps_val=100_000 \
     --no_overwrite \
     --multiple_domains \
-    --config_file vary_environment_domains.ini
+    --config_file $DOMAIN_CONFIG
 
 print_section_header "Basic Evaluation"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
@@ -42,9 +54,12 @@ start_time=$(date +%s)
 
 # Run training directly 
 python ${BASE_PATH}/transformer/train.py \
-    --n_layer=4 \
-    --n_head=4 \
-    --epochs=100 \
+    --n_layer=$N_LAYER \
+    --n_head=$N_HEAD \
+    --n_embd=$EMBD_DIM \
+    --sequence_length=$CONTEXT_LENGTH \
+    --epochs=$EPOCHS \
+    --batch_size=$BATCH_SIZE \
     --run_number $RUN_NUMBER
 
 # Record the end time
