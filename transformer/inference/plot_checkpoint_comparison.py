@@ -140,7 +140,7 @@ def main(run=None, suffix: str = 'v'):
     gt_events = parse_simulated_data(*files)
     domains = sorted(gt_events['domain'].unique())
 
-    gt_policies = pts.calc_conditional_probs(gt_events, htrials=2, sortby='pevent', pred_col='switch')
+    gt_policies = pts.calc_conditional_probs(gt_events, htrials=2, sortby='pevent', pred_col='switch', add_grps='domain')
     gt_policies['model'] = 'ground truth'
     # Create figure with two subplots for each domain
     fig, axes = plt.subplots(3, len(domains), figsize=(4.5*len(domains), 6),
@@ -179,8 +179,7 @@ def main(run=None, suffix: str = 'v'):
             sns.lineplot(bpos_domain.query('iInBlock.between(-11, 21)'),
                          x='iInBlock', y='pred_switch', ax=ax_[1], color=color, label=label)
             
-        pred_policies = pts.calc_conditional_probs(
-            events.query('domain == @domain'), htrials=2, sortby='pevent', pred_col='pred_switch')
+        pred_policies = pts.calc_conditional_probs(events, add_grps='domain', htrials=2, sortby='pevent', pred_col='pred_switch')
         pred_policies['model'] = label
         gt_policies = pd.concat([gt_policies, pred_policies])
         cmap[label] = color
@@ -196,9 +195,10 @@ def main(run=None, suffix: str = 'v'):
         ax_[1].set(xlabel='block position', xlim=(-10, 20),
                    ylabel='P(switch)', ylim=(0, 0.3))
 
-        _, ax_[2] = pts.plot_sequences(gt_policies.query('model == "ground truth"'), ax=ax_[2])
+        _, ax_[2] = pts.plot_sequences(gt_policies.query('model == "ground truth" & domain == @domain'), ax=ax_[2])
 
-        fig, ax_[2] = pts.plot_sequence_points(gt_policies.query('model != "ground truth"'), grp='model', palette=cmap, yval='pevent', size=3, ax=ax_[2], fig=fig, legend=False)
+        fig, ax_[2] = pts.plot_sequence_points(gt_policies.query('model != "ground truth" & domain == @domain'), grp='model',
+                                               palette=cmap, yval='pevent', size=3, ax=ax_[2], fig=fig, legend=False)
 
     # Modify legend display based on domains
     # if len(domains) > 1:
