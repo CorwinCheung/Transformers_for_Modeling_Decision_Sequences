@@ -68,7 +68,7 @@ def plot_conditional_switching(events, seq_length, run, suffix: str = 'v', save=
 
 
 def plot_conditional_switching_eval(events, seq_length, run, suffix: str = 'v', save=True, subdir=None):
-
+    print("events: ", events)
     for domain in events.domain.unique():
         policies = pts.calc_conditional_probs(
             events.query('domain == @domain'), htrials=seq_length, sortby='pevent', pred_col='switch')
@@ -80,7 +80,7 @@ def plot_conditional_switching_eval(events, seq_length, run, suffix: str = 'v', 
         if seq_length > 2:
             ax.set_xticks(ax.get_xticks())
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-        if (events.domain.nunique() == 1) & save:
+        if (events.domain.nunique() == 2) & save:
             fig_path = get_experiment_file(f"cond_switch_{seq_length}{suffix}{domain}.png", run, subdir=subdir)
             fig.savefig(fig_path)
             print(f'saved conditional probabilities for {seq_length} trials to {fig_path}')

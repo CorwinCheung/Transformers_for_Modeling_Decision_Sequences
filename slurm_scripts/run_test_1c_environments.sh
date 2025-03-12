@@ -35,13 +35,22 @@ echo "Using run number: $RUN_NUMBER"
 
 print_section_header "Data Generation"
 # Generate training data from domain B and validation from domains A and C
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
+python ${BASE_PATH}/synthetic_data_generation/generate_data_custom_domains.py \
     --run $RUN_NUMBER \
-    --num_steps_train=$TRAIN_STEPS \
+    --train_domains B C \
+    --val_domains A \
+    --num_steps_train=100_000 \
     --num_steps_val=100_000 \
     --no_overwrite \
-    --multiple_domains \
     --config_file $DOMAIN_CONFIG
+
+# python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
+#     --run $RUN_NUMBER \
+#     --num_steps_train=$TRAIN_STEPS \
+#     --num_steps_val=100_000 \
+#     --no_overwrite \
+#     --multiple_domains \
+#     --config_file $DOMAIN_CONFIG
 
 print_section_header "Basic Evaluation"
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER

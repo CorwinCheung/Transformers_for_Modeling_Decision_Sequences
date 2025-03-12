@@ -2,14 +2,16 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Parameters for experiment sweeps (or single)
-LAYERS_ARRAY=(2)
-HEADS_ARRAY=(2)
-EPOCHS_ARRAY=(100 10)
+LAYERS_ARRAY=(4)
+HEADS_ARRAY=(4)
+EPOCHS_ARRAY=(100 1000)
 TRAIN_STEPS_ARRAY=(100000)
-CONTEXT_LENGTH_ARRAY=(5)
-EMBD_DIM_ARRAY=(64)
+CONTEXT_LENGTH_ARRAY=(3 6 12 24 36)
+EMBD_DIM_ARRAY=(4)
+# CONTEXT_LENGTH_ARRAY=(12)
+# EMBD_DIM_ARRAY=(64)
 BATCH_SIZE_ARRAY=(256)
-DOMAIN_CONFIG_ARRAY=("evidence_based_agent_domains.ini")
+DOMAIN_CONFIG_ARRAY=("sticky_unsticky_domains.ini")
 EXPERIMENT_TYPE="agents_test"  # define the experiment you are running
 
 # Options are:
@@ -62,6 +64,14 @@ setup_environment
 # Use the pre-assigned run number instead of generating a new one
 RUN_NUMBER=${run_number}
 
+# Create logs directory for this run and redirect outputs to separate log files
+RUN_DIR="experiments/run_\${RUN_NUMBER}"
+LOG_DIR="\${RUN_DIR}/logs"
+mkdir -p "\${LOG_DIR}"
+
+# Redirect stdout to process.log and stderr to error.log
+exec > "\${LOG_DIR}/process.log" 2> "\${LOG_DIR}/error.log"
+
 echo "======================================================="
 echo "Starting experiment: $experiment_name"
 echo "Model config: $layers layers, $heads heads, $embd_dim embedding dim"
@@ -94,7 +104,6 @@ esac
 # Update tracker file in the requested format BEFORE running the experiment
 echo " " >> $TRACKER_FILE
 echo "run\${RUN_NUMBER}: $EXPERIMENT_TYPE, $epochs epochs, $train_steps train steps, $layers layers, $heads heads, $context_length context length, $embd_dim embedding dimensions, $domain_config" >> $TRACKER_FILE
-echo " " >> $TRACKER_FILE
 
 # Run the experiment
 bash \$SCRIPT \${RUN_NUMBER} $layers $heads $epochs $train_steps $context_length $embd_dim $batch_size "$domain_config"
