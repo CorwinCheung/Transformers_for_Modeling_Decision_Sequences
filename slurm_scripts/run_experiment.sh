@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1          
 #SBATCH --cpus-per-task=16
 #SBATCH --time=01:00:00  
-#SBATCH --mem=100GB
+#SBATCH --mem=150GB
 #SBATCH --partition=kempner
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
@@ -32,8 +32,13 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 setup_distributed_environment
 
 print_section_header "Model Training"
-# python ${BASE_PATH}/transformer/train.py --predict --epochs=100 --run_number $RUN_NUMBER --enforce_data_epochs
-srun python ${BASE_PATH}/transformer/train.py --predict --epochs=10 --run $RUN_NUMBER --batch_size=64 # --choice_only # --enforce_data_epochs
+srun python ${BASE_PATH}/transformer/train.py \
+    --predict \
+    --epochs=200 \
+    --sequence_length=6 \
+    --run $RUN_NUMBER \
+    --batch_size=256 \
+    --n_embd=4 # --choice_only # --enforce_data_epochs
 
 # Setup GPU environment for inference
 setup_gpu_environment

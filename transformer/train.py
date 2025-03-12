@@ -58,7 +58,7 @@ def parse_args():
     args = parser.parse_args()
 
     if args.checkpoint_interval is None:
-        args.checkpoint_interval = int(args.epochs // 10)
+        args.checkpoint_interval = max(1, int(args.epochs // 10))
     return args
 
 def write_predictions(model_name, predictions, last_step=False):
@@ -308,7 +308,7 @@ def trim_loss_steps(losses, starting_step, eval_interval):
 def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps):
     steps_per_epoch = batches_per_epoch / grad_accum_steps
     checkpoint_steps = (checkpoint_interval * steps_per_epoch)
-    return checkpoint_steps
+    return int(checkpoint_steps)
 
 def main():    
     seed = 200

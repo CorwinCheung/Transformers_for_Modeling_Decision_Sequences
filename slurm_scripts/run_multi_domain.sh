@@ -38,7 +38,7 @@ start_time=$(date +%s)
 # Launch distributed training with srun
 srun python ${BASE_PATH}/transformer/train.py \
     --predict \
-    --epochs=10 \
+    --epochs=100 \
     --run_number $RUN_NUMBER
 
 # Record the end time
