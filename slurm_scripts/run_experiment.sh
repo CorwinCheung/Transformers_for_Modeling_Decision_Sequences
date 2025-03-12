@@ -35,7 +35,14 @@ echo "Using run number: $RUN_NUMBER"
 
 # Data generation and basic evaluation
 print_section_header "Data Generation"
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "B" --num_steps_val=1_000_000 --no_overwrite --num_steps_train=$TRAIN_STEPS --config_file "$DOMAIN_CONFIG"
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
+    --run $RUN_NUMBER \
+    --domain_id "B" \
+    --num_steps_val=1_000_000 \
+    --no_overwrite \
+    --num_steps_train=$TRAIN_STEPS \
+    --config_file "$DOMAIN_CONFIG" \
+    --multiple_domains
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 

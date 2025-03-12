@@ -193,7 +193,7 @@ def main(run=None, suffix: str = 'v'):
         ax_[1].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
         ax_[0].set(title=domain, xlim=(-10, 20), ylabel='P(high)', ylim=(0, 1.1))
         ax_[1].set(xlabel='block position', xlim=(-10, 20),
-                   ylabel='P(switch)', ylim=(0, 0.3))
+                   ylabel='P(switch)', ylim=(0, 0.45))
 
         print(gt_policies)
         _, ax_[2] = pts.plot_sequences(gt_policies.query('model == "ground truth" & domain == @domain'), ax=ax_[2])

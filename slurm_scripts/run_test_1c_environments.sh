@@ -40,7 +40,7 @@ python ${BASE_PATH}/synthetic_data_generation/generate_data_custom_domains.py \
     --train_domains B C \
     --val_domains A \
     --num_steps_train=100_000 \
-    --num_steps_val=100_000 \
+    --num_steps_val=1_000_000 \
     --no_overwrite \
     --config_file $DOMAIN_CONFIG
 
