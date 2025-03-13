@@ -193,7 +193,7 @@ def main(run=None, suffix: str = 'v'):
         ax_[1].vlines(x=0, ymin=-1, ymax=1.5, ls='--', color='k', zorder=0)
         ax_[0].set(title=domain, xlim=(-10, 20), ylabel='P(high)', ylim=(0, 1.1))
         ax_[1].set(xlabel='block position', xlim=(-10, 20),
-                   ylabel='P(switch)', ylim=(0, 0.3))
+                   ylabel='P(switch)', ylim=(0, 0.45))
 
         _, ax_[2] = pts.plot_sequences(gt_policies.query('model == "ground truth" & domain == @domain'), ax=ax_[2])
 
@@ -212,6 +212,9 @@ def main(run=None, suffix: str = 'v'):
     # fig.subplots_adjust(right=0.85)  # Makes room for the legend on the right
 
     sns.despine()
+    # curr_dir = os.path.dirname(os.path.abspath(__file__))
+    # new_dir = os.path.join(curr_dir, '..', 'test')
+    # fig_path = os.path.join(new_dir, f'bpos_checkpoints_{model_name}.png')
     fig_path = fm.get_experiment_file(f'bpos_checkpoints_{model_name}.png', run, subdir='predictions')
     fig.savefig(fig_path, bbox_inches='tight')
     print(f'Saved checkpoint comparison plot to {fig_path}')

@@ -68,7 +68,6 @@ def plot_conditional_switching(events, seq_length, run, suffix: str = 'v', save=
 
 
 def plot_conditional_switching_eval(events, seq_length, run, suffix: str = 'v', save=True, subdir=None):
-
     for domain in events.domain.unique():
         policies = pts.calc_conditional_probs(
             events.query('domain == @domain'), htrials=seq_length, sortby='pevent', pred_col='switch')

@@ -46,11 +46,14 @@ def parse_args():
                         help='Whether to vary parameters across sessions')
     parser.add_argument('--domain_id', type=str, default=None,
                         help='shortcut to task parameters, overrides individual param args')
+    # Add a new argument for config file
+    parser.add_argument('--config_file', type=str, default='domains.ini',
+                        help='Configuration file for domains (domains.ini or three_domains.ini)')
     return parser.parse_args()
 
 
-def load_param_sets():
-    config_path = os.path.join(os.path.dirname(__file__), 'domains.ini')
+def load_param_sets(config_file='domains.ini'):
+    config_path = os.path.join(os.path.dirname(__file__), config_file)
     config = configparser.ConfigParser()
     config.read(config_path)
 
@@ -95,7 +98,7 @@ def get_session_params(task_params):
     return domain_id, env_params, agent_params
 
 
-def configure_task_params(task_params, multiple_domains=False):
+def configure_task_params(task_params, multiple_domains=False, config_file='domains.ini'):
     """Configure task parameters based on whether multiple domains are used,
     or whether any parameters are provided.
     
@@ -105,6 +108,7 @@ def configure_task_params(task_params, multiple_domains=False):
         params. These can be None if no parameters are provided.
         multiple_domains (bool): Whether to use multiple domains/parameter
         sets.
+        config_file (str): Configuration file for domains (domains.ini or three_domains.ini)
         
     Returns:
         dict: Configured task parameters. If multiple_domains is False,
@@ -113,6 +117,10 @@ def configure_task_params(task_params, multiple_domains=False):
         parameters are provided.
     """
 
+    # If task_params is empty, load from file
+    if not task_params:
+        task_params = load_param_sets(config_file)
+        
     default_environment = {'high_reward_prob': 0.8,
                            'low_reward_prob': 0.2,
                            'transition_prob': 0.02}
@@ -203,7 +211,8 @@ def main(
         include_val=True,
         overwrite=True,
         task_params=None,
-        multiple_domains=False):
+        multiple_domains=False,
+        config_file='domains.ini'):
 
     initialize_logger(run)
     # Format the dictionary nicely
@@ -219,7 +228,7 @@ def main(
     num_steps = [num_steps_train, num_steps_val] if include_val else [num_steps_train]
 
     # Configure task parameters here to make logging easier.
-    task_params = configure_task_params(task_params, multiple_domains)
+    task_params = configure_task_params(task_params, multiple_domains, config_file)
 
     for N, suffix in zip(num_steps, datasets):
         behavior_filename = fm.get_experiment_file("behavior_run_{}.txt", next_run, suffix, subdir='seqs')
@@ -266,8 +275,10 @@ if __name__ == "__main__":
 
     args = parse_args()
     print("Domain ID:", args.domain_id)
+    print("Config file:", args.config_file)
+    
     if args.multiple_domains or args.domain_id:
-        task_params = load_param_sets()
+        task_params = load_param_sets(args.config_file)
         if args.domain_id:
             task_params = {args.domain_id: task_params[args.domain_id]}
             print(pformat(task_params, indent=2))
@@ -303,4 +314,5 @@ if __name__ == "__main__":
          num_steps_train=args.num_steps_train,
          num_steps_val=args.num_steps_val,
          task_params=task_params,
-         multiple_domains=args.multiple_domains)
+         multiple_domains=args.multiple_domains,
+         config_file=args.config_file)

@@ -32,7 +32,8 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
     if model_name is None:
         model_info = fm.parse_model_info(run, model_name=model_name)
         model_name = model_info['model_name']
-
+    print("model_name: ", model_name)
+    
     events = load_predictions(run, model_name, suffix=suffix)
 
     # Calculate and print the percent of trials with a switch.
@@ -49,7 +50,7 @@ def main(run=None, model_name: str = None, suffix: str = 'v'):
                             'pred_selected_high': ('P(High)', (0, 1)),
                             'pred_switch': ('P(Switch)', (0, 0.4)),
                         })
-
+    print("plotting conditional switching eval")
     for seq in [2,3]:
         plot_conditional_switching_eval(events, seq_length=seq, run=run, suffix=f'{model_name}_{suffix}',
                                subdir='predictions')

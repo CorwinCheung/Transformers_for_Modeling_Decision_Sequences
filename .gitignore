@@ -10,3 +10,8 @@ transformer/wandb/*
 **/*.log
 experiments/*
 slurm_scripts/slurm_output/*
+
+git add -f experiments/run_1
+git add -f experiments/run_2
+git add -f experiments/run_3
+git add -f experiments/run_4

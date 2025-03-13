@@ -18,13 +18,31 @@ source "./slurm_scripts/common_functions.sh"
 # Setup environment
 setup_environment
 
-# Initialize run number (optionally override)
-initialize_run
+# Accept parameters from master runner
+RUN_NUMBER=${1:-$(get_next_run)}
+N_LAYER=${2:-4}
+N_HEAD=${3:-4}
+EPOCHS=${4:-100}
+TRAIN_STEPS=${5:-100000}
+CONTEXT_LENGTH=${6:-12}
+EMBD_DIM=${7:-64}
+BATCH_SIZE=${8:-256}
+DOMAIN_CONFIG=${9:-"domains.ini"}
+
+# Export run number
+export RUN_NUMBER
+echo "Using run number: $RUN_NUMBER"
 
 # Data generation and basic evaluation
 print_section_header "Data Generation"
-# python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps 100000 --no_overwrite
-python ${BASE_PATH}/synthetic_data_generation/generate_data.py --run $RUN_NUMBER --domain_id "A" --num_steps_val=1_000_000 --no_overwrite --num_steps_train=100_000
+python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
+    --run $RUN_NUMBER \
+    --domain_id "B" \
+    --num_steps_val=1_000_000 \
+    --no_overwrite \
+    --num_steps_train=$TRAIN_STEPS \
+    --config_file "$DOMAIN_CONFIG" \
+    --multiple_domains
 python ${BASE_PATH}/evaluation/basic_evaluation.py --run $RUN_NUMBER
 python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_NUMBER
 
@@ -32,13 +50,7 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 setup_distributed_environment
 
 print_section_header "Model Training"
-srun python ${BASE_PATH}/transformer/train.py \
-    --predict \
-    --epochs=200 \
-    --sequence_length=6 \
-    --run $RUN_NUMBER \
-    --batch_size=256 \
-    --n_embd=4 # --choice_only # --enforce_data_epochs
+srun --cpu-bind=none python ${BASE_PATH}/transformer/train.py --predict --epochs=$EPOCHS --run $RUN_NUMBER --batch_size=$BATCH_SIZE --n_layer=$N_LAYER --n_head=$N_HEAD --n_embd=$EMBD_DIM --sequence_length=$CONTEXT_LENGTH
 
 # Setup GPU environment for inference
 setup_gpu_environment

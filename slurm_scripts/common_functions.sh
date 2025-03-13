@@ -143,6 +143,8 @@ process_checkpoints() {
         model_name=$(basename "$model_file" .pth)
         
         # Assign GPU using modular arithmetic
+        # Default to 1 GPU if NUM_GPUS not set
+        NUM_GPUS=${NUM_GPUS:-1}
         gpu_id=$((i % NUM_GPUS))
         
         print_section_header "Processing checkpoint: $model_name on GPU $gpu_id"
