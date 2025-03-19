@@ -56,7 +56,6 @@ def main(run=None, suffix: str = 'v'):
         axes = axes.reshape(3, 1)
 
     cmap = generate_checkpoint_colormap(checkpoint_labels=checkpoint_files)
-    print(cmap)
     cmap['colors']['ground truth'] = 'k'
     # colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
     # cmap = {'ground truth': 'k'}
