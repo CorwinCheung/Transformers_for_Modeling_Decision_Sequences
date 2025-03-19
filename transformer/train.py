@@ -50,15 +50,19 @@ def parse_args():
     parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
     parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=None, help='Interval to evaluate the model')
-    parser.add_argument('--checkpoint_interval', type=int, default=None, help='Number of epochs between checkpoints')
+    parser.add_argument('--checkpoint_interval', type=str, default=None, help='Number of epochs between checkpoints or "log" for logarithmic spacing')
     parser.add_argument('--enforce_data_epochs', action='store_true', default=False, help='Flag to force data loader to reset')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
     parser.add_argument('--choice_only', action='store_true', default=False,
                         help='Objective to optimize -- choice only excludes reward prediction')
+
     args = parser.parse_args()
 
     if args.checkpoint_interval is None:
         args.checkpoint_interval = max(1, int(args.epochs // 10))
+    elif args.checkpoint_interval != 'log':
+        args.checkpoint_interval = float(args.checkpoint_interval)
+
     return args
 
 def write_predictions(model_name, predictions, last_step=False):
@@ -305,10 +309,35 @@ def trim_loss_steps(losses, starting_step, eval_interval):
 
     return losses
 
-def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps):
-    steps_per_epoch = batches_per_epoch / grad_accum_steps
-    checkpoint_steps = (checkpoint_interval * steps_per_epoch)
+def update_checkpoint_interval(nth_checkpoint=1, max_steps=None):
+
+    log_factor = 1.5
+    min_interval = 1
+    checkpoint_steps = max(min_interval, int(log_factor ** nth_checkpoint))
+
+    if nth_checkpoint == 1:
+        checkpoints = [checkpoint_steps]
+        j = 2
+        i = checkpoint_steps
+        while i < max_steps:
+            checkpoints.append(update_checkpoint_interval(j, max_steps))
+            j += 1
+            i += checkpoints[-1]
+        print(len(checkpoints), checkpoints)
+        assert(len(checkpoints) < 40), "Excessive number of checkpoints"
+
     return int(checkpoint_steps)
+
+def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps, max_steps=None):
+
+    if checkpoint_interval == 'log':
+        checkpoint_steps = update_checkpoint_interval(max_steps=max_steps)
+    else:
+        steps_per_epoch = batches_per_epoch / grad_accum_steps
+        checkpoint_steps = int(checkpoint_interval * steps_per_epoch)
+    
+    return checkpoint_steps
+
 
 def main():    
     seed = 200
@@ -331,6 +360,9 @@ def main():
     run_number = args.run_number or fm.get_latest_run()
     initialize_logger(run_number, is_master_process=ddp.master_process)
     
+    if (args.checkpoint_interval == 'log') or (args.checkpoint_interval < 1):
+        logger.info("Checkpoint interval is less than 1. Enforcing data epochs is disabled.")
+
     if ddp.master_process:
         logger.info("Starting training script with args: %s", args)
 
@@ -398,7 +430,8 @@ def main():
         logger.info("Model already exists. Skipping training.")
         return None
     elif any(checkpoints := glob.glob(os.path.join(fm.get_run_dir(run_number), 'models', "*cp*.pth"))):
-
+        if args.checkpoint_interval == 'log':
+            raise NotImplementedError('Checkpoint loading not for dynamic checkpointing.')
         # I think optimizer can be configured here?
         optimizer = model.configure_optimizers(
             weight_decay=0.1,
@@ -423,6 +456,7 @@ def main():
         # Remove any predictions made after the checkpoint was saved.
         update_predictions_file(model_name, starting_step)
         model.to(ddp.device)
+
     else:
         best_val_loss = float('inf')
         val_loss = None
@@ -430,9 +464,12 @@ def main():
         val_loss_steps = {}
         starting_step = 0
     
-    checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
+    next_checkpoint_step = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch,
+                                                grad_accum_steps, max_steps=max_steps)
+    nth_checkpoint = 1
+
     if ddp.master_process:
-        logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
+        logger.info(f"Number of steps to checkpoint: {next_checkpoint_step}")
         logger.info(f"Number of batches per epoch: {train_loader.batches_per_epoch}")
 
     if args.compile:
@@ -558,7 +595,7 @@ def main():
                 loss_steps.append(loss_accum.item())
 
         """CHECKPOINTING"""
-        if (step % checkpoint_interval == 0) and ddp.master_process:
+        if (step % next_checkpoint_step == 0) and ddp.master_process:
             logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
@@ -567,6 +604,11 @@ def main():
                         step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
                         val_loss_steps=val_loss_steps)
             logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
+
+            if args.checkpoint_interval == 'log':
+                nth_checkpoint += 1
+                next_checkpoint_step = update_checkpoint_interval(nth_checkpoint)
+                logger.info(f"Number of steps to checkpoint: {next_checkpoint_step}")
 
             if args.enforce_data_epochs:
                 if ddp.master_process:

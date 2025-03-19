@@ -2,17 +2,16 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Parameters for experiment sweeps (or single)
-LAYERS_ARRAY=(4)
-HEADS_ARRAY=(4)
-EPOCHS_ARRAY=(100)
+LAYERS_ARRAY=(1)
+HEADS_ARRAY=(1)
+EPOCHS_ARRAY=(200)
 TRAIN_STEPS_ARRAY=(100000)
 # CONTEXT_LENGTH_ARRAY=(3 6 24 36)
-# EMBD_DIM_ARRAY=(4)
-CONTEXT_LENGTH_ARRAY=(24)
-EMBD_DIM_ARRAY=(64)
+CONTEXT_LENGTH_ARRAY=(6)
+EMBD_DIM_ARRAY=(4)
 BATCH_SIZE_ARRAY=(256)
-DOMAIN_CONFIG_ARRAY=("sticky_unsticky_agent_domains.ini")
-EXPERIMENT_TYPE="agents_test"  # define the experiment you are running
+DOMAIN_CONFIG_ARRAY=("three_domains.ini")
+EXPERIMENT_TYPE="basic"  # define the experiment you are running
 
 # Options are:
 #   "basic": run_experiment.sh
@@ -23,8 +22,8 @@ EXPERIMENT_TYPE="agents_test"  # define the experiment you are running
 TRACKER_FILE="tracker.txt"
 
 # Initialize starting run number - scan existing runs once at the beginning
-# initialize_run
-NEXT_RUN_NUMBER=3
+initialize_run
+NEXT_RUN_NUMBER=$RUN_NUMBER
 
 # Function to submit a single experiment job
 submit_experiment() {

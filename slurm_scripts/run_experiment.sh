@@ -37,7 +37,7 @@ echo "Using run number: $RUN_NUMBER"
 print_section_header "Data Generation"
 python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
     --run $RUN_NUMBER \
-    --domain_id "B" \
+    --domain_id "A" \
     --num_steps_val=1_000_000 \
     --no_overwrite \
     --num_steps_train=$TRAIN_STEPS \
@@ -50,7 +50,16 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 setup_distributed_environment
 
 print_section_header "Model Training"
-srun --cpu-bind=none python ${BASE_PATH}/transformer/train.py --predict --epochs=$EPOCHS --run $RUN_NUMBER --batch_size=$BATCH_SIZE --n_layer=$N_LAYER --n_head=$N_HEAD --n_embd=$EMBD_DIM --sequence_length=$CONTEXT_LENGTH
+srun --cpu-bind=none python ${BASE_PATH}/transformer/train.py \
+    --predict \
+    --epochs=$EPOCHS \
+    --run $RUN_NUMBER \
+    --batch_size=$BATCH_SIZE \
+    --n_layer=$N_LAYER \
+    --n_head=$N_HEAD \
+    --n_embd=$EMBD_DIM \
+    --sequence_length=$CONTEXT_LENGTH \
+    --checkpoint_interval="log"
 
 # Setup GPU environment for inference
 setup_gpu_environment

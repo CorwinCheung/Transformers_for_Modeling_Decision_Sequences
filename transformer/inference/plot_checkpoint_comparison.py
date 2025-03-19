@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(__file__, '../../../')))
 import utils.file_management as fm
 
 from evaluation.graph_helper import calc_bpos_behavior
-from utils.checkpoint_processing import (add_checkpoint_colorbar,
+from utils.checkpoint_processing import (add_checkpoint_colorbar, generate_checkpoint_colormap,
                                          get_checkpoint_files)
 from utils.parse_data import (align_predictions_with_gt, get_data_filenames,
                               parse_simulated_data)
@@ -55,10 +55,13 @@ def main(run=None, suffix: str = 'v'):
     if len(domains) == 1:
         axes = axes.reshape(3, 1)
 
-    colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
-    cmap = {'ground truth': 'k'}
+    cmap = generate_checkpoint_colormap(checkpoint_labels=checkpoint_files)
+    print(cmap)
+    cmap['colors']['ground truth'] = 'k'
+    # colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
+    # cmap = {'ground truth': 'k'}
 
-    for pred_file, indices_file, color in zip(checkpoint_files, indices_files, colors):
+    for pred_file, indices_file in zip(checkpoint_files, indices_files):
 
         # Extract checkpoint numbers
         assert pred_file.split('_cp')[-1].replace('.txt', '') == indices_file.split('_cp')[-1].replace('.txt', ''), (
@@ -75,6 +78,7 @@ def main(run=None, suffix: str = 'v'):
                                    add_agg_cols=['pred_switch', 'pred_selected_high'])
 
         label = pred_file.split("_cp")[-1].replace(".txt", "")
+        color = cmap['colors'][label]
         for ax_, (domain, bpos_domain) in zip(axes.T, bpos_.groupby('domain')):
             sns.lineplot(bpos_domain.query('iInBlock.between(-11, 21)'),
                          x='iInBlock', y='pred_selected_high', ax=ax_[0], color=color, legend=False)
@@ -84,7 +88,7 @@ def main(run=None, suffix: str = 'v'):
         pred_policies = pts.calc_conditional_probs(events, add_grps='domain', htrials=2, sortby='pevent', pred_col='pred_switch')
         pred_policies['model'] = label
         gt_policies = pd.concat([gt_policies, pred_policies])
-        cmap[label] = color
+        # cmap[label] = color
 
     # Ground truth data -- mimic as a checkpoint
     for ax_, (domain, bpos_domain) in zip(axes.T, bpos_.groupby('domain')):
@@ -101,7 +105,7 @@ def main(run=None, suffix: str = 'v'):
         _, ax_[2] = pts.plot_sequences(gt_policies.query('model == "ground truth" & domain == @domain'), ax=ax_[2])
 
         fig, ax_[2] = pts.plot_sequence_points(gt_policies.query('model != "ground truth" & domain == @domain'), grp='model',
-                                               palette=cmap, yval='pevent', size=3, ax=ax_[2], fig=fig, legend=False)
+                                               palette=cmap['colors'], yval='pevent', size=3, ax=ax_[2], fig=fig, legend=False)
 
     add_checkpoint_colorbar(fig, axes, cmap)
     sns.despine()

@@ -123,8 +123,86 @@ def process_checkpoints(run, processor_fn, reference_type='final', include_final
         'run': run
     }
 
+def generate_checkpoint_colormap(checkpoint_labels=None, checkpoint_numbers=None, cmap_name='viridis'):
+    """
+    Generate a colormap for checkpoints that can be used across different plotting functions.
+    
+    Parameters:
+    -----------
+    checkpoint_labels : list, optional
+        List of checkpoint labels (e.g., ['cp10', 'cp20', ...])
+    checkpoint_numbers : list, optional
+        List of checkpoint numbers (e.g., [10, 20, ...])
+    cmap_name : str, default='viridis'
+        Name of the matplotlib colormap to use
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing:
+        - 'colors': dict mapping checkpoint labels to colors
+        - 'cmap': the matplotlib colormap
+        - 'norm': the normalization
+        - 'is_log_spaced': boolean indicating if checkpoints are log-spaced
+        - 'checkpoint_numbers': sorted list of checkpoint numbers
+    """
+    from matplotlib.colors import Normalize, BoundaryNorm, ListedColormap
+    
+    # Extract checkpoint numbers if not provided directly
+    if checkpoint_numbers is None and checkpoint_labels is not None:
+        checkpoint_numbers = [int(label.split("cp")[-1].replace(".txt", "")) 
+                             for label in checkpoint_labels if 'cp' in label]
+    
+    if not checkpoint_numbers:
+        return None
+        
+    checkpoint_numbers = sorted(checkpoint_numbers)
+    
+    # Determine if checkpoints are log-spaced
+    is_log_spaced = False
+    if len(checkpoint_numbers) > 3:
+        intervals = [checkpoint_numbers[i+1] - checkpoint_numbers[i] for i in range(len(checkpoint_numbers)-1)]
+        ratios = [intervals[i+1] / intervals[i] if intervals[i] > 0 else 1 for i in range(len(intervals)-1)]
+        
+        if sum(ratios) / len(ratios) > 1.3:
+            is_log_spaced = True
+    
+    # Create base colormap
+    cmap = plt.cm.get_cmap(cmap_name)
+    
+    # Setup normalization and colormap based on checkpoint spacing
+    if is_log_spaced:
+        # For log-spaced checkpoints, use continuous mapping
+        norm = Normalize(vmin=checkpoint_numbers[0], vmax=checkpoint_numbers[-1])
+        colors = {f"{num}": cmap(norm(num)) for num in checkpoint_numbers}
+    else:
+        # For linearly-spaced checkpoints, use discrete colors
+        n_colors = len(checkpoint_numbers)
+        discrete_colors = [cmap(i / (n_colors - 1)) for i in range(n_colors)]
+        
+        bounds = np.array([num - 0.5 for num in checkpoint_numbers] + 
+                         [checkpoint_numbers[-1] + 0.5])
+        discrete_cmap = ListedColormap(discrete_colors)
+        norm = BoundaryNorm(bounds, discrete_cmap.N)
+        
+        colors = {f"cp{num}": discrete_colors[i] for i, num in enumerate(checkpoint_numbers)}
+        cmap = discrete_cmap
+    
+    # Add final model if needed
+    if checkpoint_labels and 'final' in checkpoint_labels:
+        colors['final'] = 'red'  # Special color for final model
+    
+    # Return complete colormap package
+    return {
+        'colors': colors,
+        'cmap': cmap,
+        'norm': norm,
+        'is_log_spaced': is_log_spaced,
+        'checkpoint_numbers': checkpoint_numbers
+    }
+
 def add_checkpoint_colorbar(fig, axs, color_map, ground_truth=True,
-                           remove_legends=True, colorbar_kwargs=None):
+                            remove_legends=True, colorbar_kwargs=None, max_labels=8):
     """
     Add a colorbar for checkpoint numbers instead of a legend.
     
@@ -135,13 +213,15 @@ def add_checkpoint_colorbar(fig, axs, color_map, ground_truth=True,
     axes : numpy.ndarray
         Array of axes objects
     color_map : dict
-        Dictionary mapping model names to colors
+        Dictionary mapping model names to colors, or the output from generate_checkpoint_colormap
     ground_truth : bool, default=True
         Whether to add a separate legend for ground truth
     remove_legends : bool, default=True
         Whether to remove existing legends
     colorbar_kwargs : dict, optional
         Additional kwargs to pass to fig.colorbar()
+    max_labels : int, default=8
+        Maximum number of checkpoint labels to show on the colorbar
         
     Returns:
     --------
@@ -152,41 +232,76 @@ def add_checkpoint_colorbar(fig, axs, color_map, ground_truth=True,
     if colorbar_kwargs is None:
         colorbar_kwargs = {'shrink': 0.3, 'pad': 0.02, 'location': 'right'}
 
-    # Extract checkpoint numbers as integers for colorbar
-    color_map_copy = {k: v for k, v in color_map.copy().items() if 'cp' in k}
-    if not color_map_copy:
-        color_map_copy = {k: v for k, v in color_map.copy().items() if 'ground truth' not in k}
+    # Check if color_map is already processed or just a simple dict
+    if isinstance(color_map, dict) and any(key in color_map for key in ['colors', 'cmap', 'norm']):
+        # Already processed map
+        colormap_data = color_map
+        checkpoint_numbers = colormap_data['checkpoint_numbers']
+        is_log_spaced = colormap_data['is_log_spaced']
+        cmap = colormap_data['cmap']
+        norm = colormap_data['norm']
+    else:
+        # Extract checkpoint labels/numbers and process
+        color_map_copy = {k: v for k, v in color_map.copy().items() if 'cp' in k}
+        if not color_map_copy:
+            color_map_copy = {k: v for k, v in color_map.copy().items() if 'ground truth' not in k}
 
-    # Get checkpoint numbers and sort them
-    checkpoint_labels = list(color_map_copy.keys())
-    checkpoint_numbers = [int(label.split("cp")[-1].replace(".txt", "")) 
-                          for label in checkpoint_labels]
-    checkpoint_numbers.sort()  # Sort in ascending order
-
-    # Create discrete boundaries and select colors for each checkpoint
-    from matplotlib.colors import BoundaryNorm
-
-    # Create boundaries slightly below and above each checkpoint number
-    bounds = np.array([num - 0.5 for num in checkpoint_numbers] + 
-                      [checkpoint_numbers[-1] + 0.5])
-
-    # Get N evenly spaced colors from viridis
-    cmap = plt.cm.viridis
-    n_colors = len(checkpoint_numbers)
-    colors = [cmap(i / (n_colors - 1)) for i in range(n_colors)]
+        checkpoint_labels = list(color_map_copy.keys())
+        colormap_data = generate_checkpoint_colormap(checkpoint_labels)
+        
+        if colormap_data is None:
+            return None
+            
+        checkpoint_numbers = colormap_data['checkpoint_numbers']
+        is_log_spaced = colormap_data['is_log_spaced']
+        cmap = colormap_data['cmap']
+        norm = colormap_data['norm']
     
-    # Create a ListedColormap with these colors
-    from matplotlib.colors import ListedColormap
-    discrete_cmap = ListedColormap(colors)
-    norm = BoundaryNorm(bounds, discrete_cmap.N)
-    sm = plt.cm.ScalarMappable(cmap=discrete_cmap, norm=norm)
+    # Create scalar mappable for colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     
-    # Add colorbar with specific ticks at checkpoint numbers
-    cbar = fig.colorbar(sm, ax=axs.ravel().tolist() if isinstance(axs, np.ndarray) else axs, 
-                       ticks=checkpoint_numbers,
-                       **colorbar_kwargs)
+    # Add colorbar to figure
+    cbar = fig.colorbar(sm, ax=axs.ravel().tolist() if isinstance(axs, np.ndarray) else axs,
+                       ticks=checkpoint_numbers, **colorbar_kwargs)
     cbar.set_label('Checkpoint')
+    
+    # Handle label frequency reduction for readability
+    if len(checkpoint_numbers) > max_labels:
+        n = len(checkpoint_numbers)
+        
+        # Always include first and last checkpoints
+        if n <= 2:
+            indices = list(range(n))
+        else:
+            # For logarithmic spacing, use logarithmic distribution of labels
+            if is_log_spaced:
+                log_min = np.log10(1 + checkpoint_numbers[0]) if checkpoint_numbers[0] >= 0 else 0
+                log_max = np.log10(1 + checkpoint_numbers[-1])
+                log_steps = np.linspace(log_min, log_max, max_labels)
+                
+                # Convert log steps back to checkpoint values
+                step_values = [10**x - 1 for x in log_steps]
+                
+                # Find nearest checkpoint to each log step
+                indices = [0]  # Always include first
+                for val in step_values[1:-1]:  # Skip first and last
+                    idx = min(range(1, n-1), key=lambda i: abs(checkpoint_numbers[i] - val))
+                    if idx not in indices:
+                        indices.append(idx)
+                indices.append(n-1)  # Always include last
+            else:
+                # For linear spacing, use linear distribution
+                step = max(1, (n-2) // (max_labels-2))
+                middle_indices = list(range(1, n-1, step))
+                middle_indices = middle_indices[:max_labels-2]  # Limit to max_labels - 2
+                indices = [0] + middle_indices + [n-1]
+
+        cbar.ax.set_yticklabels([''] * len(checkpoint_numbers))
+
+        for idx in indices:
+            cbar.ax.get_yticklabels()[idx].set_text(str(checkpoint_numbers[idx]))
+            cbar.ax.get_yticklabels()[idx].set_visible(True)
 
     # Remove any existing legends if requested
     if remove_legends:
@@ -208,5 +323,5 @@ def add_checkpoint_colorbar(fig, axs, color_map, ground_truth=True,
                   title_fontsize='small',
                   borderpad=0.3,
                   handlelength=1.5)
-        
+    
     return cbar
