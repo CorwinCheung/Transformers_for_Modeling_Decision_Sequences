@@ -311,9 +311,15 @@ def trim_loss_steps(losses, starting_step, eval_interval):
 
 def update_checkpoint_interval(nth_checkpoint=1, max_steps=None):
 
-    log_factor = 1.5
     min_interval = 1
-    checkpoint_steps = max(min_interval, int(log_factor ** nth_checkpoint))
+    max_interval = 3000
+
+    log_factor = 2.5
+    
+    try:
+        checkpoint_steps = max(min_interval, min(max_interval, int(log_factor ** nth_checkpoint)))
+    except OverflowError:
+        checkpoint_steps = max_interval
 
     if nth_checkpoint == 1:
         checkpoints = [checkpoint_steps]

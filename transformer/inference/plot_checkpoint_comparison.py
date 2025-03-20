@@ -57,8 +57,6 @@ def main(run=None, suffix: str = 'v'):
 
     cmap = generate_checkpoint_colormap(checkpoint_labels=checkpoint_files)
     cmap['colors']['ground truth'] = 'k'
-    # colors = sns.color_palette('viridis', n_colors=len(checkpoint_files))
-    # cmap = {'ground truth': 'k'}
 
     for pred_file, indices_file in zip(checkpoint_files, indices_files):
 
