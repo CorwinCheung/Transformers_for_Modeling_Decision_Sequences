@@ -21,7 +21,6 @@ from transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, D
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
 
-# Module-level logger (initialized as None)
 logger = None
 
 username = getpass.getuser()
@@ -117,6 +116,52 @@ def write_metadata(model, model_name, total_batch_size, max_steps, train_loader,
         meta_file.write(f"\n")
     logger.info(f"Metadata saved to {metdata_file}")
 
+def write_experiment_summary(args, model, model_name, val_loss_steps, max_steps):
+
+    import pandas as pd
+
+    def _load_summary(path_to_file: str):
+        try:
+            summary = pd.read_csv(path_to_file, index_col=None)
+            return summary
+        except FileNotFoundError:
+            return pd.DataFrame()
+
+    def _save_summary(curr_summary: pd.DataFrame):
+        path_to_file = os.path.abspath(os.path.join(__file__, '../../', 'model_summary.csv'))
+        summary = _load_summary(path_to_file)
+        summary = pd.concat((summary, curr_summary)).reset_index(drop=True)
+        summary.to_csv(path_to_file, index=False)
+        logger.info(f"Experiment summary saved to {path_to_file}")
+
+    losses = {}
+    xs = np.concatenate([np.arange(0, max_steps, args.eval_interval), [max_steps]])
+
+    if isinstance(val_loss_steps, dict):
+        for key, data in val_loss_steps.items():
+            losses[f'best_val_{key}'] = min(data)
+            losses[f'best_val_{key}_step'] = xs[data.index(min(data))]
+    else:
+        losses['best_val_full_loss'] = min(val_loss_steps)
+        losses['best_val_full_loss_step'] = xs[val_loss_steps.index(min(val_loss_steps))]
+    summary = {
+        'model_id': os.environ.get('SLURM_JOB_NAME', 'unknown_job'),
+        'experiment_type': os.environ.get('EXPERIMENT_TYPE', None),
+        'domain_config': os.environ.get('DOMAIN_CONFIG', None),
+        'domain_id': os.environ.get('DOMAIN_ID', None),
+        'num_samples': model_name[len("model_seen"):],
+        'num_parameters': sum(p.numel() for p in model.parameters()),
+        'max_steps': max_steps,
+        'run_number': run_number
+    }
+    args_dict = vars(args)
+    summary.update(args_dict)
+    summary.update(losses)
+    logger.info(f"Experiment summary:\n{summary}")
+
+    df = pd.DataFrame(summary, index=[0])
+    _save_summary(df)
+
 def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False, **kwargs):
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
@@ -144,7 +189,9 @@ def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None,
 
 def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval, model_name):
     fig, ax = plt.subplots(figsize=(10, 6))
-    xs = np.concatenate([np.arange(0, max_steps, eval_interval), [max_steps]])
+    xs = np.arange(0, max_steps, eval_interval)
+    if not xs[-1] == (max_steps-1):
+        xs = np.concatenate([xs, [max_steps-1]])
     ax.plot(xs, loss_steps, label='Training Loss')
     if isinstance(val_loss_steps, dict):
         for key, data in val_loss_steps.items():
@@ -631,15 +678,7 @@ def main():
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         # wandb.finish()
         plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
-
-    # if ddp.ddp:
-    #     # Make sure all processes reach this point before saving
-    #     dist.barrier()
-    #     # Only the master process should save the model
-    #     if ddp.master_process:
-    #         save_model(model, model_name, run_number, compile=args.compile)
-    #     # Wait for save to complete
-    #     dist.barrier()
+        write_experiment_summary(args, model, model_name, val_loss_steps, max_steps)
 
     if ddp.ddp:
         destroy_process_group()
