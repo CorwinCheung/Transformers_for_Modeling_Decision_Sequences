@@ -15,6 +15,9 @@ from utils.checkpoint_processing import (add_checkpoint_colorbar,
                                          generate_checkpoint_colormap,
                                          process_checkpoints)
 
+vocab = ['R', 'r', 'L', 'l']
+stoi = {ch: i for i, ch in enumerate(vocab)}
+itos = {i: ch for i, ch in enumerate(vocab)}
 
 def token_embedding_similarity(model, vocab_mappings, ax=None):
     """
@@ -245,15 +248,17 @@ def extract_token_embeddings(model):
     """Extract token embedding weights from a model."""
     return model.transformer.wte.weight.detach().cpu().numpy()
 
-def embedding_processor(model, checkpoint_num, is_reference, **kwargs):
+
+def embedding_processor(model, *kwargs):
     """Process a model to extract its token embeddings."""
     embeddings = extract_token_embeddings(model)
     return embeddings
 
+
 def analyze_embedding_evolution(run, reference_type='final', save_results=False):
     """
     Analyze the evolution of token embeddings across checkpoints.
-    
+
     Parameters:
     -----------
     run : int
@@ -270,41 +275,42 @@ def analyze_embedding_evolution(run, reference_type='final', save_results=False)
         reference_type=reference_type,
         save_results=save_results
     )
-    
+
     if not checkpoint_data:
         return
-    
+
     all_embeddings = checkpoint_data['results']
     checkpoint_numbers = checkpoint_data['checkpoint_numbers']
     model_labels = checkpoint_data['model_labels']
     reference_idx = checkpoint_data['reference_idx']
-    
+
     # Get reference embeddings
     reference_embeddings = all_embeddings[reference_idx]
-    
+
     # Fit PCA on reference embeddings
     pca = PCA(n_components=2)
     pca.fit(reference_embeddings)
-    
+
     # Project all embeddings using the same PCA
     projected_embeddings = [pca.transform(emb) for emb in all_embeddings]
-    
+
     # Create visualization
-    plot_embedding_evolution(projected_embeddings, model_labels, checkpoint_numbers, 
-                             reference_idx, run, save_results)
-    
+    plot_embedding_evolution(projected_embeddings, model_labels,
+                             run, save_results)
+
     # Calculate distances from reference
     calculate_embedding_distances(all_embeddings, checkpoint_numbers, model_labels, 
                                reference_idx, run, save_results)
-    
+
     return projected_embeddings
 
-def plot_embedding_evolution(projected_embeddings, model_labels, 
+
+def plot_embedding_evolution(projected_embeddings, model_labels,
                              run, save_results=False):
     """Visualize the evolution of embeddings in 2D space."""
 
     n_tokens = projected_embeddings[0].shape[0]
-    
+
     fig, ax = plt.subplots(figsize=(4, 3), layout='constrained')
     cmap = generate_checkpoint_colormap(checkpoint_labels=model_labels, )
 
@@ -345,14 +351,15 @@ def plot_embedding_evolution(projected_embeddings, model_labels,
         out_path = fm.get_experiment_file(f'token_embedding_evolution.png', run, subdir='predictions')
         plt.savefig(out_path, bbox_inches='tight', dpi=300)
 
+
 def calculate_embedding_distances(all_embeddings, checkpoint_numbers, model_labels, 
                                reference_idx, run, save_results=False):
     """Calculate distances between embeddings across checkpoints."""
     reference_embeddings = all_embeddings[reference_idx]
-    
+
     cos_sims = []
     eucl_dists = []
-    
+
     for embeddings in all_embeddings:
         # Average cosine similarity across all tokens
         cos_sim = np.mean([
@@ -361,29 +368,29 @@ def calculate_embedding_distances(all_embeddings, checkpoint_numbers, model_labe
             for i in range(len(embeddings))
         ])
         cos_sims.append(cos_sim)
-        
+
         # Average Euclidean distance across all tokens
         eucl_dist = np.mean([
             np.linalg.norm(embeddings[i] - reference_embeddings[i])
             for i in range(len(embeddings))
         ])
         eucl_dists.append(eucl_dist)
-    
+
     df = pd.DataFrame({
         'Checkpoint': checkpoint_numbers,
         'Model': model_labels,
         'Cosine Similarity': cos_sims,
         'Euclidean Distance': eucl_dists
     })
-    
+
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(3, 3.5), sharex=True, layout='constrained')
-    
+
     plot_df = df[df.index != reference_idx]
-    
+
     sns.lineplot(data=plot_df, x='Checkpoint', y='Cosine Similarity', ax=ax1, marker='o', color='k')
     ax1.set(ylabel='Cosine\nSimilarity',
             title=f'Embedding Similarity\nto Reference Model')
-    
+
     sns.lineplot(data=plot_df, x='Checkpoint', y='Euclidean Distance', ax=ax2, marker='o', color='k')
     ax2.set(ylabel='Euclidean\nDistance',
             xlabel='Checkpoint')
