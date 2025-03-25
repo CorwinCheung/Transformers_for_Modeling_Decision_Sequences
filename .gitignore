@@ -12,5 +12,5 @@ experiments/*
 !experiments/run_1/
 !experiments/run_2/
 !experiments/run_3/
-!experiments/run_4/
+!experiments/run_5/
 slurm_scripts/slurm_output/*

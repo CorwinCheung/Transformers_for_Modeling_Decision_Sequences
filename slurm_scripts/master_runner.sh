@@ -2,17 +2,17 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Parameters for experiment sweeps (or single)
-LAYERS_ARRAY=(12)
-HEADS_ARRAY=(12)
+LAYERS_ARRAY=(4)
+HEADS_ARRAY=(4)
 EPOCHS_ARRAY=(100)
 TRAIN_STEPS_ARRAY=(100000)
 # CONTEXT_LENGTH_ARRAY=(3 6 24 36)
 # EMBD_DIM_ARRAY=(4)
-CONTEXT_LENGTH_ARRAY=(3 6 12 24 36 48)
-EMBD_DIM_ARRAY=(256 768)
+CONTEXT_LENGTH_ARRAY=(12 24 36)
+EMBD_DIM_ARRAY=(64 768)
 BATCH_SIZE_ARRAY=(256)
-DOMAIN_CONFIG_ARRAY=("sticky_unsticky_agent_domains.ini")
-EXPERIMENT_TYPE="agents_test"  # define the experiment you are running
+DOMAIN_CONFIG_ARRAY=("domains.ini")
+EXPERIMENT_TYPE="multi_domain"  # define the experiment you are running
 
 # Options are:
 #   "basic": run_experiment.sh

@@ -26,7 +26,7 @@ TRAIN_STEPS=${5:-100000}
 CONTEXT_LENGTH=${6:-12}
 EMBD_DIM=${7:-64}
 BATCH_SIZE=${8:-256}
-DOMAIN_CONFIG=${9:-"three_domains.ini"}
+DOMAIN_CONFIG=${9:-"domains.ini"}
 
 # Export run number
 export RUN_NUMBER
