@@ -2,6 +2,7 @@ Experiments Varying Agent and Environment
 
 run1: basic, 100 epochs, 100000 train steps, 4 layers, 4 heads, 12 context length, 64 embedding dimensions, three_domains.ini
 --> Train on a single agent in an 80/20 environment, the model can capture the switching and high port behavior easily
+    -mini uses a context length of 3 instead of 6. Both models are below 1K parameters, really small
 
 run2: multi_domain, 100 epochs, 100000 train steps, 4 layers, 4 heads, 12 context length, 64 embedding dimensions, domains.ini
 --> Train on agents in different domains, 90/10 and 70/30, the model can capture both behaviors 
