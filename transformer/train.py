@@ -21,7 +21,6 @@ from transformer import GPT, DataLoaderLite, DataLoader, DDPConfig, GPTConfig, D
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
 
-# Module-level logger (initialized as None)
 logger = None
 
 username = getpass.getuser()
@@ -50,15 +49,19 @@ def parse_args():
     parser.add_argument('--compile', action='store_true', default=False, help='Flag to compile the code for faster training')
     parser.add_argument('--predict', action='store_true', default=False, help='Flag to predict on the validation set')
     parser.add_argument('--eval_interval', type=int, default=None, help='Interval to evaluate the model')
-    parser.add_argument('--checkpoint_interval', type=int, default=None, help='Number of epochs between checkpoints')
+    parser.add_argument('--checkpoint_interval', type=str, default=None, help='Number of epochs between checkpoints or "log" for logarithmic spacing')
     parser.add_argument('--enforce_data_epochs', action='store_true', default=False, help='Flag to force data loader to reset')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
     parser.add_argument('--choice_only', action='store_true', default=False,
                         help='Objective to optimize -- choice only excludes reward prediction')
+
     args = parser.parse_args()
 
     if args.checkpoint_interval is None:
-        args.checkpoint_interval = int(args.epochs // 10)
+        args.checkpoint_interval = max(1, int(args.epochs // 10))
+    elif args.checkpoint_interval != 'log':
+        args.checkpoint_interval = float(args.checkpoint_interval)
+
     return args
 
 def write_predictions(model_name, predictions, last_step=False):
@@ -113,6 +116,52 @@ def write_metadata(model, model_name, total_batch_size, max_steps, train_loader,
         meta_file.write(f"\n")
     logger.info(f"Metadata saved to {metdata_file}")
 
+def write_experiment_summary(args, model, model_name, val_loss_steps, max_steps):
+
+    import pandas as pd
+
+    def _load_summary(path_to_file: str):
+        try:
+            summary = pd.read_csv(path_to_file, index_col=None)
+            return summary
+        except FileNotFoundError:
+            return pd.DataFrame()
+
+    def _save_summary(curr_summary: pd.DataFrame):
+        path_to_file = os.path.abspath(os.path.join(__file__, '../../', 'model_summary.csv'))
+        summary = _load_summary(path_to_file)
+        summary = pd.concat((summary, curr_summary)).reset_index(drop=True)
+        summary.to_csv(path_to_file, index=False)
+        logger.info(f"Experiment summary saved to {path_to_file}")
+
+    losses = {}
+    xs = np.concatenate([np.arange(0, max_steps, args.eval_interval), [max_steps]])
+
+    if isinstance(val_loss_steps, dict):
+        for key, data in val_loss_steps.items():
+            losses[f'best_val_{key}'] = min(data)
+            losses[f'best_val_{key}_step'] = xs[data.index(min(data))]
+    else:
+        losses['best_val_full_loss'] = min(val_loss_steps)
+        losses['best_val_full_loss_step'] = xs[val_loss_steps.index(min(val_loss_steps))]
+    summary = {
+        'model_id': os.environ.get('SLURM_JOB_NAME', 'unknown_job'),
+        'experiment_type': os.environ.get('EXPERIMENT_TYPE', None),
+        'domain_config': os.environ.get('DOMAIN_CONFIG', None),
+        'domain_id': os.environ.get('DOMAIN_ID', None),
+        'num_samples': model_name[len("model_seen"):],
+        'num_parameters': sum(p.numel() for p in model.parameters()),
+        'max_steps': max_steps,
+        'run_number': run_number
+    }
+    args_dict = vars(args)
+    summary.update(args_dict)
+    summary.update(losses)
+    logger.info(f"Experiment summary:\n{summary}")
+
+    df = pd.DataFrame(summary, index=[0])
+    _save_summary(df)
+
 def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None, compile=False, **kwargs):
     suffix = f"_cp{step}" if is_checkpoint else ""
     model_path = fm.get_experiment_file(f'{model_name}{suffix}.pth', run_number, subdir='models')
@@ -140,7 +189,9 @@ def save_model(model, model_name, run_number, *, is_checkpoint=False, step=None,
 
 def plot_losses(loss_steps, val_loss_steps, max_steps, eval_interval, model_name):
     fig, ax = plt.subplots(figsize=(10, 6))
-    xs = np.concatenate([np.arange(0, max_steps, eval_interval), [max_steps]])
+    xs = np.arange(0, max_steps, eval_interval)
+    if not xs[-1] == (max_steps-1):
+        xs = np.concatenate([xs, [max_steps-1]])
     ax.plot(xs, loss_steps, label='Training Loss')
     if isinstance(val_loss_steps, dict):
         for key, data in val_loss_steps.items():
@@ -305,10 +356,41 @@ def trim_loss_steps(losses, starting_step, eval_interval):
 
     return losses
 
-def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps):
-    steps_per_epoch = batches_per_epoch / grad_accum_steps
-    checkpoint_steps = (checkpoint_interval * steps_per_epoch)
+def update_checkpoint_interval(nth_checkpoint=1, max_steps=None):
+
+    min_interval = 1
+    max_interval = 3000
+
+    log_factor = 2.5
+    
+    try:
+        checkpoint_steps = max(min_interval, min(max_interval, int(log_factor ** nth_checkpoint)))
+    except OverflowError:
+        checkpoint_steps = max_interval
+
+    if nth_checkpoint == 1:
+        checkpoints = [checkpoint_steps]
+        j = 2
+        i = checkpoint_steps
+        while i < max_steps:
+            checkpoints.append(update_checkpoint_interval(j, max_steps))
+            j += 1
+            i += checkpoints[-1]
+        print(len(checkpoints), checkpoints)
+        assert(len(checkpoints) < 40), "Excessive number of checkpoints"
+
+    return int(checkpoint_steps)
+
+def steps_per_checkpoint(checkpoint_interval, batches_per_epoch, grad_accum_steps, max_steps=None):
+
+    if checkpoint_interval == 'log':
+        checkpoint_steps = update_checkpoint_interval(max_steps=max_steps)
+    else:
+        steps_per_epoch = batches_per_epoch / grad_accum_steps
+        checkpoint_steps = int(checkpoint_interval * steps_per_epoch)
+    
     return checkpoint_steps
+
 
 def main():    
     seed = 200
@@ -331,6 +413,9 @@ def main():
     run_number = args.run_number or fm.get_latest_run()
     initialize_logger(run_number, is_master_process=ddp.master_process)
     
+    if (args.checkpoint_interval == 'log') or (args.checkpoint_interval < 1):
+        logger.info("Checkpoint interval is less than 1. Enforcing data epochs is disabled.")
+
     if ddp.master_process:
         logger.info("Starting training script with args: %s", args)
 
@@ -398,7 +483,8 @@ def main():
         logger.info("Model already exists. Skipping training.")
         return None
     elif any(checkpoints := glob.glob(os.path.join(fm.get_run_dir(run_number), 'models', "*cp*.pth"))):
-
+        if args.checkpoint_interval == 'log':
+            raise NotImplementedError('Checkpoint loading not for dynamic checkpointing.')
         # I think optimizer can be configured here?
         optimizer = model.configure_optimizers(
             weight_decay=0.1,
@@ -423,6 +509,7 @@ def main():
         # Remove any predictions made after the checkpoint was saved.
         update_predictions_file(model_name, starting_step)
         model.to(ddp.device)
+
     else:
         best_val_loss = float('inf')
         val_loss = None
@@ -430,9 +517,12 @@ def main():
         val_loss_steps = {}
         starting_step = 0
     
-    checkpoint_interval = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch, grad_accum_steps)
+    next_checkpoint_step = steps_per_checkpoint(args.checkpoint_interval, train_loader.batches_per_epoch,
+                                                grad_accum_steps, max_steps=max_steps)
+    nth_checkpoint = 1
+
     if ddp.master_process:
-        logger.info(f"Number of steps per checkpoint (to finish epoch): {checkpoint_interval}")
+        logger.info(f"Number of steps to checkpoint: {next_checkpoint_step}")
         logger.info(f"Number of batches per epoch: {train_loader.batches_per_epoch}")
 
     if args.compile:
@@ -558,7 +648,7 @@ def main():
                 loss_steps.append(loss_accum.item())
 
         """CHECKPOINTING"""
-        if (step % checkpoint_interval == 0) and ddp.master_process:
+        if (step % next_checkpoint_step == 0) and ddp.master_process:
             logger.info(f"Checkpoint at step {step} with dataloader position {train_loader.current_position}")
             if loss_improved := (val_loss < best_val_loss):
                 best_val_loss = val_loss
@@ -567,6 +657,11 @@ def main():
                         step=step, optimizer=optimizer, best_val_loss=best_val_loss, loss_steps=loss_steps,
                         val_loss_steps=val_loss_steps)
             logger.info(f"New best validation loss: {best_val_loss:.4f}. Model checkpoint saved at step {step}. Validation loss improved: {loss_improved}")
+
+            if args.checkpoint_interval == 'log':
+                nth_checkpoint += 1
+                next_checkpoint_step = update_checkpoint_interval(nth_checkpoint)
+                logger.info(f"Number of steps to checkpoint: {next_checkpoint_step}")
 
             if args.enforce_data_epochs:
                 if ddp.master_process:
@@ -583,15 +678,7 @@ def main():
         write_metadata(model, model_name, total_batch_size, max_steps, train_loader, val_loader, model.config)
         # wandb.finish()
         plot_losses(loss_steps, val_loss_steps, max_steps, args.eval_interval, model_name)
-
-    # if ddp.ddp:
-    #     # Make sure all processes reach this point before saving
-    #     dist.barrier()
-    #     # Only the master process should save the model
-    #     if ddp.master_process:
-    #         save_model(model, model_name, run_number, compile=args.compile)
-    #     # Wait for save to complete
-    #     dist.barrier()
+        write_experiment_summary(args, model, model_name, val_loss_steps, max_steps)
 
     if ddp.ddp:
         destroy_process_group()

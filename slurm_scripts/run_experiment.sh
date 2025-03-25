@@ -7,7 +7,7 @@
 #SBATCH --gres=gpu:1          
 #SBATCH --cpus-per-task=16
 #SBATCH --time=01:00:00  
-#SBATCH --mem=100GB
+#SBATCH --mem=150GB
 #SBATCH --partition=kempner
 #SBATCH --output=slurm_output/%j.out
 #SBATCH --error=slurm_output/%j.err
@@ -28,6 +28,11 @@ CONTEXT_LENGTH=${6:-12}
 EMBD_DIM=${7:-64}
 BATCH_SIZE=${8:-256}
 DOMAIN_CONFIG=${9:-"domains.ini"}
+DOMAIN_ID=${10:-"B"}
+
+export DOMAIN_ID=$DOMAIN_ID
+export DOMAIN_CONFIG=$DOMAIN_CONFIG
+export EXPERIMENT_TYPE="basic"
 
 # Export run number
 export RUN_NUMBER
@@ -37,7 +42,7 @@ echo "Using run number: $RUN_NUMBER"
 print_section_header "Data Generation"
 python ${BASE_PATH}/synthetic_data_generation/generate_data.py \
     --run $RUN_NUMBER \
-    --domain_id "B" \
+    --domain_id $DOMAIN_ID \
     --num_steps_val=1_000_000 \
     --no_overwrite \
     --num_steps_train=$TRAIN_STEPS \
@@ -50,7 +55,15 @@ python ${BASE_PATH}/evaluation/graphs_on_trial_block_transitions.py --run $RUN_N
 setup_distributed_environment
 
 print_section_header "Model Training"
-srun --cpu-bind=none python ${BASE_PATH}/transformer/train.py --predict --epochs=$EPOCHS --run $RUN_NUMBER --batch_size=$BATCH_SIZE --n_layer=$N_LAYER --n_head=$N_HEAD --n_embd=$EMBD_DIM --sequence_length=$CONTEXT_LENGTH
+srun --cpu-bind=none python ${BASE_PATH}/transformer/train.py \
+    --epochs=$EPOCHS \
+    --run $RUN_NUMBER \
+    --batch_size=$BATCH_SIZE \
+    --n_layer=$N_LAYER \
+    --n_head=$N_HEAD \
+    --n_embd=$EMBD_DIM \
+    --sequence_length=$CONTEXT_LENGTH \
+    --checkpoint_interval="log"
 
 # Setup GPU environment for inference
 setup_gpu_environment

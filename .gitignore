@@ -8,6 +8,7 @@ transformer/wandb/*
 **/*.out
 **/*.txt
 **/*.log
+**/*.csv
 experiments/*
 !experiments/run_1/
 !experiments/run_1_mini/

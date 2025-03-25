@@ -331,9 +331,7 @@ def load_trained_model(run, model_name, device, **kwargs):
     try:
         model.load_state_dict(torch.load(model_path, map_location=device, **kwargs))
     except Exception:
-        print(model_path)
         checkpoint = torch.load(model_path, map_location=device,  **kwargs)
-        print(checkpoint.keys())
         model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     model.eval()
