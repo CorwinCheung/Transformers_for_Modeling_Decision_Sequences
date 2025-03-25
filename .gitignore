@@ -6,11 +6,11 @@ transformer/wandb/*
 **/__pycache__/
 **/*.err
 **/*.out
-!run_1.txt
-!run_2.txt
-!run_3.txt
-!run_4.txt
 **/*.txt
 **/*.log
 experiments/*
+!experiments/run_1/
+!experiments/run_2/
+!experiments/run_3/
+!experiments/run_4/
 slurm_scripts/slurm_output/*
