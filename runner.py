@@ -1,13 +1,13 @@
 import os
 
 # Directory containing the files
-directory = "experiments/run_2/seqs"
+directory = "experiments/run_1_mini/seqs"
 
 # Iterate through all files in the directory
 for filename in os.listdir(directory):
-    if "_97" in filename:
+    if "_8" in filename:
         # Create new filename by replacing run_97_ with run_2_
-        new_filename = filename.replace("_97", "_2")
+        new_filename = filename.replace("_8", "_1_mini")
         
         # Create full file paths
         old_file = os.path.join(directory, filename)

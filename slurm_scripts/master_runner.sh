@@ -2,14 +2,12 @@ source "./slurm_scripts/common_functions.sh"
 setup_environment
 
 # Parameters for experiment sweeps (or single)
-LAYERS_ARRAY=(4)
-HEADS_ARRAY=(4)
-EPOCHS_ARRAY=(100)
+LAYERS_ARRAY=(1)
+HEADS_ARRAY=(1)
+EPOCHS_ARRAY=(100 1000)
 TRAIN_STEPS_ARRAY=(100000)
-# CONTEXT_LENGTH_ARRAY=(3 6 24 36)
-# EMBD_DIM_ARRAY=(4)
 CONTEXT_LENGTH_ARRAY=(12 24 36)
-EMBD_DIM_ARRAY=(64 768)
+EMBD_DIM_ARRAY=(64 256)
 BATCH_SIZE_ARRAY=(256)
 DOMAIN_CONFIG_ARRAY=("domains.ini")
 EXPERIMENT_TYPE="multi_domain"  # define the experiment you are running
@@ -23,7 +21,7 @@ EXPERIMENT_TYPE="multi_domain"  # define the experiment you are running
 TRACKER_FILE="tracker.txt"
 
 # Initialize starting run number - scan existing runs once at the beginning
-initialize_run
+initialize_run 9
 NEXT_RUN_NUMBER=$RUN_NUMBER
 
 # Function to submit a single experiment job

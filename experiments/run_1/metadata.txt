@@ -1,4 +1,4 @@
-Run 1
+Run 6
 Dataset tr
 Number of steps: 100,000
 Multiple domains: 1
@@ -9,7 +9,7 @@ Task parameters:
   Agent parameters:
     {'alpha': 0.78, 'beta': 2.05, 'tau': 1.43, 'policy': 'probability_matching'}
 
-Run 1
+Run 6
 Dataset v
 Number of steps: 1,000,000
 Multiple domains: 1
@@ -22,169 +22,169 @@ Task parameters:
 
 
 Model name: model_seen9M
-  Num Parameters: 201088
+  Num Parameters: 944
 
-Tokens seen: 116,736,000
+Tokens seen: 29,568,000
 
-Total batch size: 6,144
+Total batch size: 1,536
 
-Max steps: 19,000
+Max steps: 19,250
 
 Dataloader parameters:
 
-File trained on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1tr.txt
+File trained on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6tr.txt
 
-File validated on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+File validated on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
   Batch size (B): 256
-  Sequence length (T): 12
-  Steps per epoch: 380
+  Sequence length (T): 3
+  Steps per epoch: 385
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
 
-Run: 1
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M.txt'
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M.txt'
 Model used for guessing: model_seen9M
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp0.txt'
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp0.txt'
 Model used for guessing: model_seen9M_cp0
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp11400.txt'
-Model used for guessing: model_seen9M_cp11400
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp11550.txt'
+Model used for guessing: model_seen9M_cp11550
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp13300.txt'
-Model used for guessing: model_seen9M_cp13300
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp13475.txt'
+Model used for guessing: model_seen9M_cp13475
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp15200.txt'
-Model used for guessing: model_seen9M_cp15200
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp15400.txt'
+Model used for guessing: model_seen9M_cp15400
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp17100.txt'
-Model used for guessing: model_seen9M_cp17100
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp17325.txt'
+Model used for guessing: model_seen9M_cp17325
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp1900.txt'
-Model used for guessing: model_seen9M_cp1900
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp1925.txt'
+Model used for guessing: model_seen9M_cp1925
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp3800.txt'
-Model used for guessing: model_seen9M_cp3800
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp3850.txt'
+Model used for guessing: model_seen9M_cp3850
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp5700.txt'
-Model used for guessing: model_seen9M_cp5700
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp5775.txt'
+Model used for guessing: model_seen9M_cp5775
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp7600.txt'
-Model used for guessing: model_seen9M_cp7600
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp7700.txt'
+Model used for guessing: model_seen9M_cp7700
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
-Run: 1
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8
+Run: 6
 
-Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/pred_model_seen9M_cp9500.txt'
-Model used for guessing: model_seen9M_cp9500
+Filename: '/n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/pred_model_seen9M_cp9625.txt'
+Model used for guessing: model_seen9M_cp9625
 
-Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_1/seqs/behavior_run_1v.txt
+Data guessed on: /n/home10/ccheung/Transformers_for_Modeling_Decision_Sequences/experiments/run_6/seqs/behavior_run_6v.txt
 
 GPTConfig parameters:
-  Block size: 12
+  Block size: 3
   Vocab size: 4
-  Number of layers: 4
-  Number of heads: 4
-  Embedding size: 64
+  Number of layers: 1
+  Number of heads: 1
+  Embedding size: 8

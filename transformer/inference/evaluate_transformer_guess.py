@@ -117,7 +117,7 @@ def main(run=None, model_name=None):
         logger.raw(f'\nAnalysis for Domain {domain}')
         print_accuracy(data)
         print_switches(data)
-        plot_confusion_matrix(data, run, model_name, domain)
+        # plot_confusion_matrix(data, run, model_name, domain)
 
 if __name__ == "__main__":
     print('-' * 80)
