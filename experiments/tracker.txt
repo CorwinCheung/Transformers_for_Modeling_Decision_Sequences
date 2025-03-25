@@ -1,0 +1,16 @@
+Experiments Varying Agent and Environment
+
+run1: basic, 100 epochs, 100000 train steps, 4 layers, 4 heads, 12 context length, 64 embedding dimensions, three_domains.ini
+--> Train on a single agent in an 80/20 environment, the model can capture the switching and high port behavior easily
+
+run2: multi_domain, 100 epochs, 100000 train steps, 4 layers, 4 heads, 12 context length, 64 embedding dimensions, domains.ini
+--> Train on agents in different domains, 90/10 and 70/30, the model can capture both behaviors 
+
+run3: agents_test, 100 epochs, 100000 train steps, 12 layers, 12 heads, 24 context length, 64 embedding dimensions, sticky_unsticky_agent_domains.ini
+--> Train on two agents, one very sticky one very unsticky on the 80/20 domain, The model correctly can perform these two behaviors in testing
+
+run4: environment_test, 100 epochs, 100000 train steps, 12 layers, 12 heads, 12 context length, 64 embedding dimensions, three_domains.ini
+--> Train same agent on domains 90/10 and 70/30, test to see if it can perform switching behavior for both, hopefully same parameters, switching behavior curve changes
+
+run5: environment_test (generalization), 100 epochs, 100000 train steps, 12 layers, 12 heads, 12 context length, 64 embedding dimensions, three_domains.ini
+--> Train on domains 80/20 and 70/30, Test on domain 90/10, see if it generalizes the switching behavior, it can't quite do this, no feedback loop
