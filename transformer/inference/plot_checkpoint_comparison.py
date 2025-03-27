@@ -55,7 +55,11 @@ def main(run=None, suffix: str = 'v'):
     if len(domains) == 1:
         axes = axes.reshape(3, 1)
 
+    # When generating the colormap, use numbers without 'cp' prefix as keys
     cmap = generate_checkpoint_colormap(checkpoint_labels=checkpoint_files)
+    # Process the colormap to use bare numbers as keys
+    cmap['colors'] = {label.replace('cp', ''): color 
+                      for label, color in cmap['colors'].items()}
     cmap['colors']['ground truth'] = 'k'
 
     for pred_file, indices_file in zip(checkpoint_files, indices_files):

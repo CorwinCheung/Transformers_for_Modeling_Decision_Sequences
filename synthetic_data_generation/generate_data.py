@@ -10,10 +10,12 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-from agent import RFLR_mouse
-from environment import Original_2ABT_Spouts
+from .agent import RFLR_mouse
+from .environment import Original_2ABT_Spouts
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the current directory to the path 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import utils.file_management as fm
 from pprint import pformat
 

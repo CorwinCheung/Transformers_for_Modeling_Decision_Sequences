@@ -3,7 +3,7 @@ setup_environment
 
 # Parameters for experiment sweeps (or single)
 LAYERS_ARRAY=(1 2)
-HEADS_ARRAY=(2)
+HEADS_ARRAY=(1 2)
 EPOCHS_ARRAY=(100)
 TRAIN_STEPS_ARRAY=(100000)
 CONTEXT_LENGTH_ARRAY=(36)
@@ -26,7 +26,7 @@ initialize_run
 NEXT_RUN_NUMBER=$RUN_NUMBER
 
 # At the top of your script
-MAX_CONCURRENT_JOBS=12
+MAX_CONCURRENT_JOBS=13
 # Function to count currently running/pending jobs
 count_running_jobs() {
     local username=$(whoami)

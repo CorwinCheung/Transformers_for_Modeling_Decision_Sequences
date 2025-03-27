@@ -10,16 +10,4 @@ transformer/wandb/*
 **/*.log
 **/*.csv
 experiments/*
-!experiments/run_1/
-!experiments/run_1_mini/
-!experiments/run_2/
-!experiments/run_3/
-!experiments/run_4/
-!experiments/run_5/
-!experiments/run_1/metadata.txt
-!experiments/run_1_mini/metadata.txt
-!experiments/run_2/metadata.txt
-!experiments/run_3/metadata.txt
-!experiments/run_4/metadata.txt
-!experiments/run_5/metadata.txt
 slurm_scripts/slurm_output/*
