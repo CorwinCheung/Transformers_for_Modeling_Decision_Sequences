@@ -1,0 +1,18 @@
+I want to test if the transformer can capture a long term dependency within its context length and the control will be a long term dependency outside of its context length
+
+
+
+===== Pattern-Specific Evaluation (Pattern Length: 11) =====
+Overall Accuracy: 0.5278 (52775/99988)
+Pattern Position Accuracy: 0.5300 (4817/9089)
+Non-Pattern Position Accuracy: 0.5276 (47958/90899)
+Pattern Position 'R' Prediction Rate: 0.5300 (4817/9089)
+Pattern Positions containing 'R' in ground truth: 1.0000 (9089/9089)
+
+
+===== Pattern-Specific Evaluation (Pattern Length: 13) =====
+Overall Accuracy: 0.5355 (53545/99988)
+Pattern Position Accuracy: 0.8614 (6625/7691)
+Non-Pattern Position Accuracy: 0.5084 (46920/92297)
+Pattern Position 'R' Prediction Rate: 0.8614 (6625/7691)
+Pattern Positions containing 'R' in ground truth: 1.0000 (7691/7691)
