@@ -5,7 +5,12 @@ import sys
 
 
 def get_latest_run():
-    """Find the highest numbered run directory."""
+    """
+    Find the highest numbered run directory.
+    
+    Returns:
+        int: Highest run number, or 0 if no runs exist
+    """
     base_path = os.path.dirname(os.path.dirname(__file__))
     run_dirs = glob.glob(os.path.join(base_path, "experiments", "run_*"))
     if not run_dirs:
@@ -14,7 +19,15 @@ def get_latest_run():
 
 
 def get_run_dir(run=None):
-    """Get the directory for a specific run, defaulting to latest."""
+    """
+    Get the directory for a specific run, defaulting to latest.
+    
+    Args:
+        run (int, optional): Run number. If None, uses the latest run.
+        
+    Returns:
+        str: Full path to the run directory
+    """
     base_path = os.path.dirname(os.path.dirname(__file__))
     if run is None:
         run = get_latest_run()
@@ -22,7 +35,17 @@ def get_run_dir(run=None):
 
 
 def ensure_run_dir(run, overwrite=True, subdir=None):
-    """Create run directory and subdirectory if they don't exist."""
+    """
+    Create run directory and subdirectory if they don't exist.
+    
+    Args:
+        run (int): Run number
+        overwrite (bool): Whether to overwrite existing directory
+        subdir (str, optional): Subdirectory name within run directory
+        
+    Returns:
+        str: Full path to the created directory
+    """
     run_dir = get_run_dir(run)
     if subdir:
         run_dir = os.path.join(run_dir, subdir)
@@ -32,7 +55,17 @@ def ensure_run_dir(run, overwrite=True, subdir=None):
 
 
 def get_file_path(filename, run=None, create_dir=False):
-    """Get full path for a file in a run directory."""
+    """
+    Get full path for a file in a run directory.
+    
+    Args:
+        filename (str): Name of the file
+        run (int, optional): Run number. If None, uses the latest run.
+        create_dir (bool): Whether to create the directory if it doesn't exist
+        
+    Returns:
+        str: Full path to the file
+    """
     if run is None:
         run = get_latest_run()
     run_dir = get_run_dir(run)
@@ -42,7 +75,8 @@ def get_file_path(filename, run=None, create_dir=False):
 
 
 def get_experiment_file(filename_template, run=None, suffix='tr', subdir=None):
-    """Get path to an experiment-specific file.
+    """
+    Get path to an experiment-specific file.
     
     Args:
         filename_template (str): Template like 'behavior_run_{}.txt'
@@ -66,7 +100,18 @@ def get_experiment_file(filename_template, run=None, suffix='tr', subdir=None):
 
 
 def format_tokens(tokens):
-    """Format the number of tokens to a concise string label (K, M, B, etc.)."""
+    """
+    Format the number of tokens to a concise string label (K, M, B, etc.)
+    
+    Args:
+        tokens (int): Number of tokens
+        
+    Returns:
+        str: Formatted string (e.g., "500K", "2M")
+        
+    Raises:
+        ValueError: If tokens is negative
+    """
     if tokens < 0:
         raise ValueError("Token count cannot be negative.")
     
@@ -81,7 +126,16 @@ def format_tokens(tokens):
 
 
 def parse_model_info(run=None, model_name=None):
-    """Parse model information from metadata.txt"""
+    """
+    Parse model information from metadata.txt
+    
+    Args:
+        run (int, optional): Run number. If None, uses the latest run.
+        model_name (str, optional): Filter for specific model name
+        
+    Returns:
+        dict: Dictionary containing parsed model information
+    """
     metadata_file = get_experiment_file("metadata.txt", run)
     model_info = {
         'model_name': None,
@@ -124,18 +178,42 @@ def parse_model_info(run=None, model_name=None):
 
 
 def get_latest_model_name(run=None):
-    """Get the name of the latest model based on tokens seen."""
+    """
+    Get the name of the latest model based on tokens seen.
+    
+    Args:
+        run (int, optional): Run number. If None, uses the latest run.
+        
+    Returns:
+        str: Latest model name
+    """
     model_info = parse_model_info(run)
     return model_info['model_name']
 
 
 def read_sequence(file_name):
+    """
+    Read a sequence from a file.
+    
+    Args:
+        file_name (str): Path to the file to read
+        
+    Returns:
+        str: Sequence as a single string with whitespace removed
+    """
     with open(file_name, 'r') as f:
         events = f.read().replace("\n", "").replace(" ", "")
     return events
 
 
 def write_sequence(file_name, data):
+    """
+    Write a sequence to a file with line breaks every 100 characters.
+    
+    Args:
+        file_name (str): Path to the output file
+        data (list): List of characters to write
+    """
     with open(file_name, 'w') as f:
         for i, char in enumerate(data):
             if i % 100 == 0 and i > 0:
@@ -144,7 +222,18 @@ def write_sequence(file_name, data):
 
 
 def get_relative_path(full_path):
-    """# Get the repository name and relative path"""
+    """
+    Get the repository name and relative path.
+    
+    Args:
+        full_path (str): Full path to a file
+        
+    Returns:
+        str: Path relative to the repository root
+        
+    Raises:
+        ValueError: If repository name is not found in the path
+    """
     repo_name = "Transformers_for_Modeling_Decision_Sequences"
     try:
         # Find the position of the repository name in the path
@@ -156,15 +245,27 @@ def get_relative_path(full_path):
 
 
 def convert_to_local_path(original_path):
+    """
+    Convert a path from the repository to a local path.
+    
+    Args:
+        original_path (str): Original path in the repository
+        
+    Returns:
+        str: Converted local path
+    """
     relative_path = get_relative_path(original_path)
     return os.path.join(os.path.expanduser("~"), "GitHub", relative_path)
 
 
 def check_files_exist(*filepaths, verbose=True):
-    """Check if all specified files exist.
+    """
+    Check if all specified files exist.
 
     Args:
         *filepaths: Variable number of file paths to check
+        verbose (bool): Whether to print information about missing files
+        
     Returns:
         bool: True if all files exist, False otherwise
     """
@@ -181,6 +282,11 @@ def check_files_exist(*filepaths, verbose=True):
 
 
 class ConditionalFormatter(logging.Formatter):
+    """
+    Custom formatter that handles conditional formatting of log messages.
+    
+    This formatter allows for bypassing the standard formatting for certain messages.
+    """
     def __init__(self, fmt=None, datefmt=None):
         super().__init__(fmt, datefmt)
     
@@ -195,23 +301,39 @@ class ConditionalFormatter(logging.Formatter):
 
 
 class FormattedLogger(logging.LoggerAdapter):
+    """
+    Custom logger adapter that adds formatting options.
+    
+    This adapter extends the standard logger with a raw method for
+    outputting messages without the standard formatting.
+    """
     def __init__(self, logger, extra):
         super().__init__(logger, extra)
     
     def raw(self, msg, *args):
-        """Log a message without the standard formatting"""
+        """
+        Log a message without the standard formatting.
+        
+        Args:
+            msg (str): Message to log
+            *args: Arguments for string formatting
+        """
         if args:
             msg = msg % args
         self.logger.info(msg, extra={'no_format': True})
 
 
 def setup_logging(run_number, component_name, module_name=None):
-    """Set up logging for experiment scripts.
+    """
+    Set up logging for experiment scripts.
     
     Args:
         run_number (int): The experiment run number
         component_name (str): Name of the component for log file (e.g., 'data_generation', 'training')
         module_name (str, optional): Name of the module for logger. If None, uses component_name
+        
+    Returns:
+        FormattedLogger: Configured logger instance
     """
     run_dir = get_run_dir(run_number)
     log_dir = os.path.join(run_dir, 'logs')

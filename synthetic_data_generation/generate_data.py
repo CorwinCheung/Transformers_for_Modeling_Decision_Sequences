@@ -1,11 +1,8 @@
 import configparser
 import cProfile
-import glob
-import io
 import os
 import pstats
 import random
-# Add the project root directory to Python path
 import sys
 
 import matplotlib.pyplot as plt
@@ -13,8 +10,8 @@ import numpy as np
 from agent import RFLR_mouse
 from environment import Original_2ABT_Spouts
 
+# Add paths
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Add the current directory to the path 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import utils.file_management as fm
 from pprint import pformat
@@ -22,39 +19,51 @@ from pprint import pformat
 logger = None
 
 def initialize_logger(run_number):
+    """Set up logger for data generation"""
     global logger
     logger = fm.setup_logging(run_number, 'data_generation', 'generate_data')
 
 def parse_args():
+    """Parse command-line arguments"""
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--run', type=int, default=None)
-    parser.add_argument('--profile', type=bool, default=False)
+    parser = argparse.ArgumentParser(description="Generate synthetic data for two-armed bandit task")
+    parser.add_argument('--run', type=int, default=None, 
+                      help='Run number')
+    parser.add_argument('--profile', type=bool, default=False,
+                      help='Profile code execution')
     parser.add_argument('--no_overwrite', action='store_false', default=True,
-                        help='Pass flag to prevent overwriting existing data')
-    parser.add_argument('--num_steps_train', type=int, default=100000)
-    parser.add_argument('--num_steps_val', type=int, default=100000)
+                      help='Prevent overwriting existing data')
+    parser.add_argument('--num_steps_train', type=int, default=100000,
+                      help='Training steps')
+    parser.add_argument('--num_steps_val', type=int, default=100000,
+                      help='Validation steps')
     # Agent parameters
-    parser.add_argument('--alpha', type=float, default=None)
-    parser.add_argument('--beta', type=float, default=None)
-    parser.add_argument('--tau', type=float, default=None)
-    parser.add_argument('--policy', type=str, default=None)
-
+    parser.add_argument('--alpha', type=float, default=None,
+                      help='Agent: Weight for recent choices')
+    parser.add_argument('--beta', type=float, default=None,
+                      help='Agent: Weight for reward information')
+    parser.add_argument('--tau', type=float, default=None,
+                      help='Agent: Decay rate for reward history')
+    parser.add_argument('--policy', type=str, default=None,
+                      help='Agent: Action selection policy')
     # Environment parameters
-    parser.add_argument('--high_reward_prob', type=float, default=0.8)
-    parser.add_argument('--low_reward_prob', type=float, default=0.2)
-    parser.add_argument('--transition_prob', type=float, default=0.02)
+    parser.add_argument('--high_reward_prob', type=float, default=0.8,
+                      help='Env: High reward probability')
+    parser.add_argument('--low_reward_prob', type=float, default=0.2,
+                      help='Env: Low reward probability')
+    parser.add_argument('--transition_prob', type=float, default=0.02,
+                      help='Env: Probability of spouts switching')
     parser.add_argument('--multiple_domains', action='store_true', default=False,
-                        help='Whether to vary parameters across sessions')
+                      help='Use multiple parameter domains')
     parser.add_argument('--domain_id', type=str, default=None,
-                        help='shortcut to task parameters, overrides individual param args')
-    # Add a new argument for config file
+                      help='Specific domain ID from config')
     parser.add_argument('--config_file', type=str, default='domains.ini',
-                        help='Configuration file for domains (domains.ini or three_domains.ini)')
+                      help='Config file for domains')
     return parser.parse_args()
 
 
 def load_param_sets(config_file='domains.ini'):
+    """Load parameter sets from config file"""
     config_path = os.path.join(os.path.dirname(__file__), config_file)
     config = configparser.ConfigParser()
     config.read(config_path)
@@ -62,19 +71,31 @@ def load_param_sets(config_file='domains.ini'):
     task_params = {}
     for section in config.sections():
         task_params[section] = {
-            'environment': eval(config[section]['environment']) ,
+            'environment': eval(config[section]['environment']),
             'agent': eval(config[section]['agent'])
         }
     return task_params
 
 
 def generate_session(num_trials, agent, environment):
-    """Generate data for a single session with specified number of trials."""
+    """
+    Generate data for a single session with specified number of trials.
+    
+    Args:
+        num_trials (int): Number of trials to generate
+        agent (RFLR_mouse): Agent instance
+        environment (Original_2ABT_Spouts): Environment instance
+        
+    Returns:
+        tuple: (behavior_data, high_port_data)
+            behavior_data (list): List of behavior tokens (L, l, R, r)
+            high_port_data (list): List of high port positions
+    """
     behavior_data = []
     high_port_data = []
     high_port = environment.high_spout_position
 
-    for step in range(num_trials):
+    for _ in range(num_trials):
         choice = agent.make_choice()
         reward, transitioned = environment.step(choice)
         if choice == 0:  # Left choice
@@ -90,10 +111,19 @@ def generate_session(num_trials, agent, environment):
 
 
 def get_session_params(task_params):
-    """Randomly select parameters for a session from predefined sets."""
-
-    # For now, keep environment and agent behaviors locked together, so choose
-    # them together by ID
+    """
+    Randomly select parameters for a session from predefined sets.
+    
+    Args:
+        task_params (dict): Dictionary of task parameters by domain ID
+        
+    Returns:
+        tuple: (domain_id, env_params, agent_params)
+            domain_id (str): Selected domain ID
+            env_params (dict): Environment parameters for this session
+            agent_params (dict): Agent parameters for this session
+    """
+    # Choose a domain ID randomly
     domain_id = random.choice(list(task_params.keys()))
     env_params = task_params[domain_id]['environment']
     agent_params = task_params[domain_id]['agent']
@@ -101,25 +131,8 @@ def get_session_params(task_params):
 
 
 def configure_task_params(task_params, multiple_domains=False, config_file='domains.ini'):
-    """Configure task parameters based on whether multiple domains are used,
-    or whether any parameters are provided.
-    
-    Args:
-        task_params (dict): Dictionary containing task parameters for
-        environment and agent. Each domain should have environment and agent
-        params. These can be None if no parameters are provided.
-        multiple_domains (bool): Whether to use multiple domains/parameter
-        sets.
-        config_file (str): Configuration file for domains (domains.ini or three_domains.ini)
-        
-    Returns:
-        dict: Configured task parameters. If multiple_domains is False,
-        returns dict with single 'B' domain. If True, returns original
-        multi-domain dict. Fills in defaults if not multiple_cdomains and no
-        parameters are provided.
-    """
-
-    # If task_params is empty, load from file
+    """Configure task parameters based on inputs"""
+    # Load from file if empty
     if not task_params:
         task_params = load_param_sets(config_file)
         
@@ -130,6 +143,8 @@ def configure_task_params(task_params, multiple_domains=False, config_file='doma
                      'beta': 2.1,
                      'tau': 1.4,
                      'policy': 'probability_matching'}
+    
+    # If not using multiple domains, use single domain with defaults
     if (not multiple_domains) and (not any([task_params.get(k, False) for k in ['A', 'B', 'C']])):
         task_params['environment'] = task_params.get('environment', default_environment)
         task_params['agent'] = task_params.get('agent', default_agent)
@@ -138,7 +153,20 @@ def configure_task_params(task_params, multiple_domains=False, config_file='doma
 
 
 def generate_data(num_steps, task_params=None, multiple_domains=False):
-    """Generate data across multiple sessions with varying parameters."""
+    """
+    Generate data across multiple sessions with varying parameters.
+    
+    Args:
+        num_steps (int): Total number of steps to generate
+        task_params (dict): Dictionary of task parameters by domain ID
+        multiple_domains (bool): Whether to use multiple domains
+        
+    Returns:
+        tuple: (behavior_data, high_port_data, session_transitions)
+            behavior_data (list): List of behavior tokens
+            high_port_data (list): List of high port positions
+            session_transitions (list): List of (trial_number, domain_id) tuples
+    """
     behavior_data = []
     high_port_data = []
     session_transitions = []
@@ -150,11 +178,12 @@ def generate_data(num_steps, task_params=None, multiple_domains=False):
     while total_trials < num_steps:
         # Generate number of trials for this session
         session_trials = int(np.random.normal(trials_per_session_mean, trials_per_session_std))
-        session_trials = max(0, min(session_trials, num_steps - total_trials))  # Ensure reasonable bounds
+        session_trials = max(0, min(session_trials, num_steps - total_trials))
 
         # Get parameters for this session
         domain_id, env_params, agent_params = get_session_params(task_params)
         session_transitions.append((total_trials, domain_id))
+        
         # Initialize environment and agent for this session
         environment = Original_2ABT_Spouts(**env_params)
         agent = RFLR_mouse(**agent_params)
@@ -172,13 +201,14 @@ def generate_data(num_steps, task_params=None, multiple_domains=False):
 
 
 def plot_profiling_results(stats):
+    """Plot profiling results to visualize performance bottlenecks"""
     function_names = []
     cumulative_times = []
 
     # Extract top functions based on cumulative time
     for func, stat in stats.stats.items():
         filename, lineno, func_name = func
-        cumulative_time = stat[3]  # cumulative time is the 4th element in stat tuple
+        cumulative_time = stat[3]  # cumulative time is the 4th element
         if cumulative_time > 0.01:
             function_names.append(f"{lineno}({func_name})")
             cumulative_times.append(cumulative_time)
@@ -194,12 +224,7 @@ def plot_profiling_results(stats):
 
 
 def write_session_transitions(filepath, session_transitions):
-    """Write session transition data (and if multiple_domains, domain transitions) to file.
-    
-    Args:
-        filepath (str): Path to output file
-        session_transitions (list): List of (trial_number, domain_id) tuples
-    """
+    """Write session transition data to file"""
     with open(filepath, 'w') as f:
         for trial, domain in session_transitions:
             f.write(f"{trial},{domain}\n")
@@ -215,21 +240,19 @@ def main(
         task_params=None,
         multiple_domains=False,
         config_file='domains.ini'):
-
+    """Generate synthetic data for reinforcement learning agents"""
     initialize_logger(run)
-    # Format the dictionary nicely
     args_str = pformat(locals(), indent=2)
     logger.info("Starting data generation with args:\n%s", args_str)
 
-    # Get next run number.
+    # Get next run number
     next_run = run or (fm.get_latest_run() + 1)
     run_dir = fm.ensure_run_dir(next_run, subdir='seqs')
 
     datasets = ['tr', 'v'] if include_val else ['tr']
-    # If num_steps is a single value, repeat it for each dataset
     num_steps = [num_steps_train, num_steps_val] if include_val else [num_steps_train]
 
-    # Configure task parameters here to make logging easier.
+    # Configure task parameters
     task_params = configure_task_params(task_params, multiple_domains, config_file)
 
     for N, suffix in zip(num_steps, datasets):
@@ -249,6 +272,7 @@ def main(
         else:
             behavior_data, high_port_data, session_transitions = generate_data(N, task_params, multiple_domains)
 
+        # Write data to files
         fm.write_sequence(behavior_filename, behavior_data)
         fm.write_sequence(high_port_filename, high_port_data)
         write_session_transitions(sessions_filename, session_transitions)
@@ -265,9 +289,10 @@ def main(
                 meta_file.write(f"{' '*2}Environment parameters:\n{' '*4}{params['environment']}\n")
                 meta_file.write(f"{' '*2}Agent parameters:\n{' '*4}{params['agent']}\n")
             meta_file.write(f"\n")
-        logger.info(f"Generated data for run_{next_run}")
-        logger.info(f"Files saved to {run_dir}")
-    logger.info(f"Metadata saved to {metadata_filename}")
+        logger.info(f"Generated {len(behavior_data)} steps for {suffix} in run_{next_run}")
+    
+    logger.info(f"Data generation complete for run_{next_run}")
+    return next_run
 
 
 if __name__ == "__main__":

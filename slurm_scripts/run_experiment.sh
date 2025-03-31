@@ -9,8 +9,6 @@
 #SBATCH --time=01:00:00  
 #SBATCH --mem=150GB
 #SBATCH --partition=kempner
-#SBATCH --output=slurm_output/%j.out
-#SBATCH --error=slurm_output/%j.err
 
 # Source common functions
 source "./slurm_scripts/common_functions.sh"

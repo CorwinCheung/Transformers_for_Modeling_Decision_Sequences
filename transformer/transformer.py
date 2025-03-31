@@ -1,4 +1,3 @@
-import inspect
 import os
 import sys
 from dataclasses import dataclass
@@ -12,12 +11,14 @@ from torch.nn import functional as F
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.file_management import get_experiment_file, read_sequence
 
+# Set random seed for reproducibility
 seed = 200
 torch.manual_seed(seed)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(seed)
 
 class CausalSelfAttention(nn.Module):
+    """Causal self-attention layer with masking"""
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
@@ -48,6 +49,7 @@ class CausalSelfAttention(nn.Module):
 
 
 class MLP(nn.Module):
+    """Multi-layer perceptron for transformer block"""
     def __init__(self, config):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
@@ -60,6 +62,7 @@ class MLP(nn.Module):
 
 
 class Block(nn.Module):
+    """Transformer block with attention and MLP"""
     def __init__(self, config):
         super().__init__()
         self.ln_1 = nn.LayerNorm(config.n_embd)
@@ -82,6 +85,7 @@ class Block(nn.Module):
 
 @dataclass
 class GPTConfig:
+    """Configuration for the GPT model"""
     block_size: int = 12
     vocab_size: int = 4
     n_layer: int = 1
@@ -91,6 +95,7 @@ class GPTConfig:
 
 
 class GPT(nn.Module):
+    """GPT-style transformer model for sequence prediction"""
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -101,7 +106,7 @@ class GPT(nn.Module):
             'ln_f': nn.LayerNorm(config.n_embd),
         })
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        self.lm_head.weight = self.transformer.wte.weight
+        self.lm_head.weight = self.transformer.wte.weight  # Weight tying
         self.apply(self._init_weights)
         self.device = config.device
 
@@ -115,7 +120,7 @@ class GPT(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def combine_logits_by_group(self, logits, targets, group_label=''):
-
+        """Combine logits by grouping tokens (choice or reward)"""
         group_idcs = {
             'choice': [[0, 1], [2, 3]],  # Right and left
             'reward': [[0, 2], [1, 3]]   # Reward and unreward
@@ -126,17 +131,14 @@ class GPT(nn.Module):
 
         for i, idcs in enumerate(group_idcs.get(group_label)):
             grouped_logits.append(logits[:, :, idcs].sum(dim=2))
-            # Create a boolean mask for targets
-            mask = torch.isin(targets, torch.tensor(idcs).to(self.device))  # Porting across devices may be costly
-            combined_targets[mask] = i  # Assign the group index to combined_targets
+            mask = torch.isin(targets, torch.tensor(idcs).to(self.device))
+            combined_targets[mask] = i
     
-        # Create a new logits tensor with shape [batch_size, sequence_length, 2]
-        combined_logits = torch.stack(grouped_logits, dim=2)  # Shape: [batch_size, sequence_length,            
-
+        combined_logits = torch.stack(grouped_logits, dim=2)
         return combined_logits, combined_targets
 
     def calculate_loss(self, logits, targets=None, choice_only=False, by_feature=False):
-        
+        """Calculate loss with different options (full, choice-only, or by feature)"""
         if choice_only:
             logits_choice, targets_choice = self.combine_logits_by_group(logits, targets, 'choice')
             loss = F.cross_entropy(logits_choice.view(-1, logits_choice.size(-1)),
@@ -156,6 +158,7 @@ class GPT(nn.Module):
         return loss
 
     def forward(self, idx, targets=None, return_attn_weights=False, **kwargs):
+        """Forward pass through the model"""
         B, T = idx.size()
         assert T <= self.config.block_size, f"Sequence length {T} exceeds block size {self.config.block_size}"
 
@@ -172,13 +175,14 @@ class GPT(nn.Module):
 
         logits = self.lm_head(self.transformer.ln_f(x))
         loss = self.calculate_loss(logits, targets, **kwargs)
+        
         if return_attn_weights:
-            # Each attn_weights is of shape (batch_size, num_heads, seq_len, seq_len)
             return logits, loss, attn_weights_all_layers
         return logits, loss
 
     @classmethod
     def from_pretrained(cls, model_type):
+        """Load pre-trained GPT-2 model weights"""
         from transformers import GPT2LMHeadModel
         config_args = {
             'gpt2': dict(n_layer=12, n_head=12, n_embd=768),
@@ -202,6 +206,7 @@ class GPT(nn.Module):
         return model
 
     def configure_optimizers(self, weight_decay, learning_rate, device, master_process):
+        """Configure optimizer with weight decay for training"""
         params = {pn: p for pn, p in self.named_parameters() if p.requires_grad}
         decay_params = [p for n, p in params.items() if p.dim() >= 2]
         nodecay_params = [p for n, p in params.items() if p.dim() < 2]
@@ -209,44 +214,40 @@ class GPT(nn.Module):
             {'params': decay_params, 'weight_decay': weight_decay},
             {'params': nodecay_params, 'weight_decay': 0.0}
         ]
-        num_decay_params = sum(p.numel() for p in decay_params)
-        num_nodecay_params = sum(p.numel() for p in nodecay_params)
+        
         if master_process:
+            num_decay_params = sum(p.numel() for p in decay_params)
+            num_nodecay_params = sum(p.numel() for p in nodecay_params)
             print(f"num decayed parameter tensors: {len(decay_params)}, with {num_decay_params:,} parameters")
             print(f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters")
-        fused = 'fused' in inspect.signature(torch.optim.AdamW).parameters and device.type == 'cuda'
+            
+        fused = 'fused' in torch.optim.AdamW.__init__.__code__.co_varnames and device.type == 'cuda'
         optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=(0.9, 0.95), eps=1e-8, fused=fused)
         return optimizer
 
 
 class BaseDataLoader:
+    """Base data loader for sequence data"""
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
-        """Initialize data loader for training or validation.
-        
-        Args:
-            B (int): Batch size
-            T (int): Sequence length
-            process_rank (int): Rank of current process for DDP
-            num_processes (int): Total number of processes for DDP
-            run_number (int, optional): Run number to load. Defaults to latest run.
-            suffix (str, optional): Dataset suffix ('tr' or 'v'). Defaults to 'tr'.
-        """
-
-        self.B = B
-        self.T = T
+        self.B = B  # Batch size
+        self.T = T  # Sequence length
         self.process_rank = process_rank
         self.num_processes = num_processes
         
-        # Get the behavior file path using the file management utility
+        # Load data
         behavior_file = get_experiment_file("behavior_run_{}.txt", run_number, suffix, subdir='seqs')
         text = read_sequence(behavior_file)
+        
+        # Load session transition points
         sessions_file = behavior_file.replace('behavior', 'session_transitions')
         self.session_transitions = []
         with open(sessions_file, 'r') as f:
             for line in f:
                 self.session_transitions.append(int(line.strip().split(',')[0]))
-        self.valid_indices = self.get_valid_indices(T + 1)  # +1 because we need T+1 tokens for x and y
+                
+        self.valid_indices = self.get_valid_indices(T + 1)  # +1 for x and y
         
+        # Convert text to tokens
         vocab = ['R', 'r', 'L', 'l']
         stoi = {ch: i for i, ch in enumerate(vocab)}
         tokens = [stoi[ch] for ch in text if ch in stoi]
@@ -258,7 +259,7 @@ class BaseDataLoader:
         self.behavior_file = behavior_file
 
     def get_valid_indices(self, min_length):
-        """Get all valid starting indices for sequences of at least min_length."""
+        """Get indices where valid sequences of length min_length can start"""
         valid_indices = []
         prev_transition = 0
         
@@ -271,10 +272,11 @@ class BaseDataLoader:
         return torch.tensor(valid_indices, dtype=torch.long)
         
 class DataLoader(BaseDataLoader):
+    """Data loader for sequence prediction tasks"""
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         super().__init__(B, T, process_rank, num_processes, run_number, suffix)
 
-        # Assign indices to processes
+        # Assign indices to processes for distributed training
         self.indices_per_process = len(self.valid_indices) // num_processes
         start_idx = process_rank * self.indices_per_process
         end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
@@ -285,13 +287,15 @@ class DataLoader(BaseDataLoader):
         self.suffix = suffix
 
     def handle_batch_overflow(self):
+        """Reset position when we run out of batches"""
         if self.suffix == 'tr':
-            self.current_position = torch.randint(low=0, high=50, size=(1,)).item()  # to diversify batches
+            # For training, add some randomness to diversify batches
+            self.current_position = torch.randint(low=0, high=50, size=(1,)).item()
         else:
             self.current_position = 0
     
     def next_batch(self, return_indices=False):
-        """Get next batch of data."""
+        """Get next batch of data"""
         B, T = self.B, self.T
 
         if self.current_position + B > len(self.process_valid_indices):
@@ -300,10 +304,11 @@ class DataLoader(BaseDataLoader):
         # Get starting indices for this batch
         batch_start_indices = self.process_valid_indices[self.current_position:self.current_position+B]
     
-        # Create a tensor of shape [B, T] with all required indices
+        # Create a tensor with all required indices
         offsets = torch.arange(T).unsqueeze(0).expand(B, -1)
         indices = batch_start_indices.unsqueeze(1) + offsets
-        # Get x and y in a vectorized way
+        
+        # Get x and y tensors
         x = self.tokens[indices]
         y = self.tokens[indices + 1]
 
@@ -315,13 +320,12 @@ class DataLoader(BaseDataLoader):
         return x, y
 
 class DataLoaderLite(DataLoader):
+    """Lighter data loader that avoids overlapping contexts"""
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         super().__init__(B, T, process_rank, num_processes, run_number, suffix)
-        # self.current_position = 0 # self.B * self.T * self.process_rank
         self.valid_indices = self.filter_overlapping_indices(self.valid_indices, T)
-        # self.batches_per_epoch = len(self.valid_indices) // (self.B * self.T)
 
-        # Assign indices to processes
+        # Reassign indices to processes
         self.indices_per_process = len(self.valid_indices) // num_processes
         start_idx = process_rank * self.indices_per_process
         end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
@@ -332,18 +336,11 @@ class DataLoaderLite(DataLoader):
         self.suffix = suffix
 
     def handle_batch_overflow(self):
-        self.current_position = 0 # self.B * self.T * self.process_rank
+        """Reset position when out of batches"""
+        self.current_position = 0
     
     def filter_overlapping_indices(self, indices, context_length):
-        """Filter out indices that would be included within the context length of other indices.
-        
-        Args:
-            indices (torch.Tensor): Tensor of valid starting indices
-            context_length (int): Context length (T)
-            
-        Returns:
-            torch.Tensor: Filtered indices with no overlaps
-        """
+        """Filter indices to avoid overlapping contexts"""
         if len(indices) == 0:
             return indices
             
@@ -362,19 +359,20 @@ class DataLoaderLite(DataLoader):
         return torch.tensor(filtered_indices, dtype=torch.long)
     
 class DataLoaderShuffle(DataLoader):
+    """Data loader that shuffles indices for each epoch"""
     def __init__(self, B, T, process_rank, num_processes, run_number=None, suffix='tr'):
         super().__init__(B, T, process_rank, num_processes, run_number, suffix)
         
-        torch.manual_seed(200 + process_rank)  # Use different seed for each process
+        torch.manual_seed(200 + process_rank)  # Different seed per process
 
-         # Assign indices to processes
+        # Shuffle and assign indices to processes
         start_idx = process_rank * self.indices_per_process
         end_idx = start_idx + self.indices_per_process if process_rank < num_processes - 1 else len(self.valid_indices)
         self.shuffled_indices = torch.randperm(len(self.valid_indices))
         self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
         
     def handle_batch_overflow(self):
-        # Reshuffle for next epoch
+        """Reshuffle for next epoch"""
         self.current_position = 0
         torch.manual_seed(200 + self.process_rank + int(torch.randint(1, 1000, (1,)).item()))
         self.shuffled_indices = torch.randperm(len(self.valid_indices))
@@ -383,12 +381,11 @@ class DataLoaderShuffle(DataLoader):
         self.process_valid_indices = self.shuffled_indices[start_idx:end_idx]
     
 class DDPConfig:
+    """Configuration for Distributed Data Parallel training"""
     def __init__(self):
-        # Check if we're in a SLURM environment
+        # Check environment variables
         slurm_procid = os.environ.get('SLURM_PROCID')
         slurm_localid = os.environ.get('SLURM_LOCALID')
-        
-        # Check if we're in a PyTorch DDP environment
         rank = os.environ.get('RANK')
         local_rank = os.environ.get('LOCAL_RANK')
         world_size = os.environ.get('WORLD_SIZE')
@@ -396,23 +393,19 @@ class DDPConfig:
         print(slurm_procid, rank, local_rank, world_size)
         # Determine if we're in a distributed environment
         self.ddp = (int(os.environ.get('WORLD_SIZE', 1)) > 1) or (int(os.environ.get('SLURM_NTASKS', 1)) > 1)
-        # self.ddp = (rank is not None and int(rank) != -1) or (slurm_procid is not None)
         
         if self.ddp:
             assert torch.cuda.is_available(), "need CUDA for DDP"
             
-            # Use SLURM_LOCALID for local rank
+            # Set up ranks and process group
             self.local_rank = int(os.environ.get('SLURM_PROCID')) - int(os.environ.get('SLURM_NODEID')) * int(os.environ.get('SLURM_NTASKS_PER_NODE'))
             self.rank = int(os.environ.get('SLURM_PROCID'))
             self.world_size = int(os.environ.get('WORLD_SIZE'))
-            
-            
             self.master_process = (self.rank == 0)
             
             # Initialize the process group
             try:
                 print(self.rank, self.local_rank, self.world_size)
-
                 dist.init_process_group(
                     backend="nccl",
                     timeout=timedelta(minutes=30),
@@ -441,10 +434,9 @@ class DDPConfig:
             print(f"Process {self.rank} initialized successfully: "
                   f"local_rank={self.local_rank}, master_process={self.master_process}")
         else:
+            # Single process mode
             self.rank = 0
             self.local_rank = 0
             self.world_size = 1
             self.master_process = True
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            
-        self.device_type = "cuda" if str(self.device).startswith("cuda") else "cpu"

@@ -5,41 +5,39 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils.file_management as fm
 from pprint import pformat
+
+# Import functions from generate_data to avoid duplication
 from synthetic_data_generation.generate_data import (
-    generate_data, initialize_logger, write_session_transitions
+    generate_data, initialize_logger, write_session_transitions, load_param_sets
 )
 
 def parse_args():
+    """Parse command-line arguments for custom domain data generation"""
     import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--run', type=int, default=None)
+    parser = argparse.ArgumentParser(description="Generate data with custom domain selections")
+    parser.add_argument('--run', type=int, default=None,
+                      help='Run number')
     parser.add_argument('--no_overwrite', action='store_false', default=True,
-                      help='Pass flag to prevent overwriting existing data')
-    parser.add_argument('--num_steps_train', type=int, default=100000)
-    parser.add_argument('--num_steps_val', type=int, default=1000000)
+                      help='Prevent overwriting existing data')
+    parser.add_argument('--num_steps_train', type=int, default=100000,
+                      help='Training steps')
+    parser.add_argument('--num_steps_val', type=int, default=1000000,
+                      help='Validation steps')
     parser.add_argument('--train_domains', type=str, nargs='+', default=['B'],
-                      help='Domain(s) to use for training data')
+                      help='Domains for training data')
     parser.add_argument('--val_domains', type=str, nargs='+', default=['A', 'C'],
-                      help='Domain(s) to use for validation data')
+                      help='Domains for validation data')
     parser.add_argument('--config_file', type=str, default='three_domains.ini',
-                      help='Configuration file for domains')
+                      help='Config file for domains')
     return parser.parse_args()
 
-def load_param_sets(config_file):
-    config_path = os.path.join(os.path.dirname(__file__), config_file)
-    config = configparser.ConfigParser()
-    config.read(config_path)
-
-    task_params = {}
-    for section in config.sections():
-        task_params[section] = {
-            'environment': eval(config[section]['environment']),
-            'agent': eval(config[section]['agent'])
-        }
-    return task_params
-
 def generate_data_custom_domains(num_steps, task_params, domains):
-    """Generate data using only specified domains."""
+    """
+    Generate data using only specified domains
+    
+    Raises:
+        ValueError: If none of the specified domains are found
+    """
     # Filter task_params to only include the specified domains
     filtered_params = {domain: task_params[domain] for domain in domains if domain in task_params}
     if not filtered_params:
@@ -78,32 +76,27 @@ def generate_data_custom_domains(num_steps, task_params, domains):
         # Generate session data
         session_behavior, session_high_port = generate_session(session_trials, agent, environment)
         
-        # Record session transition
+        # Record session transition and add data
         trial_num = len(behavior_data)
         session_transitions.append((trial_num, domain_id))
-        
-        # Add session data to overall data
         behavior_data.extend(session_behavior)
         high_port_data.extend(session_high_port)
     
     return behavior_data, high_port_data, session_transitions
 
 def main():
+    """Generate synthetic data with separate domains for training/validation"""
     args = parse_args()
     
-    # Get next run number
+    # Get next run number and initialize logger
     next_run = args.run or (fm.get_latest_run() + 1)
-    
-    # Initialize logger
     initialize_logger(next_run)
     
     # Load domain configurations
     task_params = load_param_sets(args.config_file)
-    
-    # Generate training data
     run_dir = fm.ensure_run_dir(next_run, subdir='seqs')
     
-    # Training data with domain B
+    # Training data with specified domains
     behavior_filename_tr = fm.get_experiment_file("behavior_run_{}.txt", next_run, "tr", subdir='seqs')
     high_port_filename_tr = fm.get_experiment_file("high_port_run_{}.txt", next_run, "tr", subdir='seqs')
     sessions_filename_tr = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, "tr", subdir='seqs')
@@ -119,7 +112,7 @@ def main():
         write_session_transitions(sessions_filename_tr, session_transitions_tr)
         print(f"Generated training data for run_{next_run} using domains {args.train_domains}")
     
-    # Validation data with domains A and C
+    # Validation data with different domains
     behavior_filename_v = fm.get_experiment_file("behavior_run_{}.txt", next_run, "v", subdir='seqs')
     high_port_filename_v = fm.get_experiment_file("high_port_run_{}.txt", next_run, "v", subdir='seqs')
     sessions_filename_v = fm.get_experiment_file("session_transitions_run_{}.txt", next_run, "v", subdir='seqs')
@@ -152,7 +145,7 @@ def main():
     print(f"Metadata saved to {metadata_filename}")
 
 if __name__ == "__main__":
-    # Need to import these inside the function to avoid circular imports
+    # Import here to avoid circular imports
     from synthetic_data_generation.agent import RFLR_mouse
     from synthetic_data_generation.environment import Original_2ABT_Spouts
     from synthetic_data_generation.generate_data import generate_session

@@ -12,4 +12,3 @@ transformer/wandb/*
 experiments/*
 !experiments/ltd
 !experiments/ltd/info.txt
-slurm_scripts/slurm_output/*
